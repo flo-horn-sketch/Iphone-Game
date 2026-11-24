@@ -1,0 +1,13 @@
+{
+  "name": "Die Fahrenden",
+  "short_name": "Fahrenden",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0D1718",
+  "theme_color": "#0D1718",
+  "icons": [
+    { "src": "app-icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "app-icon.png", "sizes": "1024x1024", "type": "image/png" }
+  ]
+}

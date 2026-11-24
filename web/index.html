@@ -1,0 +1,267 @@
+<meta charset="utf-8">
+<title>Die Fahrenden</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fahrenden">
+<meta name="theme-color" content="#0D1718">
+<link rel="apple-touch-icon" href="app-icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+/* Ein festes Spielfeld von 844 × 390 Punkten (iPhone quer), das auf jede Bildschirmgröße skaliert wird. */
+:root {
+  --nacht: #0D1718;
+  --tinte: #1B2A2B;
+  --pergament: #E8EDE6;
+  --weinrot: #2D4A47;
+  --gold: #C9963A;
+  --hellgold: #F3D27A;
+  --nachtblau: #2F4F7A;
+  --gut: #78BF5A;
+  --mittel: #F2BF40;
+  --schlecht: #D94033;
+  --titel: "Cinzel", "Trajan Pro", Georgia, serif;
+  --text: "Alegreya", Georgia, "Times New Roman", serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--nacht);
+  color: var(--pergament);
+  font-family: var(--text);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+#rahmen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: radial-gradient(ellipse at center, #1d2c2d 0%, var(--nacht) 70%);
+}
+#feld {
+  position: relative;
+  width: 844px;
+  height: 390px;
+  overflow: hidden;
+  transform-origin: center center;
+  background: var(--nacht);
+  font-size: 14px;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--hellgold); outline-offset: 2px; }
+.schirm { position: absolute; inset: 0; }
+
+/* Bilder und Platzhalter */
+.bild { display: block; width: 100%; height: 100%; object-fit: cover; }
+.platzhalter {
+  width: 100%; height: 100%;
+  display: grid; place-content: center; text-align: center; gap: 4px;
+  background: repeating-linear-gradient(135deg, #d3ddd8 0 18px, #c9d4cf 18px 36px);
+  color: var(--tinte);
+  border: 2px dashed rgba(27,42,43,.45);
+  font-family: var(--text);
+}
+.platzhalter b { font-family: var(--titel); font-size: 15px; }
+.platzhalter small { font-size: 12px; opacity: .75; }
+.symbol { display: inline-grid; place-items: center; flex: none; line-height: 1; }
+.symbol img { width: 100%; height: 100%; object-fit: contain; }
+.portrait {
+  position: relative; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+}
+.portrait .kopf {
+  position: absolute; inset: 9%; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center;
+  background: linear-gradient(160deg, var(--weinrot), #162827);
+  font-family: var(--titel); color: var(--hellgold);
+}
+.portrait .kopf img { width: 100%; height: 100%; object-fit: cover; }
+.portrait svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.portrait.tot .kopf { filter: grayscale(1); opacity: .45; }
+.portrait .marke { position: absolute; top: -4%; right: -6%; }
+
+/* Leisten */
+.leiste {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  padding: 5px 14px; border-radius: 999px;
+  background: rgba(6,12,13,.62); border: 1px solid rgba(201,150,58,.5);
+  font-family: var(--titel); font-size: 14px; font-variant-numeric: tabular-nums;
+  white-space: nowrap; z-index: 5;
+}
+.leiste .wert { display: flex; align-items: center; gap: 4px; }
+.leiste .warn { color: #ff8a7a; }
+.leiste .trenner { width: 1px; height: 16px; background: rgba(201,150,58,.5); }
+.leiste .zeit { font-family: var(--text); font-size: 13px; opacity: .75; }
+.truppe {
+  position: absolute; left: 10px; bottom: 10px; z-index: 5;
+  display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: rgba(6,12,13,.55);
+}
+.rund {
+  position: absolute; z-index: 6; width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; background: rgba(6,12,13,.62); border: 1px solid rgba(201,150,58,.45);
+  font-size: 20px;
+}
+
+/* Knöpfe */
+.hauptknopf {
+  font-family: var(--titel); font-weight: 700; font-size: 16px; color: var(--nacht);
+  padding: 9px 22px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--hellgold));
+  box-shadow: 0 3px 8px rgba(0,0,0,.45);
+}
+.hauptknopf:disabled { opacity: .4; }
+.hauptknopf:active { transform: translateY(1px); }
+
+/* Karten */
+.welt-karte, .region-blick { position: absolute; inset: 0; overflow: hidden; }
+.karte-flaeche { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.karte-flaeche svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ort {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.ort .name, .region-name {
+  font-family: var(--titel); font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  background: rgba(6,12,13,.62); white-space: nowrap;
+}
+.ort.fern { opacity: .7; }
+.ort.gewaehlt .symbol { filter: drop-shadow(0 0 8px var(--hellgold)); transform: scale(1.18); }
+.ort .symbol { transition: transform .2s; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+.wagen {
+  position: absolute; transform: translate(-50%, -115%); pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.6));
+}
+.wagen.faehrt { transition: left 2.2s ease-in-out, top 2.2s ease-in-out; }
+.region-marke {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.region-marke .region-name { font-size: 14px; padding: 4px 11px; color: var(--hellgold); }
+.region-marke.zu .region-name { color: rgba(241,228,200,.55); background: rgba(6,12,13,.4); }
+.wackeln { animation: wackeln .3s; }
+@keyframes wackeln { 25% { transform: translate(calc(-50% + 6px), -50%); } 75% { transform: translate(calc(-50% - 6px), -50%); } }
+.tafel {
+  position: absolute; right: 12px; bottom: 12px; z-index: 6; width: 270px;
+  display: flex; flex-direction: column; gap: 8px; padding: 13px;
+  background: rgba(13,23,24,.92); border: 1px solid rgba(201,150,58,.6); border-radius: 14px;
+}
+.tafel h2 { margin: 0; font-family: var(--titel); font-size: 17px; line-height: 1.1; }
+.tafel .art { font-size: 12px; opacity: .6; }
+.reihe { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aenderung { display: inline-flex; align-items: center; gap: 2px; font-family: var(--titel); font-size: 13px; font-variant-numeric: tabular-nums; }
+.plus { color: #8fd27a; }
+.minus { color: #ff8a7a; }
+.verboten { position: relative; }
+.verboten::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 2px; background: var(--schlecht); transform: rotate(-45deg); }
+.brett-mini { width: 6px; height: 14px; border-radius: 2px; background: rgba(201,150,58,.7); }
+.hinweis {
+  position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 7;
+  padding: 6px 10px; border-radius: 8px; background: rgba(0,0,0,.8);
+  font: 12px ui-monospace, Menlo, monospace; user-select: text; -webkit-user-select: text;
+}
+
+/* Überlagerte Tafeln */
+.schleier { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0,0,0,.55); animation: auf .25s ease-out; }
+@keyframes auf { from { opacity: 0; transform: scale(.96); } }
+.ereignis {
+  display: grid; grid-template-columns: 320px 360px; height: 300px;
+  border-radius: 18px; overflow: hidden; border: 1.5px solid rgba(201,150,58,.7);
+  background: rgba(13,23,24,.97); box-shadow: 0 10px 30px rgba(0,0,0,.6);
+}
+.ereignis .seite { display: flex; flex-direction: column; gap: 9px; padding: 16px; min-width: 0; }
+.ereignis h2 { margin: 0; font-family: var(--titel); font-size: 21px; color: var(--hellgold); line-height: 1.1; }
+.ereignis p { margin: 0; font-size: 16px; line-height: 1.3; }
+.ereignis .luft { flex: 1; }
+.option {
+  text-align: left; display: flex; flex-direction: column; gap: 3px;
+  padding: 7px 11px; border-radius: 10px;
+  background: rgba(45,74,71,.88); border: 1px solid rgba(201,150,58,.7);
+}
+.option:disabled { opacity: .5; background: rgba(45,74,71,.35); }
+.option .label { display: flex; align-items: center; gap: 6px; font-family: var(--titel); font-size: 14px; }
+.bericht {
+  display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 320px;
+  padding: 22px; border-radius: 18px; background: rgba(13,23,24,.96); border: 1.5px solid rgba(201,150,58,.7);
+}
+.bericht .gross { font-family: var(--titel); font-size: 20px; }
+
+/* Vorstellung */
+.vorstellung .hintergrund { position: absolute; inset: 0; }
+.vorstellung .verlauf { position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.1) 45%, rgba(0,0,0,.72)); }
+.vorstellung .kopfzeile {
+  position: absolute; left: 16px; right: 16px; top: 8px; display: flex; align-items: center; gap: 8px; z-index: 3;
+}
+.vorstellung .kopfzeile h1 { margin: 0; font-family: var(--titel); font-size: 17px; color: var(--hellgold); }
+.vorstellung .kopfzeile .leiste { position: static; transform: none; margin-left: auto; }
+.publikum { position: absolute; left: 16px; top: 46px; display: flex; gap: 3px; z-index: 3; }
+.publikum .figur { display: flex; flex-direction: column; align-items: center; }
+.buehne { position: absolute; left: 0; right: 0; top: 92px; display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 3; }
+.faden { position: relative; height: 56px; }
+.faden svg { position: absolute; inset: 0; overflow: visible; }
+.reaktion { position: absolute; top: -6px; transform: translateX(-50%); animation: auf .3s ease-out; }
+.bretter { display: flex; gap: 10px; }
+.brett {
+  position: relative; width: 84px; height: 100px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: rgba(92,61,36,.88); border: 1.5px dashed rgba(201,150,58,.5);
+  transition: transform .2s, box-shadow .2s;
+}
+.brett.voll { border-style: solid; }
+.brett.licht { border: 3px solid var(--hellgold); transform: scale(1.06); box-shadow: 0 0 16px rgba(243,210,122,.7); }
+.brett.ziel { box-shadow: 0 0 0 3px var(--hellgold); }
+.brett .nr { font-family: var(--titel); font-size: 22px; color: rgba(201,150,58,.4); }
+.hand { position: absolute; left: 16px; right: 170px; bottom: 8px; display: flex; gap: 8px; overflow-x: auto; z-index: 3; padding: 2px; }
+.nummer {
+  flex: none; width: 76px; height: 96px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: rgba(13,23,24,.88); border: 1px solid rgba(201,150,58,.5);
+  touch-action: none;
+}
+.brett .nummer { background: none; border: 0; height: 92px; }
+.nummer .wer { font-family: var(--titel); font-size: 11px; }
+.nummer.gesperrt { opacity: .4; filter: grayscale(.8); }
+.nummer.muede { opacity: .62; animation: zittern .36s infinite alternate; }
+@keyframes zittern { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+.geist { position: absolute; z-index: 30; pointer-events: none; transform: translate(-50%, -50%) scale(1.08); opacity: .92; }
+.vorhang { position: absolute; right: 18px; bottom: 34px; z-index: 4; }
+.ergebnis {
+  display: flex; flex-direction: column; align-items: center; gap: 13px;
+  padding: 20px 24px; border-radius: 18px; background: rgba(13,23,24,.95); border: 1.5px solid rgba(201,150,58,.7);
+}
+.sterne { font-size: 26px; color: var(--hellgold); letter-spacing: 4px; }
+.handel {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  background: rgba(0,0,0,.5); border: 1px solid rgba(201,150,58,.5);
+}
+.handel:disabled { opacity: .4; }
+.ende { display: grid; place-content: center; justify-items: center; gap: 16px; text-align: center; }
+.ende h1 { margin: 0; font-family: var(--titel); font-size: 30px; color: var(--hellgold); }
+
+/* Hochformat: bitte drehen */
+#drehen {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  place-content: center; justify-items: center; gap: 14px; text-align: center;
+  background: var(--nacht); color: var(--pergament); padding: 24px;
+  font-family: var(--titel); font-size: 18px;
+}
+#drehen .telefon { width: 46px; height: 80px; border: 3px solid var(--hellgold); border-radius: 10px; animation: drehen 2s ease-in-out infinite; }
+@keyframes drehen { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (max-width: 700px) { #drehen { display: grid; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div id="rahmen"><div id="feld" aria-live="polite"></div></div>
+<div id="drehen" role="status"><div class="telefon"></div><div>Dreh dein iPhone quer</div></div>
+
+<script src="logik.js" charset="utf-8"></script>
+<script src="spiel.js" charset="utf-8"></script>

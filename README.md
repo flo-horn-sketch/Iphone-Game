@@ -4,7 +4,13 @@ Ein iPhone-Spiel im Querformat: Du führst eine mittelalterliche Gauklertruppe d
 
 Dies ist der **erste spielbare Ausschnitt**: das Mittelreich mit sechs Orten, Reise auf der Karte, Vorstellungen mit Stimmungskurve und sechs Ereignisse.
 
-## Starten
+## Web-Version (ohne Mac)
+
+Im Ordner `web/` liegt derselbe Ausschnitt als Webseite, mit denselben Regeln (`web/logik.js`) und derselben `welt.json`. Sie läuft in Safari auf dem iPhone im Querformat und lässt sich über *Teilen → Zum Home-Bildschirm* wie eine App ablegen. Bilder kommen nach `web/grafiken/` und werden in `web/grafiken/vorhanden.json` eingetragen.
+
+Tests: `node --test web/tests/logik.test.js`
+
+## iPhone-App starten
 
 Du brauchst einen Mac mit **Xcode 16 oder neuer**.
 

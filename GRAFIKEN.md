@@ -27,7 +27,9 @@ Weil ein Bild nur etwa Full HD hat, gibt es eine **Weltkarte** mit allen fünf R
 
 ## Stilvorgabe (immer zuerst einfügen)
 
-> Stil für alle Bilder dieses Spiels: handgemalte Illustration in Gouache und Tusche, wie eine Mischung aus mittelalterlicher Buchmalerei und hochwertigem Bilderbuch. Warme Erdtöne, dazu tiefes Weinrot (#7A2E22), mattes Gold (#C9963A), Nachtblau (#2F4F7A) und Pergament (#F1E4C8). Sichtbare Pinselstriche, weiche Schatten, leicht körnige Papierstruktur. Erfundene, leicht fantastische mittelalterliche Welt. Keine Schrift, keine Buchstaben, keine Zahlen, kein Rahmen, kein Wasserzeichen.
+Vorbild ist Florians Beispielbild: nebliger Märchenwald in Blaugrün mit goldenen Lichtpunkten, ein kleines Mädchen auf einer Schaukel von hinten.
+
+> Stil für alle Bilder dieses Spiels: stimmungsvolle, malerische digitale Illustration, märchenhaft und leicht fantastisch, wie ein Standbild aus einem Märchenfilm. Gedämpfte Farben in kühlem Blaugrün, Nebelgrau und tiefem Waldgrün, dazu warme goldene Lichtpunkte, schwebende Glühpartikel und goldgelbe Blüten als Akzente. Weiches, diffuses Licht, Nebel und Dunst geben Tiefe, dunkle Vordergründe rahmen das Bild. Figuren eher klein, oft von hinten oder im Profil, damit die Szene erzählt. Erfundene mittelalterliche Welt. Keine Schrift, keine Buchstaben, keine Zahlen, kein Rahmen, kein Wasserzeichen.
 
 Für Bilder mit transparentem Hintergrund zusätzlich anhängen:
 
@@ -41,7 +43,7 @@ Tipp: Alle Bilder einer Gruppe im selben ChatGPT-Chat erzeugen, dann bleibt der 
 
 | Datei | Prompt |
 |---|---|
-| `karte-welt.png` | Gemalte Weltkarte eines erfundenen mittelalterlichen Königreichs, Draufsicht wie eine alte Pergamentkarte. Fünf Gebiete: oben in der Mitte eine kalte Fjordlandschaft mit verschneiten Bergen (Nordmark), in der Mitte grünes Ackerland mit Hügeln, Wäldern und einem Fluss (Mittelreich), unten links eine warme Küste mit Lagunen und Inseln (Lagunenstädte), rechts weites goldenes Grasland (Steppe), unten rechts eine helle Wüste mit Oasen (Weiße Wüste). Gebirge und Meer als natürliche Grenzen. Keine Städte, keine Straßen, keine Beschriftung. |
+| `karte-welt.png` | Weltkarte eines erfundenen mittelalterlichen Königreichs als gemalte Landschaft aus großer Höhe, fast senkrecht von oben, Nebelschwaden über den Tälern. Fünf Gebiete: oben in der Mitte eine kalte Fjordlandschaft mit verschneiten Bergen (Nordmark), in der Mitte grünes Ackerland mit Hügeln, Wäldern und einem Fluss (Mittelreich), unten links eine warme Küste mit Lagunen und Inseln (Lagunenstädte), rechts weites goldenes Grasland (Steppe), unten rechts eine helle Wüste mit Oasen (Weiße Wüste). Gebirge und Meer als natürliche Grenzen. Keine Städte, keine Straßen, keine Beschriftung. |
 | `karte-mittelreich.png` | Gemalte Landkarte des Mittelreichs aus leicht schräger Vogelperspektive: sanfte grüne Hügel, Felder in Flicken, kleine Wälder, links ein Bach, in der Mitte ein breiter Fluss, oben ein dunkler Wald, oben rechts ein felsiger Hügel, unten rechts eine Senke mit Wiesen. Viel freie Fläche für Orte. Keine Häuser, keine Burgen, keine Straßen, keine Beschriftung. |
 | `karte-nordmark.png` | Gemalte Landkarte der Nordmark: Fjorde, dunkle Nadelwälder, verschneite Pässe, Gletscher, kaltes graublaues Licht. Keine Siedlungen, keine Wege, keine Beschriftung. *(für später)* |
 | `karte-lagunen.png` | Gemalte Landkarte der Lagunenstädte: warme Küste, türkisfarbene Lagunen, kleine Inseln, Zypressen, Sandbänke, Abendlicht. Keine Siedlungen, keine Wege, keine Beschriftung. *(für später)* |
@@ -60,7 +62,7 @@ Tipp: Alle Bilder einer Gruppe im selben ChatGPT-Chat erzeugen, dann bleibt der 
 
 ### Porträts (1024 × 1024)
 
-Gemeinsamer Zusatz für alle Porträts: *Brustbild, Blick leicht zur Seite, warmer neutraler Hintergrund, Gesicht gut erkennbar, auch klein lesbar.*
+Gemeinsamer Zusatz für alle Porträts: *Hier ausnahmsweise nah: Brustbild von vorn, Blick leicht zur Seite, nebliger blaugrüner Hintergrund mit wenigen goldenen Lichtpunkten, Gesicht warm beleuchtet und gut erkennbar, auch klein lesbar.*
 
 | Datei | Prompt |
 |---|---|
@@ -74,7 +76,7 @@ Gemeinsamer Zusatz für alle Porträts: *Brustbild, Blick leicht zur Seite, warm
 
 ### Bühnen (1536 × 1024)
 
-Gemeinsamer Zusatz: *Blick vom Publikum auf eine leere Bühne, abends, Fackellicht, untere Bildhälfte ruhig und dunkel, damit Karten darauf gut lesbar sind.*
+Gemeinsamer Zusatz: *Blick vom Publikum auf eine leere Bühne, abends im Nebel, warmes Fackellicht und goldene Funken, untere Bildhälfte ruhig und dunkel, damit Karten darauf gut lesbar sind.*
 
 | Datei | Prompt |
 |---|---|
@@ -106,7 +108,7 @@ Gemeinsamer Zusatz: *Dramatische Szene wie eine gemalte Bildtafel, das Wichtigst
 
 ### Symbole (1024 × 1024, transparent)
 
-Gemeinsamer Zusatz: *Einfaches, kräftiges Symbol, wenig Details, klar erkennbar in 20 Pixel Größe, goldene Konturen.*
+Gemeinsamer Zusatz: *Einfaches, kräftiges Symbol, wenig Details, klar erkennbar in 20 Pixel Größe, warm leuchtendes Gold mit blaugrünen Schatten.*
 
 | Datei | Prompt |
 |---|---|
