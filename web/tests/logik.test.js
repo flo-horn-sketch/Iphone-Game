@@ -86,3 +86,32 @@ test("Vorstellung zahlt, Kloster verbietet Feuer, Handel kostet Münzen", () => 
   assert.equal(s.resources.coins, 1);
   assert.throws(() => L.kaufen(s, "food"));
 });
+
+test("Wünsche: passende Nummer bringt mehr, Wiederholung langweilt", () => {
+  const ort = { kind: "village", likes: ["humor"], banned: [] };
+  const w = L.programmBewerten([m("a", "humor"), m("b", "humor"), m("c", "heart")], ["humor", "tension", "heart"]);
+  assert.equal(w[0].punkte, 3);
+  assert.equal(w[1].gaehnen, true);
+  assert.equal(w[1].punkte, 0);
+  assert.equal(w[2].punkte, 3);
+  const lueckeWertung = L.programmBewerten([m("a", "humor"), null, m("c", "humor")], ["humor", "x", "humor"]);
+  assert.equal(lueckeWertung[2].gaehnen, false);
+  const wuensche = L.wuenscheErzeugen(ort, L.neuerZufall(3));
+  assert.equal(wuensche.length, 3);
+  for (let i = 1; i < wuensche.length; i++) assert.notEqual(wuensche[i], wuensche[i - 1]);
+});
+
+test("Vorstellung mit Wünschen zahlt Applaus aus", () => {
+  const w = laden();
+  const s = L.neuesSpiel(w, 11);
+  const wuensche = L.wuenscheFuer(s, w);
+  const vorher = s.resources.food;
+  const e = L.auftretenMitWuenschen(s, ["jorin", null, "berta"], w);
+  assert.equal(e.nummern.length, 2);
+  assert.deepEqual(e.nummern.map((n) => n.brett), [0, 2]);
+  assert.equal(e.applaus, e.nummern.reduce((a, n) => a + n.punkte, 0));
+  assert.equal(s.resources.food, vorher + e.reward.food);
+  assert.equal(s.wuensche, null);
+  assert.equal(s.tutorial.vorstellung, true);
+  assert.ok(wuensche.length === 3);
+});

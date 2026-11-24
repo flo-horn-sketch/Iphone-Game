@@ -207,6 +207,8 @@
       seenEvents: [],
       visits: { [w.start.place]: 1 },
       rng: neuerZufall(seed),
+      wuensche: null,
+      tutorial: { karte: false, vorstellung: false },
     };
   }
 
@@ -299,6 +301,7 @@
     s.location = ziel;
     s.visits[ziel] = (s.visits[ziel] || 0) + 1;
     bericht.event = ereignisWaehlen(s, weg, w);
+    s.wuensche = wuenscheErzeugen(w.ort(ziel), s.rng);
     return bericht;
   }
 
@@ -376,6 +379,115 @@
     return ergebnis;
   }
 
+
+  // ---------- Vorstellung mit Publikumswünschen ----------
+  // Über jedem Bühnenbrett steht ein Wunsch des Publikums (ein Gefühl).
+  // Jede Nummer bringt Applaus: passt sie zum Wunsch 3, sonst 1. Dasselbe
+  // Gefühl direkt hintereinander langweilt (0). Stars (Können 4–5) +1,
+  // Erschöpfte oder Kranke −1. Riskante Nummern bringen +1, können aber
+  // misslingen. Alles davon zeigt die Karte schon vor dem Vorhang.
+
+  const GEFUEHLE = ["tension", "humor", "wonder", "heart"];
+
+  function wuenscheErzeugen(ort, rng) {
+    const topf = ort.likes.concat(ort.likes, ort.likes, GEFUEHLE);
+    const wuensche = [];
+    for (let i = 0; i < BRETTER[ort.kind]; i++) {
+      let f = topf[zufallsIndex(rng, topf.length)];
+      for (let versuch = 0; versuch < 6 && f === wuensche[i - 1]; versuch++) f = topf[zufallsIndex(rng, topf.length)];
+      wuensche.push(f);
+    }
+    return wuensche;
+  }
+
+  const pannenRisiko = (m) => 0.15 + m.fatigue / 400 + (100 - m.health) / 400;
+
+  function nummerWert(m, wunsch, vorherGefuehl) {
+    const passt = m.feeling === wunsch;
+    const gaehnen = vorherGefuehl === m.feeling;
+    const stark = m.skill >= 4;
+    const schwach = m.fatigue > 60 || m.health < 50;
+    const riskant = RISKANT.has(m.discipline);
+    let punkte = 0;
+    if (!gaehnen) {
+      punkte = passt ? 3 : 1;
+      if (stark) punkte += 1;
+      if (riskant) punkte += 1;
+      if (schwach) punkte = Math.max(0, punkte - 1);
+    }
+    return { punkte, passt, gaehnen, stark, schwach, riskant };
+  }
+
+  /** Bewertet die Bretter von links nach rechts. Leere Bretter sind null. */
+  function programmBewerten(bretter, wuensche) {
+    let vorher = null;
+    return bretter.map((m, i) => {
+      if (!m) { vorher = null; return null; }
+      const wert = nummerWert(m, wuensche[i], vorher);
+      vorher = m.feeling;
+      return wert;
+    });
+  }
+
+  function applausLohn(applaus, ort) {
+    const a = applaus;
+    switch (ort.kind) {
+      case "village": return { food: 2 + a, coins: Math.floor(a / 4), wood: Math.floor(a / 5), morale: 0 };
+      case "market": return { food: Math.floor(a / 3), coins: 2 + a, wood: 0, morale: 0 };
+      case "castle": return { food: Math.floor(a / 4), coins: 3 + Math.round(a * 1.5), wood: Math.floor(a / 5), morale: 0 };
+      default: return { food: 3 + a, coins: 0, wood: Math.floor(a / 4), morale: 0 };
+    }
+  }
+
+  /** Spielt die Vorstellung. ids: eine Mitglieds-ID oder null pro Brett. */
+  function auftretenMitWuenschen(s, ids, w) {
+    const ort = w.ort(s.location);
+    if (!ort) throw new Error("unbekannter Ort");
+    if (!s.wuensche || s.wuensche.length !== BRETTER[ort.kind]) s.wuensche = wuenscheErzeugen(ort, s.rng);
+    const bretter = ids.map((id) => {
+      const m = id && mitglied(s, id);
+      return m && darfAuftreten(m, ort) ? m : null;
+    });
+    const werte = programmBewerten(bretter, s.wuensche);
+    const nummern = [];
+    let applaus = 0;
+    bretter.forEach((m, i) => {
+      if (!m) return;
+      const wert = werte[i];
+      const panne = wert.riskant && !wert.gaehnen && einheit(s.rng) < pannenRisiko(m);
+      const punkte = panne ? 0 : wert.punkte;
+      applaus += punkte;
+      nummern.push({ brett: i, memberID: m.id, punkte, panne, passt: wert.passt, gaehnen: wert.gaehnen });
+    });
+    const moeglich = BRETTER[ort.kind] * 3;
+    const sterne = Math.max(1, Math.min(5, Math.round((applaus / moeglich) * 5)));
+    const lohn = applausLohn(applaus, ort);
+    lohn.morale = sterne >= 4 ? 5 : sterne <= 2 ? -5 : 0;
+    const pflege = ort.kind === "monastery" ? applaus * 2 : 0;
+
+    for (const k of ["food", "coins", "wood", "morale"]) s.resources[k] += lohn[k];
+    begrenzen(s.resources);
+    const spieler = new Set(nummern.map((n) => n.memberID));
+    for (const m of s.troupe) {
+      if (!m.isAlive) continue;
+      m.fatigue = spieler.has(m.id) ? Math.min(100, m.fatigue + 10) : Math.max(0, m.fatigue - 20);
+      if (pflege > 0) {
+        gesundheitAendern(m, pflege);
+        if (m.health >= 80) m.isSick = false;
+      }
+    }
+    const gespielteWuensche = s.wuensche;
+    s.wuensche = null;
+    if (s.tutorial) s.tutorial.vorstellung = true;
+    return { nummern, applaus, sterne, reward: lohn, healing: pflege, wuensche: gespielteWuensche };
+  }
+
+  function wuenscheFuer(s, w) {
+    const ort = w.ort(s.location);
+    if (!s.wuensche || s.wuensche.length !== BRETTER[ort.kind]) s.wuensche = wuenscheErzeugen(ort, s.rng);
+    return s.wuensche;
+  }
+
   const kannKaufen = (s, ware) => s.resources.coins >= HANDEL[ware].preis;
 
   function kaufen(s, ware) {
@@ -388,6 +500,7 @@
     neuerZufall, einheit, welt, pruefen, darfAuftreten, erwarteteKurve, wertung, lohn,
     vorstellungSpielen, neuesSpiel, lebende, mitglied, spielVorbei, jahreszeit, kannPassieren,
     reisen, optionMoeglich, entscheiden, auftreten, kannKaufen, kaufen,
+    wuenscheErzeugen, wuenscheFuer, nummerWert, programmBewerten, auftretenMitWuenschen, pannenRisiko,
     BRETTER, ORTSART, GEFUEHL, DISZIPLIN, HANDEL, START_STIMMUNG,
   };
 
