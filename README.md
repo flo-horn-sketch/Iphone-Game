@@ -6,7 +6,7 @@ Dies ist der **erste spielbare Ausschnitt**: das Mittelreich mit sechs Orten, Re
 
 ## Web-Version (ohne Mac)
 
-Im Ordner `web/` liegt derselbe Ausschnitt als Webseite, mit denselben Regeln (`web/logik.js`) und derselben `welt.json`. Sie läuft in Safari auf dem iPhone im Querformat und lässt sich über *Teilen → Zum Home-Bildschirm* wie eine App ablegen. Bilder kommen nach `web/grafiken/` und werden in `web/grafiken/vorhanden.json` eingetragen.
+Im Ordner `web/` liegt derselbe Ausschnitt als Webseite, mit denselben Regeln (`web/logik.js`) und derselben `welt.json`. Sie wird bei jedem Merge auf main unter https://flo-horn-sketch.github.io/Iphone-Game/ veröffentlicht (GitHub Pages), läuft in Safari auf dem iPhone im Querformat und lässt sich über *Teilen → Zum Home-Bildschirm* wie eine App ablegen. Bilder kommen nach `web/grafiken/` und werden in `web/grafiken/vorhanden.json` eingetragen.
 
 Tests: `node --test web/tests/logik.test.js`
 
