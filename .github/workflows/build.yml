@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  spiellogik:
+    name: Spiellogik testen
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: GameCore-Tests
+        run: swift test --package-path GameCore
+
+  web:
+    name: Web-Version testen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Spiellogik (JavaScript)
+        run: node --test web/tests/logik.test.js
+
+  app:
+    name: App bauen (Simulator)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode-Version
+        run: xcodebuild -version
+      - name: App bauen
+        run: |
+          xcodebuild build \
+            -project DieFahrenden.xcodeproj \
+            -scheme DieFahrenden \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet
