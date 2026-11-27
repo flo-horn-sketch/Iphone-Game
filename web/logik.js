@@ -1,20 +1,29 @@
-// Spiellogik von "Die Fahrenden" für die Web-Version.
-// Gleiche Regeln wie GameCore (Swift), damit App und Web gleich spielen.
+// Spiellogik von "Die Fahrenden" (Web-Version, vereinfacht).
 // Kein Zugriff auf die Seite: alles hier lässt sich mit `node --test` prüfen.
+//
+// Der ganze Kern in fünf Sätzen:
+// 1. Zwei Vorräte: Brot (jeder Weg kostet Brot) und Gold.
+// 2. In jedem Ort gibt es eine Vorstellung: Das Publikum ruft einen Wunsch,
+//    man schickt eine passende Figur, die Serie wächst. Nach jeder Nummer:
+//    „Noch eine!“ wagen oder den Hut rumgehen lassen.
+// 3. Figuren sind fit, verletzt oder tot. Verletzte treten nicht auf, das
+//    Kloster heilt sie. Wer verletzt nochmal getroffen wird, stirbt.
+// 4. Auf Märkten wirbt man mit Gold neue Künstler an.
+// 5. Jedes Kapitel hat ein Ziel: mit genug Gold an einen bestimmten Ort.
 (function (root) {
   "use strict";
 
   const MASK = (1n << 64n) - 1n;
 
-  // Zufall mit Startwert (SplitMix64), wie SeededRandom in Swift.
+  // Zufall mit Startwert (SplitMix64), damit Spielstände wiederholbar sind.
   function neuerZufall(seed) {
-    let s = BigInt.asUintN(64, BigInt(seed));
-    if (s === 0n) s = 0x9e3779b97f4a7c15n;
-    return { state: s.toString() };
+    let st = BigInt.asUintN(64, BigInt(seed));
+    if (st === 0n) st = 0x9e3779b97f4a7c15n;
+    return { state: st.toString() };
   }
 
   function naechste(rng) {
-    let state = (BigInt(rng.state) + 0x9e3779b97f4a7c15n) & MASK;
+    const state = (BigInt(rng.state) + 0x9e3779b97f4a7c15n) & MASK;
     rng.state = state.toString();
     let z = state;
     z = ((z ^ (z >> 30n)) * 0xbf58476d1ce4e5b9n) & MASK;
@@ -22,45 +31,44 @@
     return z ^ (z >> 31n);
   }
 
-  function einheit(rng) {
-    return Number(naechste(rng) >> 11n) / 2 ** 53;
-  }
-
-  function zufallsIndex(rng, anzahl) {
-    return Number(naechste(rng) % BigInt(anzahl));
-  }
+  const einheit = (rng) => Number(naechste(rng) >> 11n) / 2 ** 53;
+  const zufallsIndex = (rng, anzahl) => Number(naechste(rng) % BigInt(anzahl));
 
   // ---------- Grunddaten ----------
 
   const RISKANT = new Set(["acrobatics", "fire", "animals"]);
-  const BRETTER = { village: 3, market: 5, castle: 4, monastery: 3 };
   const ORTSART = { village: "Dorf", market: "Markt", castle: "Burg", monastery: "Kloster" };
   const GEFUEHL = { tension: "Spannung", humor: "Humor", wonder: "Staunen", heart: "Herz" };
+  const GEFUEHLE = Object.keys(GEFUEHL);
   const DISZIPLIN = {
     acrobatics: "Akrobatik", foolery: "Narretei", animals: "Tiere", juggling: "Gaukelei",
     music: "Musik", fire: "Feuer", story: "Erzählung",
   };
-  const START_STIMMUNG = 20;
-  const ESSEN_PRO_TAG = 1;
-  const HOLZ_PRO_NACHT = 1;
-  const HANDEL = { food: { preis: 3, menge: 5 }, wood: { preis: 2, menge: 3 } };
+  const GEDULD = 3;
+  const PANNE_RISIKO = 0.2;
+  const SERIE_MAX = 5;
+  const BROT_KAUF = { preis: 3, menge: 6 };
 
   function begrenzen(r) {
     r.food = Math.max(0, r.food);
     r.coins = Math.max(0, r.coins);
-    r.wood = Math.max(0, r.wood);
-    r.morale = Math.min(100, Math.max(0, r.morale));
     return r;
   }
 
   function mitgliedAnlegen(m) {
-    return Object.assign({ health: 100, fatigue: 0, isAlive: true, isSick: false }, JSON.parse(JSON.stringify(m)));
+    const kopie = JSON.parse(JSON.stringify(m));
+    delete kopie.price;
+    return Object.assign({ zustand: "fit" }, kopie);
   }
 
-  function gesundheitAendern(m, betrag) {
-    if (!m.isAlive) return;
-    m.health = Math.min(100, Math.max(0, m.health + betrag));
-    if (m.health === 0) m.isAlive = false;
+  const lebt = (m) => m.zustand !== "tot";
+  const fit = (m) => m.zustand === "fit";
+
+  /** Trifft eine Figur: fit → verletzt, verletzt → tot. */
+  function verletzen(m) {
+    if (m.zustand === "fit") m.zustand = "verletzt";
+    else if (m.zustand === "verletzt") m.zustand = "tot";
+    return m.zustand;
   }
 
   // ---------- Welt ----------
@@ -90,11 +98,12 @@
       if (!orte.has(r.from) || !orte.has(r.to)) probleme.push(`Weg ${r.from}–${r.to}: Ort fehlt`);
       if (r.days < 1) probleme.push(`Weg ${r.from}–${r.to}: mindestens 1 Tag`);
     }
+    for (const k of w.chapters) if (!orte.has(k.place)) probleme.push(`Kapitel ${k.title}: Ort fehlt`);
     for (const e of w.events) {
-      if (!e.options.length) probleme.push(`Ereignis ${e.id} ohne Optionen`);
+      if (e.options.length !== 2) probleme.push(`Ereignis ${e.id}: genau zwei Wahlen`);
       if (e.needsMember && !leute.has(e.needsMember)) probleme.push(`Ereignis ${e.id}: Mitglied fehlt`);
       for (const o of e.options) {
-        for (const m of [o.effect.recruit, o.effect.removeMember, o.effect.makeSick]) {
+        for (const m of [o.effect.recruit, o.effect.removeMember, o.effect.hurtMember]) {
           if (m && !leute.has(m)) probleme.push(`Ereignis ${e.id}: Mitglied ${m} fehlt`);
         }
       }
@@ -102,151 +111,120 @@
     return probleme;
   }
 
-  // ---------- Vorstellung ----------
-
-  function darfAuftreten(m, ort) {
-    return m.isAlive && !ort.banned.includes(m.discipline);
-  }
-
-  function staerke(m, moral) {
-    const basis = 6 + m.skill * 4;
-    const zustand = (m.health / 100) * (1 - m.fatigue / 200);
-    const geist = 0.75 + moral / 400;
-    return basis * zustand * geist;
-  }
-
-  function faktor(gefuehl, vorher, ort) {
-    let f = ort.likes.includes(gefuehl) ? 1.5 : 0.9;
-    const letzte = vorher[vorher.length - 1];
-    const vorletzte = vorher[vorher.length - 2];
-    if (letzte === gefuehl) {
-      if (vorletzte === gefuehl) return -0.5;
-      f *= 0.5;
-    }
-    if (gefuehl === "tension" && letzte === "heart") f *= 1.4;
-    return f;
-  }
-
-  const stimmungBegrenzen = (v) => Math.min(100, Math.max(0, v));
-
-  function erwarteteKurve(programm, ort, moral) {
-    let stimmung = START_STIMMUNG;
-    const kurve = [stimmung];
-    const gefuehle = [];
-    for (const m of programm) {
-      stimmung = stimmungBegrenzen(stimmung + staerke(m, moral) * faktor(m.feeling, gefuehle, ort));
-      kurve.push(stimmung);
-      gefuehle.push(m.feeling);
-    }
-    return kurve;
-  }
-
-  function wertung(stimmungen) {
-    if (!stimmungen.length) return 0;
-    let summe = 0, gewichte = 0;
-    stimmungen.forEach((s, i) => {
-      const g = i === 0 || i === stimmungen.length - 1 ? 2 : 1;
-      summe += s * g;
-      gewichte += g;
-    });
-    return Math.round(0.6 * (summe / gewichte) + 0.4 * stimmungen[stimmungen.length - 1]);
-  }
-
-  const ganz = (x) => Math.trunc(x);
-
-  function lohn(punkte, ort) {
-    const s = ganz(punkte);
-    const moral = ganz((s - 50) / 5);
-    switch (ort.kind) {
-      case "village": return { food: 2 + ganz(s / 5), coins: ganz(s / 25), wood: ganz(s / 30), morale: moral };
-      case "market": return { food: ganz(s / 10), coins: 2 + ganz(s / 4), wood: 0, morale: moral };
-      case "castle": return { food: ganz(s / 12), coins: 4 + ganz(s / 3), wood: ganz(s / 25), morale: moral };
-      default: return { food: 4 + ganz(s / 8), coins: 0, wood: ganz(s / 20), morale: moral };
-    }
-  }
-
-  function vorstellungSpielen(programm, ort, moral, rng) {
-    let stimmung = START_STIMMUNG;
-    const gefuehle = [];
-    const nummern = [];
-    for (const m of programm) {
-      const st = staerke(m, moral);
-      let delta = st * faktor(m.feeling, gefuehle, ort);
-      let panne = false;
-      const pannenChance = (RISKANT.has(m.discipline) ? 0.1 : 0.03) + m.fatigue / 400 + (100 - m.health) / 400;
-      if (einheit(rng) < pannenChance) {
-        panne = true;
-        delta = -st * 0.6;
-      } else if (RISKANT.has(m.discipline)) {
-        delta *= 0.5 + einheit(rng);
-      } else {
-        delta *= 0.85 + einheit(rng) * 0.3;
-      }
-      stimmung = stimmungBegrenzen(stimmung + delta);
-      nummern.push({ memberID: m.id, delta, mood: stimmung, mishap: panne });
-      gefuehle.push(m.feeling);
-    }
-    const punkte = wertung(nummern.map((n) => n.mood));
-    return {
-      acts: nummern,
-      score: punkte,
-      reward: lohn(punkte, ort),
-      healing: ort.kind === "monastery" ? ganz(punkte / 5) : 0,
-      curve: [START_STIMMUNG].concat(nummern.map((n) => n.mood)),
-    };
-  }
-
   // ---------- Spielstand ----------
 
   function neuesSpiel(w, seed) {
     return {
-      day: 1,
       location: w.start.place,
       resources: Object.assign({}, w.start.resources),
       troupe: w.troupe.map(mitgliedAnlegen),
+      kapitel: 0,
       seenEvents: [],
-      visits: { [w.start.place]: 1 },
       rng: neuerZufall(seed),
-      wuensche: null,
+      show: null,
       tutorial: { karte: false, vorstellung: false },
     };
   }
 
-  const lebende = (s) => s.troupe.filter((m) => m.isAlive);
-  const mitglied = (s, id) => s.troupe.find((m) => m.id === id);
-  const spielVorbei = (s) => lebende(s).length === 0 || s.resources.morale <= 0;
-  const jahreszeit = (s) => ["Frühling", "Sommer", "Herbst", "Winter"][Math.floor((s.day - 1) / 30) % 4];
+  // Eine Tour benutzt dieselbe Karte, aber einen wiederholbaren Tourplan.
+  const TOUR_LIMIT = 6;
+  const TOUR_FINALE_AB = 5;
+  const WAGEN = {
+    buehne: { name: "Bühnenwagen", text: "Fünf Künstler und die volle Startbesetzung." },
+    leicht: { name: "Leichter Wagen", text: "Vier Künstler brauchen weniger Brot. Wenzel bleibt zurück." },
+  };
+  const VERBESSERUNGEN = {
+    sicher: { name: "Generalprobe", text: "Pannenrisiko bei riskanten Nummern halbiert." },
+    finale: { name: "Große Nummer", text: "Ab Serie ×2: riskante Treffer bringen mehr Applaus, können aber eher schiefgehen." },
+    impro: { name: "Improvisation", text: "Die sichere Improvisation bringt 4 Applaus und hält die Serie." },
+  };
 
-  function allenGesundheit(s, betrag) {
-    for (const m of s.troupe) gesundheitAendern(m, betrag);
+  const wegSchluessel = (r) => [r.from, r.to].sort().join(":");
+  const tourWeg = (s, r) => !!r && (!s.tour || !s.tour.gesperrt.includes(wegSchluessel(r)));
+
+  function distanz(w, gesperrt, start, ziel) {
+    const besucht = new Set([start]);
+    let ebene = [start], n = 0;
+    while (ebene.length) {
+      if (ebene.includes(ziel)) return n;
+      const weiter = [];
+      for (const ort of ebene) for (const nach of w.nachbarn(ort)) {
+        if (besucht.has(nach) || gesperrt.includes(wegSchluessel(w.weg(ort, nach)))) continue;
+        besucht.add(nach);
+        weiter.push(nach);
+      }
+      ebene = weiter;
+      n++;
+    }
+    return Infinity;
   }
 
-  function zufallsLebender(s, bedingung) {
-    const kandidaten = s.troupe.filter((m) => m.isAlive && (!bedingung || bedingung(m)));
+  function neueTour(w, seed, wagen = "buehne") {
+    if (!Object.hasOwn(WAGEN, wagen)) throw new Error("unbekannter Wagen");
+    const s = neuesSpiel(w, seed);
+    const plan = neuerZufall(BigInt(seed) ^ 0xfad159n);
+    const finale = w.chapters[w.chapters.length - 1].place;
+    const maerkte = w.places.filter((p) => p.kind === "market");
+    const jahrmarkt = maerkte[zufallsIndex(plan, maerkte.length)].id;
+    const strassen = w.roads.map(wegSchluessel).sort();
+    const gesperrt = [];
+    // Höchstens ein gesperrter Weg und keine unerreichbaren Orte.
+    while (strassen.length) {
+      const schluessel = strassen.splice(zufallsIndex(plan, strassen.length), 1)[0];
+      if (w.places.every((o) => Number.isFinite(distanz(w, [schluessel], o.id, finale)))) {
+        gesperrt.push(schluessel);
+        break;
+      }
+    }
+    const kosten = {};
+    const offen = w.roads.filter((r) => !gesperrt.includes(wegSchluessel(r)));
+    const abkuerzung = offen[zufallsIndex(plan, offen.length)];
+    kosten[wegSchluessel(abkuerzung)] = -1;
+    s.tour = { seed: String(seed), wagen, finale, ziel: 17 + zufallsIndex(plan, 3),
+      jahrmarkt, gesperrt, kosten, schritte: 0, status: "unterwegs", perks: [], angebot: [],
+      marktStart: zufallsIndex(plan, w.recruits.length), auszahlung: null, halt: null, freigeschaltet: false };
+    if (wagen === "leicht") s.troupe = s.troupe.filter((m) => m.id !== "wenzel");
+    return s;
+  }
+
+  const tourFinale = (s) => !!s.tour && s.location === s.tour.finale && s.tour.schritte >= TOUR_FINALE_AB;
+  const tourRestweg = (s, w, von = s.location) => distanz(w, s.tour.gesperrt, von, s.tour.finale);
+  const lebende = (s) => s.troupe.filter(lebt);
+  const mitglied = (s, id) => s.troupe.find((m) => m.id === id);
+  const spielVorbei = (s) => lebende(s).length === 0 || !!(s.tour && s.tour.status !== "unterwegs");
+  const kapitel = (s, w) => s.tour ? null : w.chapters[s.kapitel] || null;
+
+  function zufallsFitter(s) {
+    const kandidaten = s.troupe.filter(fit);
     if (!kandidaten.length) return null;
     return kandidaten[zufallsIndex(s.rng, kandidaten.length)];
+  }
+
+  // ---------- Reisen ----------
+
+  /** Brot für einen Weg: je Tag ein Brot pro zwei Leute. */
+  function wegKosten(s, weg) {
+    const rabatt = s.tour ? s.tour.kosten[wegSchluessel(weg)] || 0 : 0;
+    return Math.max(1, weg.days * Math.ceil(lebende(s).length / 2) + rabatt);
   }
 
   function kannPassieren(s, e) {
     if (!e.repeatable && s.seenEvents.includes(e.id)) return false;
     if (e.needsMember) {
       const m = mitglied(s, e.needsMember);
-      return !!(m && m.isAlive);
+      return !!(m && lebt(m));
     }
     return true;
   }
 
-  function ereignisWaehlen(s, weg, w) {
+  function ereignisWaehlen(s, weg, w, hunger) {
     const offen = w.events.filter((e) => kannPassieren(s, e));
-    if (s.resources.food === 0) {
-      const hunger = offen.find((e) => e.trigger === "hunger");
-      if (hunger) return hunger;
-    }
+    if (hunger) return offen.find((e) => e.trigger === "hunger") || null;
     if (weg.kind === "forest" && einheit(s.rng) < 0.6) {
       const wald = offen.filter((e) => e.trigger === "forest");
       if (wald.length) return wald[zufallsIndex(s.rng, wald.length)];
     }
-    if (einheit(s.rng) < 0.45) {
+    if (einheit(s.rng) < 0.4) {
       const reise = offen.filter((e) => e.trigger === "travel");
       if (reise.length) return reise[zufallsIndex(s.rng, reise.length)];
     }
@@ -254,254 +232,303 @@
   }
 
   function reisen(s, ziel, w) {
-    if (!w.ort(ziel)) throw new Error("unbekannter Ort");
+    const ort = w.ort(ziel);
+    if (!ort) throw new Error("unbekannter Ort");
     const weg = w.weg(s.location, ziel);
-    if (!weg) throw new Error("kein Weg");
-    const bericht = {
-      from: s.location, to: ziel, days: weg.days, foodEaten: 0, woodBurned: 0,
-      hungryDays: 0, coldDays: 0, fellSick: [], deaths: [], event: null,
-    };
-    const lebendVorher = new Set(lebende(s).map((m) => m.id));
-    for (let t = 0; t < weg.days; t++) {
-      s.day += 1;
-      const muender = lebende(s).length * ESSEN_PRO_TAG;
-      if (s.resources.food >= muender) {
-        s.resources.food -= muender;
-        bericht.foodEaten += muender;
-      } else {
-        bericht.foodEaten += s.resources.food;
-        s.resources.food = 0;
-        bericht.hungryDays += 1;
-        s.resources.morale -= 5;
-        allenGesundheit(s, -15);
-      }
-      if (s.resources.wood >= HOLZ_PRO_NACHT) {
-        s.resources.wood -= HOLZ_PRO_NACHT;
-        bericht.woodBurned += HOLZ_PRO_NACHT;
-      } else {
-        bericht.coldDays += 1;
-        s.resources.morale -= 3;
-        allenGesundheit(s, -5);
-      }
-      for (const m of s.troupe) {
-        if (!m.isAlive) continue;
-        m.fatigue = Math.min(100, m.fatigue + 8);
-        if (m.isSick) gesundheitAendern(m, -10);
-      }
-      if (s.troupe.some((m) => m.isAlive && m.isSick) && einheit(s.rng) < 0.15) {
-        const neu = zufallsLebender(s, (m) => !m.isSick);
-        if (neu) {
-          neu.isSick = true;
-          bericht.fellSick.push(neu.id);
-        }
-      }
-      begrenzen(s.resources);
-    }
-    bericht.deaths = s.troupe.filter((m) => lebendVorher.has(m.id) && !m.isAlive).map((m) => m.id);
+    if (!tourWeg(s, weg)) throw new Error("kein offener Weg");
+    if (s.tour && (s.tour.status !== "unterwegs" || s.tour.schritte >= TOUR_LIMIT || s.tour.halt || s.tour.auszahlung || s.show)) throw new Error("die Tour kann gerade nicht weiterreisen");
+    if (s.tour) s.tour.schritte++;
+    const kosten = wegKosten(s, weg);
+    const hunger = s.resources.food < kosten;
+    s.resources.food = Math.max(0, s.resources.food - kosten);
     s.location = ziel;
-    s.visits[ziel] = (s.visits[ziel] || 0) + 1;
-    bericht.event = ereignisWaehlen(s, weg, w);
-    s.wuensche = wuenscheErzeugen(w.ort(ziel), s.rng);
+    s.show = null;
+    const geheilt = [];
+    if (ort.kind === "monastery") {
+      for (const m of s.troupe) if (m.zustand === "verletzt") { m.zustand = "fit"; geheilt.push(m.id); }
+    }
+    const bericht = { from: weg.from, to: ziel, brot: kosten, hunger, geheilt, event: ereignisWaehlen(s, weg, w, hunger) };
+    if (s.tour) s.tour.halt = { art: "ankunft", ereignis: bericht.event && bericht.event.id, geheilt };
     return bericht;
   }
 
-  function optionMoeglich(s, option) {
-    if (!option.requires) return true;
-    return lebende(s).some((m) => m.discipline === option.requires);
-  }
+  // ---------- Ereignisse ----------
 
   function entscheiden(s, option, ereignis, w) {
-    if (!optionMoeglich(s, option)) throw new Error("Option gesperrt");
     const e = option.effect || {};
-    const lebendVorher = new Set(lebende(s).map((m) => m.id));
     const vorher = Object.assign({}, s.resources);
-    const dazu = [], weg = [];
+    const dazu = [], weg = [], verletzt = [], tot = [];
     s.resources.food += e.food || 0;
     s.resources.coins += e.coins || 0;
-    s.resources.wood += e.wood || 0;
-    s.resources.morale += e.morale || 0;
     begrenzen(s.resources);
-    if (e.healthAll) allenGesundheit(s, e.healthAll);
-    if (e.healthRandom) {
-      const m = zufallsLebender(s);
-      if (m) gesundheitAendern(m, e.healthRandom);
+    const treffen = (m) => {
+      if (!m) return;
+      if (verletzen(m) === "tot") tot.push(m.id);
+      else verletzt.push(m.id);
+    };
+    if (e.hurt) {
+      // trifft eine zufällige Figur, auch schon verletzte
+      const kandidaten = lebende(s);
+      if (kandidaten.length) treffen(kandidaten[zufallsIndex(s.rng, kandidaten.length)]);
     }
-    if (e.makeSick) {
-      const m = s.troupe.find((x) => x.id === e.makeSick && x.isAlive);
-      if (m) {
-        m.isSick = true;
-        gesundheitAendern(m, -10);
-      }
+    if (e.hurtMember) {
+      const m = mitglied(s, e.hurtMember);
+      if (m && lebt(m)) treffen(m);
     }
     if (e.removeMember) {
       const i = s.troupe.findIndex((x) => x.id === e.removeMember);
-      if (i >= 0) {
-        s.troupe.splice(i, 1);
-        weg.push(e.removeMember);
-      }
+      if (i >= 0) { s.troupe.splice(i, 1); weg.push(e.removeMember); }
     }
     if (e.recruit && !mitglied(s, e.recruit)) {
       const neu = w.recruits.find((m) => m.id === e.recruit);
-      if (neu) {
-        s.troupe.push(mitgliedAnlegen(neu));
-        dazu.push(neu.id);
-      }
+      if (neu) { s.troupe.push(mitgliedAnlegen(neu)); dazu.push(neu.id); }
     }
     if (!s.seenEvents.includes(ereignis.id)) s.seenEvents.push(ereignis.id);
     return {
       outcome: option.outcome,
-      change: {
-        food: s.resources.food - vorher.food, coins: s.resources.coins - vorher.coins,
-        wood: s.resources.wood - vorher.wood, morale: s.resources.morale - vorher.morale,
-      },
-      joined: dazu,
-      left: weg,
-      deaths: s.troupe.filter((m) => lebendVorher.has(m.id) && !m.isAlive).map((m) => m.id),
+      change: { food: s.resources.food - vorher.food, coins: s.resources.coins - vorher.coins },
+      joined: dazu, left: weg, hurt: verletzt, deaths: tot,
     };
   }
 
-  function auftreten(s, ids, w) {
+  // ---------- Kapitelziel ----------
+
+  /** Ist das Kapitelziel hier und jetzt erfüllt? */
+  const zielErreichbar = (s, w) => {
+    const k = kapitel(s, w);
+    return !!k && s.location === k.place && s.resources.coins >= k.coins;
+  };
+
+  /** Ziel einlösen: Gold wird bezahlt, das nächste Kapitel beginnt. */
+  function zielEinloesen(s, w) {
+    if (!zielErreichbar(s, w)) throw new Error("Ziel nicht erreicht");
+    const k = kapitel(s, w);
+    s.resources.coins -= k.coins;
+    s.kapitel += 1;
+    for (const m of s.troupe) if (m.zustand === "verletzt") m.zustand = "fit";
+    return k;
+  }
+
+  // ---------- Vorstellung „Noch eine Nummer?“ ----------
+  // Das Publikum ruft immer nur EINEN Wunsch. Passt die Figur, gibt es
+  // Können × Serie Applaus und die Serie wächst. Passt sie nicht, gibt es
+  // 1 Applaus, die Serie reißt und das Publikum verliert Geduld. Riskante
+  // Nummern (Akrobatik, Feuer, Tiere) bringen mehr, können aber misslingen:
+  // dann ist die Figur verletzt. Ist die Geduld weg, laufen die Leute
+  // davon und der halbe Hut ist leer.
+
+  function rufWaehlen(ort, rng, vorher) {
+    const topf = ort.likes.concat(ort.likes, GEFUEHLE);
+    let f = topf[zufallsIndex(rng, topf.length)];
+    for (let i = 0; i < 6 && f === vorher; i++) f = topf[zufallsIndex(rng, topf.length)];
+    return f;
+  }
+
+  function showStarten(s, w) {
     const ort = w.ort(s.location);
-    if (!ort) throw new Error("unbekannter Ort");
-    const programm = ids.map((id) => mitglied(s, id)).filter((m) => m && darfAuftreten(m, ort));
-    const ergebnis = vorstellungSpielen(programm, ort, s.resources.morale, s.rng);
-    for (const k of ["food", "coins", "wood", "morale"]) s.resources[k] += ergebnis.reward[k];
-    begrenzen(s.resources);
-    const spieler = new Set(programm.map((m) => m.id));
-    for (const m of s.troupe) {
-      if (!m.isAlive) continue;
-      m.fatigue = spieler.has(m.id) ? Math.min(100, m.fatigue + 10) : Math.max(0, m.fatigue - 20);
-      if (ergebnis.healing > 0) {
-        gesundheitAendern(m, ergebnis.healing);
-        if (m.health >= 80) m.isSick = false;
-      }
+    if (s.tour) {
+      if (spielVorbei(s) || s.tour.auszahlung || s.show || (!s.tour.halt && (s.tour.schritte > 0 || s.tour.startAuftritt))) throw new Error("kein neuer Auftritt möglich");
+      if (!s.tour.schritte) s.tour.startAuftritt = true;
+      s.tour.halt = null;
     }
-    return ergebnis;
+    if (s.tour) s.tour.publikum = ort.likes.slice();
+    s.show = { ruf: rufWaehlen(ort, s.rng, null), applaus: 0, serie: 1, geduld: GEDULD, gespielt: [], vorbei: false, verlaufen: false, verloren: 0, offen: true, naechsterRuf: null, improvisiert: false };
+    return s.show;
   }
 
-
-  // ---------- Vorstellung mit Publikumswünschen ----------
-  // Über jedem Bühnenbrett steht ein Wunsch des Publikums (ein Gefühl).
-  // Jede Nummer bringt Applaus: passt sie zum Wunsch 3, sonst 1. Dasselbe
-  // Gefühl direkt hintereinander langweilt (0). Stars (Können 4–5) +1,
-  // Erschöpfte oder Kranke −1. Riskante Nummern bringen +1, können aber
-  // misslingen. Alles davon zeigt die Karte schon vor dem Vorhang.
-
-  const GEFUEHLE = ["tension", "humor", "wonder", "heart"];
-
-  function wuenscheErzeugen(ort, rng) {
-    const topf = ort.likes.concat(ort.likes, ort.likes, GEFUEHLE);
-    const wuensche = [];
-    for (let i = 0; i < BRETTER[ort.kind]; i++) {
-      let f = topf[zufallsIndex(rng, topf.length)];
-      for (let versuch = 0; versuch < 6 && f === wuensche[i - 1]; versuch++) f = topf[zufallsIndex(rng, topf.length)];
-      wuensche.push(f);
-    }
-    return wuensche;
+  /** Wer kann jetzt noch auftreten? */
+  function showFrei(s) {
+    const gespielt = new Set(s.show ? s.show.gespielt : []);
+    return s.troupe.filter((m) => fit(m) && !gespielt.has(m.id));
   }
 
-  const pannenRisiko = (m) => 0.15 + m.fatigue / 400 + (100 - m.health) / 400;
-
-  function nummerWert(m, wunsch, vorherGefuehl) {
-    const passt = m.feeling === wunsch;
-    const gaehnen = vorherGefuehl === m.feeling;
-    const stark = m.skill >= 4;
-    const schwach = m.fatigue > 60 || m.health < 50;
+  /** Was würde diese Figur jetzt bringen? */
+  function showVorschau(s, m) {
+    const sh = s.show;
+    const passt = m.feeling === sh.ruf;
     const riskant = RISKANT.has(m.discipline);
-    let punkte = 0;
-    if (!gaehnen) {
-      punkte = passt ? 3 : 1;
-      if (stark) punkte += 1;
-      if (riskant) punkte += 1;
-      if (schwach) punkte = Math.max(0, punkte - 1);
+    const perks = s.tour ? s.tour.perks : [];
+    const finale = riskant && perks.includes("finale") && sh.serie >= 2;
+    const risiko = riskant ? (PANNE_RISIKO + (finale ? 0.1 : 0)) * (perks.includes("sicher") ? 0.5 : 1) : 0;
+    return { passt, riskant, risiko, punkte: passt ? (m.skill + (riskant ? 1 : 0) + (finale ? 3 : 0)) * sh.serie : 1 };
+  }
+
+  function showNummer(s, id) {
+    const sh = s.show;
+    if (!sh || sh.vorbei || !sh.offen) throw new Error("gerade keine Nummer möglich");
+    const m = showFrei(s).find((x) => x.id === id);
+    if (!m) throw new Error("diese Figur kann nicht auftreten");
+    const v = showVorschau(s, m);
+    const panne = v.riskant && einheit(s.rng) < v.risiko;
+    let punkte;
+    if (panne) {
+      punkte = 0;
+      verletzen(m);
+      sh.geduld -= 1;
+      sh.serie = 1;
+    } else if (v.passt) {
+      punkte = v.punkte;
+      sh.serie = Math.min(SERIE_MAX, sh.serie + 1);
+    } else {
+      punkte = 1;
+      sh.geduld -= 1;
+      sh.serie = 1;
     }
-    return { punkte, passt, gaehnen, stark, schwach, riskant };
+    sh.applaus += punkte;
+    sh.gespielt.push(m.id);
+    if (sh.geduld <= 0) {
+      sh.vorbei = true;
+      sh.verlaufen = true;
+      sh.verloren = Math.ceil(sh.applaus / 2);
+      sh.applaus -= sh.verloren;
+    } else if (!showFrei(s).length) {
+      sh.vorbei = true;
+    }
+    sh.offen = false;
+    if (s.tour && !sh.vorbei) sh.naechsterRuf = rufWaehlen({ likes: s.tour.publikum }, s.rng, sh.ruf);
+    return { memberID: m.id, ruf: sh.ruf, passt: v.passt && !panne, panne, punkte, serie: sh.serie };
   }
 
-  /** Bewertet die Bretter von links nach rechts. Leere Bretter sind null. */
-  function programmBewerten(bretter, wuensche) {
-    let vorher = null;
-    return bretter.map((m, i) => {
-      if (!m) { vorher = null; return null; }
-      const wert = nummerWert(m, wuensche[i], vorher);
-      vorher = m.feeling;
-      return wert;
-    });
+  /** „Noch eine!“: Das Publikum ruft den nächsten Wunsch. */
+  function showWeiter(s, w) {
+    const sh = s.show;
+    if (!sh || sh.vorbei || sh.offen) throw new Error("gerade nicht möglich");
+    sh.ruf = sh.naechsterRuf || rufWaehlen(w.ort(s.location), s.rng, sh.ruf);
+    sh.naechsterRuf = null;
+    sh.offen = true;
+    return sh.ruf;
   }
 
-  function applausLohn(applaus, ort) {
+  function improvisationsKandidat(s) {
+    const sh = s.show;
+    if (!s.tour || !sh || sh.vorbei || sh.improvisiert) return null;
+    const ruf = sh.offen ? sh.ruf : sh.naechsterRuf;
+    if (!ruf) return null;
+    return showFrei(s).filter((m) => m.feeling !== ruf).sort((a, b) => a.skill - b.skill || a.id.localeCompare(b.id))[0] || null;
+  }
+
+  function showImprovisieren(s, w) {
+    const m = improvisationsKandidat(s);
+    if (!m) throw new Error("keine Improvisation möglich");
+    const sh = s.show;
+    if (!sh.offen) showWeiter(s, w);
+    const geuebt = s.tour.perks.includes("impro");
+    const punkte = geuebt ? 4 : 1;
+    sh.improvisiert = true;
+    sh.applaus += punkte;
+    if (!geuebt) sh.serie = 1;
+    sh.gespielt.push(m.id);
+    sh.vorbei = !showFrei(s).length;
+    sh.offen = false;
+    if (!sh.vorbei) sh.naechsterRuf = rufWaehlen(w.ort(s.location), s.rng, sh.ruf);
+    return { memberID: m.id, ruf: sh.ruf, passt: true, panne: false, punkte, serie: sh.serie };
+  }
+
+  function hutVorschau(s, w) {
+    const a = s.show.applaus;
+    const l = lohn(a, w.ort(s.location));
+    if (s.tour && s.location === s.tour.jahrmarkt) l.coins += Math.floor(a / 6);
+    return l;
+  }
+
+  /** Was bringt der Applaus an diesem Ort? Dörfer zahlen in Brot, Märkte und Burgen in Gold. */
+  function lohn(applaus, ort) {
     const a = applaus;
     switch (ort.kind) {
-      case "village": return { food: 2 + a, coins: Math.floor(a / 4), wood: Math.floor(a / 5), morale: 0 };
-      case "market": return { food: Math.floor(a / 3), coins: 2 + a, wood: 0, morale: 0 };
-      case "castle": return { food: Math.floor(a / 4), coins: 3 + Math.round(a * 1.5), wood: Math.floor(a / 5), morale: 0 };
-      default: return { food: 3 + a, coins: 0, wood: Math.floor(a / 4), morale: 0 };
+      case "village": return { food: 2 + Math.round(a * 0.45), coins: Math.floor(a / 8) };
+      case "market": return { food: Math.floor(a / 8), coins: 1 + Math.round(a * 0.3) };
+      case "castle": return { food: 0, coins: 2 + Math.round(a * 0.45) };
+      default: return { food: 3 + Math.round(a * 0.4), coins: 0 };
     }
   }
 
-  /** Spielt die Vorstellung. ids: eine Mitglieds-ID oder null pro Brett. */
-  function auftretenMitWuenschen(s, ids, w) {
-    const ort = w.ort(s.location);
-    if (!ort) throw new Error("unbekannter Ort");
-    if (!s.wuensche || s.wuensche.length !== BRETTER[ort.kind]) s.wuensche = wuenscheErzeugen(ort, s.rng);
-    const bretter = ids.map((id) => {
-      const m = id && mitglied(s, id);
-      return m && darfAuftreten(m, ort) ? m : null;
-    });
-    const werte = programmBewerten(bretter, s.wuensche);
-    const nummern = [];
-    let applaus = 0;
-    bretter.forEach((m, i) => {
-      if (!m) return;
-      const wert = werte[i];
-      const panne = wert.riskant && !wert.gaehnen && einheit(s.rng) < pannenRisiko(m);
-      const punkte = panne ? 0 : wert.punkte;
-      applaus += punkte;
-      nummern.push({ brett: i, memberID: m.id, punkte, panne, passt: wert.passt, gaehnen: wert.gaehnen });
-    });
-    const moeglich = BRETTER[ort.kind] * 3;
-    const sterne = Math.max(1, Math.min(5, Math.round((applaus / moeglich) * 5)));
-    const lohn = applausLohn(applaus, ort);
-    lohn.morale = sterne >= 4 ? 5 : sterne <= 2 ? -5 : 0;
-    const pflege = ort.kind === "monastery" ? applaus * 2 : 0;
+  const sterneFuer = (applaus, verlaufen) => (verlaufen ? 1 : Math.max(1, Math.min(5, Math.round(applaus / 7))));
 
-    for (const k of ["food", "coins", "wood", "morale"]) s.resources[k] += lohn[k];
+  function showKassieren(s, w) {
+    const sh = s.show;
+    if (!sh) throw new Error("keine Vorstellung");
+    if (s.tour && !sh.gespielt.length) throw new Error("zuerst eine Nummer spielen");
+    const l = hutVorschau(s, w);
+    s.resources.food += l.food;
+    s.resources.coins += l.coins;
     begrenzen(s.resources);
-    const spieler = new Set(nummern.map((n) => n.memberID));
-    for (const m of s.troupe) {
-      if (!m.isAlive) continue;
-      m.fatigue = spieler.has(m.id) ? Math.min(100, m.fatigue + 10) : Math.max(0, m.fatigue - 20);
-      if (pflege > 0) {
-        gesundheitAendern(m, pflege);
-        if (m.health >= 80) m.isSick = false;
-      }
-    }
-    const gespielteWuensche = s.wuensche;
-    s.wuensche = null;
+    s.show = null;
     if (s.tutorial) s.tutorial.vorstellung = true;
-    return { nummern, applaus, sterne, reward: lohn, healing: pflege, wuensche: gespielteWuensche };
+    const result = { applaus: sh.applaus, sterne: sterneFuer(sh.applaus, sh.verlaufen), reward: l, verlaufen: sh.verlaufen, verloren: sh.verloren };
+    if (s.tour) {
+      const t = s.tour;
+      const finale = tourFinale(s);
+      const erfolg = finale && !sh.verlaufen && sh.applaus >= t.ziel;
+      if (erfolg) t.status = "gewonnen";
+      else if (finale || t.schritte >= TOUR_LIMIT) t.status = "gescheitert";
+      const frei = Object.keys(VERBESSERUNGEN).filter((k) => !t.perks.includes(k));
+      if (t.status === "unterwegs" && sh.applaus >= 4 && !sh.verlaufen && t.perks.length < 2 && frei.length >= 2) {
+        const start = zufallsIndex(s.rng, frei.length);
+        t.angebot = [frei[start], frei[(start + 1) % frei.length]];
+      }
+      t.auszahlung = Object.assign(result, { finale, erfolg });
+    }
+    return result;
   }
 
-  function wuenscheFuer(s, w) {
+  function tourVerbessern(s, id) {
+    const t = s.tour;
+    if (!t || !t.auszahlung || !t.angebot.includes(id)) throw new Error("Verbesserung nicht verfügbar");
+    t.perks.push(id);
+    t.angebot = [];
+    return VERBESSERUNGEN[id];
+  }
+
+  function tourAufbruch(s) {
+    const t = s.tour;
+    if (!t || !t.auszahlung || t.angebot.length) throw new Error("Auszahlung/Verbesserung noch offen");
+    t.auszahlung = null;
+  }
+
+  function tourOhneAuftritt(s) {
+    if (!s.tour || !s.show || showFrei(s).length || s.show.gespielt.length) throw new Error("ein Auftritt ist möglich");
+    s.show = null;
+    if (tourFinale(s) || s.tour.schritte >= TOUR_LIMIT) s.tour.status = "gescheitert";
+  }
+
+  // ---------- Markt: Brot kaufen, Künstler anwerben ----------
+
+  const kannBrotKaufen = (s, ort) => ort.kind !== "castle" && ort.kind !== "monastery" && s.resources.coins >= BROT_KAUF.preis;
+
+  function brotKaufen(s, ort) {
+    if (!kannBrotKaufen(s, ort)) throw new Error("hier kein Brot");
+    s.resources.coins -= BROT_KAUF.preis;
+    s.resources.food += BROT_KAUF.menge;
+  }
+
+  /** Wer wartet auf diesem Markt auf Arbeit? Immer dieselbe Person pro Markt, bis sie angeworben ist. */
+  function bewerber(s, w) {
     const ort = w.ort(s.location);
-    if (!s.wuensche || s.wuensche.length !== BRETTER[ort.kind]) s.wuensche = wuenscheErzeugen(ort, s.rng);
-    return s.wuensche;
+    if (ort.kind !== "market") return null;
+    const frei = w.recruits.filter((m) => m.price && !mitglied(s, m.id));
+    if (!frei.length) return null;
+    let h = 0;
+    for (const c of ort.id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return frei[((h + s.troupe.length + (s.tour ? s.tour.marktStart : 0)) >>> 0) % frei.length];
   }
 
-  const kannKaufen = (s, ware) => s.resources.coins >= HANDEL[ware].preis;
-
-  function kaufen(s, ware) {
-    if (!kannKaufen(s, ware)) throw new Error("zu wenig Münzen");
-    s.resources.coins -= HANDEL[ware].preis;
-    s.resources[ware] += HANDEL[ware].menge;
+  function anwerben(s, w) {
+    const b = bewerber(s, w);
+    if (!b || s.resources.coins < b.price) throw new Error("kann nicht anwerben");
+    s.resources.coins -= b.price;
+    const neu = mitgliedAnlegen(b);
+    s.troupe.push(neu);
+    return neu;
   }
 
   const Logik = {
-    neuerZufall, einheit, welt, pruefen, darfAuftreten, erwarteteKurve, wertung, lohn,
-    vorstellungSpielen, neuesSpiel, lebende, mitglied, spielVorbei, jahreszeit, kannPassieren,
-    reisen, optionMoeglich, entscheiden, auftreten, kannKaufen, kaufen,
-    wuenscheErzeugen, wuenscheFuer, nummerWert, programmBewerten, auftretenMitWuenschen, pannenRisiko,
-    BRETTER, ORTSART, GEFUEHL, DISZIPLIN, HANDEL, START_STIMMUNG,
+    neuerZufall, einheit, welt, pruefen, neuesSpiel, lebende, mitglied, spielVorbei, kapitel, lebt, fit,
+    wegKosten, reisen, kannPassieren, entscheiden, zielErreichbar, zielEinloesen,
+    showStarten, showFrei, showVorschau, showNummer, showWeiter, showKassieren, lohn, sterneFuer,
+    kannBrotKaufen, brotKaufen, bewerber, anwerben,
+    neueTour, tourWeg, tourRestweg, tourFinale, tourVerbessern, tourAufbruch, tourOhneAuftritt,
+    improvisationsKandidat, showImprovisieren, hutVorschau, TOUR_LIMIT, TOUR_FINALE_AB, WAGEN, VERBESSERUNGEN,
+    ORTSART, GEFUEHL, DISZIPLIN, GEDULD, BROT_KAUF, RISKANT,
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = Logik;

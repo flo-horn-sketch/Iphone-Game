@@ -73,6 +73,13 @@ Gemeinsamer Zusatz für alle Porträts: *Hier ausnahmsweise nah: Brustbild von v
 | `portrait-wenzel.png` | Älterer Spielmann mit Laute, buntem Wams, Federhut und freundlichem Lächeln. |
 | `portrait-mira.png` | Junge Jongleurin, Flüchtling, abgetragene Kleider, entschlossener Blick, drei bunte Bälle in der Hand. |
 | `portrait-kaspar.png` | Kräftiger Bärenführer mit Vollbart, Fellweste und einer Kette in der Hand, hinter ihm der Kopf eines zahmen Braunbären. |
+| `portrait-ottilie.png` | Alte Wahrsagerin mit Kopftuch voller Münzen, dunklen Augen und einer Glaskugel in den Händen. |
+| `portrait-bruno.png` | Breitschultriger Kraftmensch mit Schnurrbart, gestreiftem Trikot und einer eisernen Hantel auf der Schulter. |
+| `portrait-fips.png` | Kleiner, frecher Spaßmacher, etwa zwölf Jahre alt, Zahnlücke, viel zu große Mütze mit Glöckchen. |
+| `portrait-selma.png` | Junge Sängerin mit langem rotem Zopf, grünem Kleid und offenem, warmem Blick, eine Hand am Herzen. |
+| `portrait-rasko.png` | Schlanker Messerwerfer mit schmalem Gesicht, Narbe über der Braue, Lederweste, drei Messer zwischen den Fingern. |
+| `portrait-lio.png` | Junger Puppenspieler mit Lockenkopf und Lachfalten, eine bemalte Holzpuppe auf der Hand. |
+| `portrait-zora.png` | Geheimnisvolle Schlangentänzerin mit goldenem Stirnschmuck, eine Schlange um die Schultern gelegt. |
 
 ### Bühnen (1536 × 1024)
 
@@ -104,6 +111,8 @@ Gemeinsamer Zusatz: *Dramatische Szene wie eine gemalte Bildtafel, das Wichtigst
 | `ereignis-fluechtlinge.png` | Eine erschöpfte Familie mit Bündeln steht am Wegrand und bittet die Gaukler um Hilfe, grauer Himmel. |
 | `ereignis-fieber.png` | Im Inneren eines Wagens liegt eine junge Seiltänzerin mit Fieber, eine alte Frau kühlt ihre Stirn, Kerzenlicht. |
 | `ereignis-baerenfuehrer.png` | Am Wegrand sitzt ein bärtiger Mann neben einem zahmen Braunbären mit Halsband und wartet. |
+| `ereignis-zoll.png` | Zwei grimmige Bewaffnete versperren eine alte Steinbrücke, davor hält der Gauklerwagen. |
+| `ereignis-kaufmann.png` | Ein dicker, reich gekleideter Kaufmann sitzt in seiner Kutsche auf der Landstraße und winkt die Gaukler heran. |
 | `ereignis-hunger.png` | Die Truppe sitzt im Schnee um ein kleines Feuer, leere Töpfe, ein Pferd steht daneben, bedrückte Stimmung. |
 
 ### Symbole (1024 × 1024, transparent)
@@ -114,16 +123,14 @@ Gemeinsamer Zusatz: *Einfaches, kräftiges Symbol, wenig Details, klar erkennbar
 |---|---|
 | `symbol-brot.png` | Ein runder Brotlaib. |
 | `symbol-muenze.png` | Eine goldene Münze mit Krone. |
-| `symbol-holz.png` | Ein Bündel Feuerholz. |
-| `symbol-moral.png` | Ein lachendes Gesicht wie eine Theatermaske. |
-| `symbol-tag.png` | Eine Sonne. |
 | `symbol-gefahr.png` | Ein Warndreieck aus Holz mit Ausrufezeichen-Form aus einem Dolch. |
 | `symbol-wald.png` | Zwei dunkle Tannen. |
 | `symbol-jubel.png` | Zwei klatschende Hände mit fliegendem Hut. |
 | `symbol-panne.png` | Ein gerissenes Seil. |
 | `symbol-gaehnen.png` | Ein gähnendes Gesicht. |
 | `symbol-schloss.png` | Ein altes Vorhängeschloss. |
-| `symbol-krank.png` | Ein grüner Fiebertropfen. |
+| `symbol-verletzt.png` | Ein gekreuzter Verband, wie ein Pflaster. |
+| `symbol-ziel.png` | Ein rotes Fähnchen an einem Holzstab. |
 | `symbol-tod.png` | Ein schlichtes Holzkreuz mit Blume. |
 | `symbol-pflege.png` | Ein Heilkräuterbündel mit rotem Band. |
 | `gefuehl-spannung.png` | Ein Blitz. |
