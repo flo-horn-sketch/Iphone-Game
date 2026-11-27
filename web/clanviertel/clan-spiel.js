@@ -442,7 +442,8 @@
       [v.art === "haupthaus" ? "🧱 Mauern" : "🏮 Heim", w.heim]].filter(([, n]) => n);
     const ertragText = { mine: "Volle Laternen: jeden Abend 1 💎 Jade.", markt: "Volle Laternen: jeden Abend 2 🪙 Gold.",
       schule: `Volle Laternen: alle ${L.REGELN.schuleTage} Tage ein neuer Kämpfer (im Rückstand alle ${L.REGELN.schuleTageRueckstand}).`,
-      haupthaus: "Jeden Abend 2 🪙. Fällt es, ist die Partie verloren." }[v.art];
+      haupthaus: "Jeden Abend 2 🪙. Fällt es, ist die Partie verloren. Angreifen darf man es erst ab Tag " + L.REGELN.friedenBis +
+        " und nur aus einem Nachbarviertel mit drei Laternen (Belagerung)." }[v.art];
     return schleier(el("div", { class: "tafel" },
       el("h2", { text: WAPPEN[v.art] + " " + v.name }),
       el("p", { text: besitzer === "p" ? "Gehört dir." : besitzer === "r" ? "Gehört " + rivalName() + "." : "Gehört niemandem. Wer zuerst dort steht, nimmt es." }),
@@ -507,7 +508,7 @@
       ziel: '[data-aktion="jade"]' },
     { id: "d4", tag: 4, text: "Mit 5 🪙 wirbst du neue Kämpfer an: <b>Wächter</b> halten, <b>Läufer</b> kommen weit, <b>Späher</b> sehen gegnerische Züge.",
       ziel: '[data-aktion="anwerben"]' },
-    { id: "d5", tag: 5, text: "Ab heute dürfen Haupthäuser angegriffen werden. Du gewinnst mit <b>7 Vierteln mit 🏮🏮🏮</b> oder mit dem Natternhaus.",
+    { id: "d5", tag: 5, text: "Ab heute dürfen Haupthäuser angegriffen werden, aber nur aus einem Nachbarviertel mit 🏮🏮🏮. Du gewinnst mit <b>7 Vierteln mit 🏮🏮🏮</b> oder mit dem Natternhaus.",
       ziel: ".fortschritt" },
   ];
 

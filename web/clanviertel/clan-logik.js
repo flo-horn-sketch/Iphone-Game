@@ -68,15 +68,15 @@
   const RIVALEN = {
     stuermer: {
       name: "Varo", titel: "der Stürmer", text: "Greift an, wo du schwach stehst. Führt selbst an der Front.",
-      truppe: ["waechter", "laeufer", "laeufer"], hqSorge: 0.5, marge: 1, maxAngriffe: 2, fuehrerVorn: true,
+      truppe: ["waechter", "laeufer", "laeufer"], hqSorge: 0.5, vorsicht: 0.5, marge: 1, maxAngriffe: 2, fuehrerVorn: true, angriffZuerst: true,
     },
     mauer: {
       name: "Hesra", titel: "die Mauer", text: "Bewacht alles und schlägt nur zu, wenn sie haushoch überlegen ist.",
-      truppe: ["waechter", "waechter", "laeufer"], hqSorge: 0.6, marge: "doppelt", maxAngriffe: 1, fuehrerVorn: false,
+      truppe: ["waechter", "waechter", "laeufer"], hqSorge: 0.7, vorsicht: 0.8, marge: 2, maxAngriffe: 2, fuehrerVorn: false,
     },
     listig: {
       name: "Sel", titel: "der Listige", text: "Seine Ansage ist eine Finte. Er greift woanders an.",
-      truppe: ["laeufer", "spaeher", "waechter"], hqSorge: 0.5, marge: 2, maxAngriffe: 2, fuehrerVorn: false, finte: true,
+      truppe: ["laeufer", "spaeher", "waechter"], hqSorge: 0.6, vorsicht: 0.6, marge: 2, maxAngriffe: 2, fuehrerVorn: false, finte: true,
     },
   };
 
@@ -213,7 +213,11 @@
   // Wohin darf eine Figur heute? Eigene Viertel und deren Nachbarn, Läufer zwei weit.
   function erreichbar(st, seite, ziel, typ) {
     if (st.besitz[ziel] === seite) return true;
-    if (ziel === HAUPTHAUS[gegner(seite)] && st.tag < REGELN.friedenBis) return false;
+    if (ziel === HAUPTHAUS[gegner(seite)]) {
+      if (st.tag < REGELN.friedenBis) return false;
+      // Belagerung: Ein Haupthaus greift man nur aus einem Nachbarviertel mit vollen Laternen an.
+      return nachbarn(ziel).some((n) => st.besitz[n] === seite && voll(st, n));
+    }
     const weite = typ === "laeufer" ? 2 : 1;
     return besitzt(st, seite).some((id) => distanz(id, ziel) <= weite);
   }
@@ -288,29 +292,32 @@
   }
 
   // Der Rivale plant mit dem, was er sieht: deine Aufstellung von gestern.
+  // Er schätzt, wo du zuschlagen könntest, verteidigt dort und greift dort an,
+  // wo du schwach stehst. Wie mutig er dabei ist, hängt von seinem Stil ab.
   function rivalePlant(st) {
     const stil = RIVALEN[st.rivale];
     const plan = {};
     const hq = HAUPTHAUS[RIVALE];
     const alle = bereit(st, RIVALE);
     const fuehrer = alle.find((f) => f.typ === "anfuehrer");
-    const frei = alle.filter((f) => f !== fuehrer).sort((a, b) => staerke(b) - staerke(a) || (a.id < b.id ? -1 : 1));
+    let frei = alle.filter((f) => f !== fuehrer).sort((a, b) => staerke(b) - staerke(a) || (a.id < b.id ? -1 : 1));
+    const spieler = bereit(st, SPIELER);
     const spielerOrt = fuehrerOrt(st, SPIELER);
-    const erwartet = (id) => {
-      const fs = bereit(st, SPIELER).filter((f) => ortVon(f) === id);
-      return wertung(st, SPIELER, id, fs, spielerOrt).summe;
-    };
+    const erwartet = (id) => wertung(st, SPIELER, id, spieler.filter((f) => ortVon(f) === id), spielerOrt).summe;
+    // Wie viel Stärke könnte der Spieler morgen in ein Viertel werfen? Alle, die es erreichen.
+    const moeglich = (id) => spieler.filter((f) => erreichbar(st, SPIELER, id, f.typ)).reduce((s, f) => s + staerke(f), 0);
+    const schonDa = (id) => alle.filter((f) => plan[f.id] === id);
 
     // Ziele bewerten.
-    const ziele = VIERTEL.filter((v) => st.besitz[v.id] !== RIVALE && erreichbar(st, RIVALE, v.id))
+    const ziele = VIERTEL.filter((v) => st.besitz[v.id] !== RIVALE && erreichbar(st, RIVALE, v.id, "laeufer"))
       .map((v) => {
         const e = erwartet(v.id);
-        const marge = stil.marge === "doppelt" ? Math.max(e, 2) : stil.marge;
+        const marge = stil.marge;
         return { id: v.id, erwartet: e, noetig: e + marge, wert: WERT[v.art] };
       })
       .sort((a, b) => (b.wert * 2 - b.noetig) - (a.wert * 2 - a.noetig) || (a.id < b.id ? -1 : 1));
 
-    // Der Führer stellt sich hinter das beste Ziel, wenn er vorn führt.
+    // Der Führer stellt sich hinter das beste Ziel, wenn er vorn führt. Sonst bleibt er zu Hause.
     let fOrt = hq;
     if (fuehrer && stil.fuehrerVorn && ziele.length) {
       const basis = besitzt(st, RIVALE).filter((id) => distanz(id, ziele[0].id) === 1)
@@ -319,35 +326,55 @@
     }
     if (fuehrer) plan[fuehrer.id] = fOrt;
 
-    // 1. Haupthaus sichern.
-    if (st.tag >= REGELN.friedenBis && erreichbar(st, SPIELER, hq)) {
-      const gesamtSpieler = bereit(st, SPIELER).reduce((s, f) => s + staerke(f), 0);
-      const drohung = Math.ceil(gesamtSpieler * stil.hqSorge) + 2;
-      const wache = () => wertung(st, RIVALE, hq, alle.filter((f) => plan[f.id] === hq), fOrt).summe;
-      while (wache() <= drohung && frei.length) plan[frei.pop().id] = hq;
-    }
+    const bewache = (id, bedarf) => {
+      // Wächter zuerst, dann die schwächsten, bis die Stärke reicht.
+      const reihe = frei.slice().sort((a, b) => ((b.typ === "waechter") - (a.typ === "waechter")) || staerke(a) - staerke(b));
+      for (const f of reihe) {
+        if (wertung(st, RIVALE, id, schonDa(id), fOrt).summe > bedarf) break;
+        plan[f.id] = id;
+        frei = frei.filter((x) => x !== f);
+      }
+    };
 
-    // 2. Angreifen, wo es sich lohnt.
-    let angriffe = 0;
+    const verteidigen = () => {
+      // 1. Haupthaus, sobald es angegriffen werden darf.
+      if (st.tag >= REGELN.friedenBis && erreichbar(st, SPIELER, hq)) {
+        bewache(hq, Math.ceil(moeglich(hq) * stil.hqSorge) + 2);
+      }
+      // 2. Bedrohte Viertel, wertvollste zuerst.
+      const bedroht = VIERTEL.filter((v) => st.besitz[v.id] === RIVALE && v.id !== hq && moeglich(v.id) > 0)
+        .sort((a, b) => (WERT[b.art] - WERT[a.art]) || (moeglich(b.id) - moeglich(a.id)) || (a.id < b.id ? -1 : 1));
+      for (const v of bedroht) {
+        if (!frei.length) break;
+        bewache(v.id, Math.ceil(moeglich(v.id) * stil.vorsicht * 0.5));
+      }
+    };
+
+    const angreifen = () => {
+      let angriffe = 0;
+      for (const z of ziele) {
+        if (angriffe >= stil.maxAngriffe) break;
+        const trupp = truppFinden(st, frei, z, fOrt);
+        if (!trupp) continue;
+        for (const f of trupp) plan[f.id] = z.id;
+        frei = frei.filter((f) => !trupp.includes(f));
+        angegriffen.push(z.id);
+        angriffe++;
+      }
+    };
+
     const angegriffen = [];
-    for (const z of ziele) {
-      if (angriffe >= stil.maxAngriffe) break;
-      const trupp = truppFinden(st, frei, z, fOrt);
-      if (!trupp) continue;
-      for (const f of trupp) { plan[f.id] = z.id; frei.splice(frei.indexOf(f), 1); }
-      angegriffen.push(z.id);
-      angriffe++;
-    }
+    // Steht der Führer vorn, bekommt er zuerst Schutz: Fällt er, ist die Partie verloren.
+    if (fOrt !== hq) bewache(fOrt, Math.ceil(moeglich(fOrt) * 0.6));
+    if (stil.angriffZuerst) { angreifen(); verteidigen(); } else { verteidigen(); angreifen(); }
 
-    // 3. Übrige Kämpfer: unsichere und bedrohte eigene Viertel bewachen.
-    const bewachen = VIERTEL.filter((v) => st.besitz[v.id] === RIVALE && v.id !== hq &&
-      (!voll(st, v.id) || nachbarn(v.id).some((n) => st.besitz[n] === SPIELER)))
-      .sort((a, b) => (st.laternen[a.id] - st.laternen[b.id]) || (WERT[b.art] - WERT[a.art]) || (a.id < b.id ? -1 : 1));
-    for (const v of bewachen) {
+    // 3. Übrige: Laternen in unsicheren Vierteln anzünden, sonst nach Hause.
+    const unsicher = VIERTEL.filter((v) => st.besitz[v.id] === RIVALE && !voll(st, v.id) && !schonDa(v.id).length)
+      .sort((a, b) => st.laternen[a.id] - st.laternen[b.id] || (a.id < b.id ? -1 : 1));
+    for (const v of unsicher) {
       if (!frei.length) break;
-      const f = frei.find((x) => x.typ === "waechter") || frei[frei.length - 1];
+      const f = frei.pop();
       plan[f.id] = v.id;
-      frei.splice(frei.indexOf(f), 1);
     }
     for (const f of frei) plan[f.id] = hq;
 
