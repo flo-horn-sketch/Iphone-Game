@@ -375,6 +375,24 @@ button:focus-visible { outline: 2px solid var(--hellgold); outline-offset: 2px; 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.tour-stand { color: var(--hellgold); font-size: 12px; white-space: nowrap; }
+.tour-detail { color: var(--hellgold); font-size: 13px; margin: 3px 0; }
+.tour-markt { position: absolute; top: -9px; left: -10px; color: var(--hellgold); text-shadow: 0 1px 4px #000; font-size: 19px; }
+.tour-naechster { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px; border-radius: 8px; background: rgba(10,22,23,.94); color: var(--hellgold); font-size: 13px; text-align: center; }
+.tour-kassiert { display: block; color: var(--hellgold); font-size: 12px; text-align: center; }
+.nummer-risiko { font-size: 10px; color: #ffd396; white-space: nowrap; }
+.finale-badge { position: absolute; top: 56px; left: 18px; z-index: 4; color: var(--hellgold); background: rgba(12,23,23,.94); padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+.tour-start { background: radial-gradient(ellipse at 52% 12%, #284a44, #0c181b 69%); padding: 24px; gap: 12px; text-align: center; }
+.tour-start h1, .tour-start p { margin: 0; }
+.tour-start p { max-width: 495px; line-height: 1.45; }
+.tour-perks { display: grid; gap: 5px; text-align: center; }
+.tour-perk-paar { display: flex; gap: 8px; justify-content: center; }
+.tour-perk-paar button { width: 190px; white-space: normal; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tour-perk-paar button span { font-size: 12px; font-weight: normal; line-height: 1.25; }
+.tour-wagen { min-height: 72px; }
+.tour-wagen:disabled, .ergebnis .hauptknopf:disabled { opacity: .5; }
+.ergebnis { max-height: 360px; overflow-y: auto; }
 </style>
 
 <div id="rahmen"><div id="feld" aria-live="polite"></div></div>
