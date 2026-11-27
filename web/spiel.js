@@ -95,6 +95,8 @@
     monastery: Array(6).fill("publikum-geistlichkeit").concat(["publikum-volk", "publikum-volk"]),
   };
 
+  const BILD_VERSION = "2";
+  const bildPfad = (datei) => "grafiken/" + encodeURIComponent(datei) + "?v=" + BILD_VERSION;
   const dateien = new Map(); // Bildname → Dateiname
   const seiten = new Map(); // Bildname → Seitenverhältnis
 
@@ -104,7 +106,7 @@
   function grossesBild(name) {
     const datei = dateien.get(name);
     if (datei) {
-      const img = el("img", { class: "bild", src: "grafiken/" + encodeURIComponent(datei), alt: "", draggable: "false" });
+      const img = el("img", { class: "bild", src: bildPfad(datei), alt: "", draggable: "false" });
       img.addEventListener("load", () => {
         const a = img.naturalWidth / img.naturalHeight;
         if (!seiten.has(name) || Math.abs(seiten.get(name) - a) > 0.01) {
@@ -123,7 +125,7 @@
   function symbol(name, px, extraClass) {
     const datei = dateien.get(name);
     const s = el("span", { class: "symbol" + (extraClass ? " " + extraClass : ""), style: { width: px + "px", height: px + "px", fontSize: Math.round(px * 0.82) + "px" }, "aria-hidden": "true" });
-    if (datei) s.append(el("img", { src: "grafiken/" + encodeURIComponent(datei), alt: "", draggable: "false" }));
+    if (datei) s.append(el("img", { src: bildPfad(datei), alt: "", draggable: "false" }));
     else s.textContent = ERSATZ[name] || "▫️";
     return s;
   }
@@ -137,7 +139,7 @@
   function portrait(m, px) {
     const datei = dateien.get(m.portrait);
     const kopf = el("div", { class: "kopf", style: { fontSize: Math.round(px * 0.42) + "px" } });
-    if (datei) kopf.append(el("img", { src: "grafiken/" + encodeURIComponent(datei), alt: "", draggable: "false" }));
+    if (datei) kopf.append(el("img", { src: bildPfad(datei), alt: "", draggable: "false" }));
     else kopf.textContent = m.name[0];
     const r = 46;
     const umfang = 2 * Math.PI * r;
@@ -959,7 +961,9 @@
 
   function tourStartSchirm() {
     const frei = wagenFrei();
+    const wagenBild = dateien.get("wagen");
     return el("div", { class: "schirm ende tour-start" },
+      wagenBild ? el("img", { class: "tour-start-art", src: bildPfad(wagenBild), alt: "" }) : null,
       el("div", { class: "kapitel-nr", text: "Die Fahrenden" }),
       el("h1", { text: "Die Wintertour" }),
       el("p", { text: "Sechs Etappen. Spiel ab Etappe fünf im Kloster St. Ilgen um dein Winterquartier. Wege und Jahrmarkt wechseln bei jeder Tour." }),
@@ -993,7 +997,7 @@
     const daten = await fetch("welt.json").then((r) => r.json());
     welt = L.welt(daten);
     try {
-      const liste = await fetch("grafiken/vorhanden.json").then((r) => (r.ok ? r.json() : []));
+      const liste = await fetch("grafiken/vorhanden.json?v=" + BILD_VERSION, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : []));
       for (const datei of liste) dateien.set(datei.replace(/\.(png|jpe?g|webp)$/i, ""), datei);
     } catch (e) { /* ohne Bilderliste: nur Platzhalter */ }
     s = (hot && hot.s && hot.s.tour && welt.ort(hot.s.location) && hot.s) || laden();
