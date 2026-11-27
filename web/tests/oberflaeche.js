@@ -27,6 +27,14 @@ async function smoke() {
     page.on("pageerror", e => errors.push(e.message));
     await page.route("**/*", route => route.request().url().startsWith(url) ? route.continue() : route.abort());
     await page.goto(url);
+    // Spielauswahl: Die Fahrenden starten, Turmwächter ist noch gesperrt.
+    assert.equal(await page.locator('[data-spiel="bald"]').getAttribute("aria-disabled"), "true");
+    await page.locator('[data-spiel="fahrenden"]').tap();
+    await page.waitForURL(/fahrenden\.html$/);
+    await page.locator('a.heim').tap();
+    await page.waitForURL(u => new URL(u).pathname === "/");
+    await page.locator('[data-spiel="fahrenden"]').tap();
+    await page.waitForURL(/fahrenden\.html$/);
     await page.locator('[data-wagen="buehne"]').waitFor();
     assert.ok(await page.locator('[data-wagen="leicht"]').isDisabled());
     await page.locator('[data-wagen="buehne"]').tap();

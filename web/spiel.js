@@ -393,6 +393,7 @@
     kartenGesten(blick, flaeche, region);
 
     const kopf = el("div", { style: { position: "absolute", left: "10px", top: "8px", display: "flex", alignItems: "center", gap: "8px", zIndex: 6 } },
+      el("a", { class: "rund heim", href: "./", "aria-label": "Spielauswahl", style: { position: "static", textDecoration: "none" } }, "⌂"),
       el("button", { class: "rund", style: { position: "static" }, "aria-label": "Weltkarte", onclick: (e) => { e.stopPropagation(); ui.schirm = "welt"; ui.gewaehlt = null; zeichnen(); } }, "🌍"),
       el("span", { style: { fontFamily: "var(--titel)", fontSize: "16px", color: "var(--hellgold)", textShadow: "0 1px 3px #000" }, text: region.name }));
 
@@ -963,6 +964,7 @@
     const frei = wagenFrei();
     const wagenBild = dateien.get("wagen");
     return el("div", { class: "schirm ende tour-start" },
+      el("a", { class: "rund heim", href: "./", "aria-label": "Spielauswahl", style: { left: "10px", top: "8px", textDecoration: "none" } }, "⌂"),
       wagenBild ? el("img", { class: "tour-start-art", src: bildPfad(wagenBild), alt: "" }) : null,
       el("div", { class: "kapitel-nr", text: "Die Fahrenden" }),
       el("h1", { text: "Die Wintertour" }),

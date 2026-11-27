@@ -68,8 +68,9 @@ jobs:
                       url = root + path + join + "verify=" + rev
                       with urllib.request.urlopen(url, timeout=10) as response:
                           return response.read() if limit is None else response.read(limit)
-                  assert 'spiel.js?v=2' in get("").decode(), "HTML nicht auf der neuen Version"
-                  assert 'BILD_VERSION = "2"' in get("spiel.js?v=2").decode(), "Skript nicht auf der neuen Version"
+                  assert 'href="fahrenden.html"' in get("").decode(), "Spielauswahl nicht auf der neuen Version"
+                  assert 'spiel.js?v=3' in get("fahrenden.html").decode(), "HTML nicht auf der neuen Version"
+                  assert 'BILD_VERSION = "2"' in get("spiel.js?v=3").decode(), "Skript nicht auf der neuen Version"
                   names = set(json.loads(get("grafiken/vorhanden.json?v=2")))
                   for name, size in [("wagen.png", (1024, 1024)), ("karte-mittelreich.png", (1536, 1024))]:
                       assert name in names, name + " fehlt im Manifest"
