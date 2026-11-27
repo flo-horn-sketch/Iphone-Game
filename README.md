@@ -2,13 +2,20 @@
 
 Ein iPhone-Spiel im Querformat: Du führst eine mittelalterliche Gauklertruppe durch ein erfundenes Königreich. Reisen kostet Vorräte, Vorstellungen bringen Brot und Münzen, und unterwegs warten Entscheidungen ohne gute Wahl.
 
-Dies ist ein **spielbarer Ausschnitt**: das Mittelreich mit sechs Orten, drei Kapiteln und acht Ereignissen. Im November 2026 wurde das Spiel stark vereinfacht: nur noch Brot und Gold, Figuren sind fit, verletzt oder tot, und die Vorstellung ist ein Wagnis („Noch eine Nummer?“).
+Dies ist ein **spielbarer Ausschnitt**: das Mittelreich mit sechs Orten und acht Reiseereignissen. In der Web-Version ziehst du auf eine kurze Wintertour. Brot und Gold bleiben die einzigen Vorräte. Figuren können sich verletzen, und jede Zugabe in „Noch eine Nummer?“ ist ein Wagnis.
 
 ## Web-Version (ohne Mac)
 
-Im Ordner `web/` liegt derselbe Ausschnitt als Webseite, mit denselben Regeln (`web/logik.js`) und derselben `welt.json`. Sie wird bei jedem Merge auf main unter https://flo-horn-sketch.github.io/Iphone-Game/ veröffentlicht (GitHub Pages), läuft in Safari auf dem iPhone im Querformat und lässt sich über *Teilen → Zum Home-Bildschirm* wie eine App ablegen. Bilder kommen nach `web/grafiken/` und werden in `web/grafiken/vorhanden.json` eingetragen.
+Im Ordner `web/` liegt der Web-Prototyp (`web/logik.js`, `web/welt.json`). Sie wird bei jedem Merge auf main unter https://flo-horn-sketch.github.io/Iphone-Game/ veröffentlicht (GitHub Pages), läuft in Safari auf dem iPhone im Querformat und lässt sich über *Teilen → Zum Home-Bildschirm* wie eine App ablegen. Bilder kommen nach `web/grafiken/` und werden in `web/grafiken/vorhanden.json` eingetragen.
 
-Tests: `node --test web/tests/logik.test.js`
+### Wintertour (Roguelite-Prototyp)
+
+- Pro Tour wechseln gesperrter Weg, Abkürzung, Jahrmarkt, Marktbesetzung und Reiseereignisse. Eine Tour hat höchstens sechs Reiseetappen.
+- Ab Etappe fünf ist der Auftritt in St. Ilgen das Finale. Verdienst du dort den geforderten Applaus, habt ihr das Winterquartier erreicht. Andernfalls endet die Tour.
+- Zwischen Nummern siehst du die aktuelle Auszahlung und den nächsten Wunsch. Einmal pro Show kannst du sicher improvisieren. Zwei gewählte Verbesserungen können pro Tour die Truppe prägen.
+- Nach der ersten gewonnenen Tour ist der leichtere Wagen als alternative Startbesetzung verfügbar. Touren haben einen eigenen lokalen Spielstand; ältere Kapitel-Spielstände werden nicht überschrieben.
+
+Logiktests: `node --test web/tests/*.test.js`. Browser-Smoke mit Playwright: `node web/tests/oberflaeche.js` (optional Pfad zu Chromium als Argument).
 
 ## iPhone-App starten
 

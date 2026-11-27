@@ -6,7 +6,8 @@
   const L = window.Logik;
   const FELD_B = 844;
   const FELD_H = 390;
-  const SPEICHER = "diefahrenden-spielstand-v2";
+  const SPEICHER = "diefahrenden-tour-v1";
+  const WAGEN_SPEICHER = "diefahrenden-leichter-wagen";
   const BEARBEITEN = location.hash === "#bearbeiten";
 
   const feld = document.getElementById("feld");
@@ -195,7 +196,7 @@
       const roh = localStorage.getItem(SPEICHER);
       if (!roh) return null;
       const g = JSON.parse(roh);
-      return g && welt.ort(g.location) ? g : null;
+      return g && g.tour && welt.ort(g.location) ? g : null;
     } catch (e) {
       return null;
     }
@@ -209,10 +210,34 @@
 
   const ortHier = () => welt.ort(s.location);
 
+  function wagenFrei() {
+    if (s && s.tour.status === "gewonnen") return true;
+    try { return localStorage.getItem(WAGEN_SPEICHER) === "ja"; } catch (e) { return false; }
+  }
+
+  function tourStarten(wagen) {
+    s = L.neueTour(welt, neuerStartwert(), wagen);
+    Object.assign(ui, { schirm: "region", region: ortHier().region, gewaehlt: null, reise: null, karte: null, pan: null, vorst: null, hinweis: null });
+    speichern();
+    zeichnen();
+  }
+
+  function tourAnkunftWiederherstellen() {
+    const h = s.tour.halt;
+    if (!h) return;
+    const e = h.ereignis && welt.ereignis(h.ereignis);
+    if (h.art === "folge" && e) ui.karte = { art: "folge", ereignis: e, folge: h.folge, geheilt: h.geheilt };
+    else if (e) ui.karte = { art: "ereignis", ereignis: e, geheilt: h.geheilt };
+    else if (h.geheilt.length) ui.karte = { art: "heilung", geheilt: h.geheilt };
+    else { ankommen(); return; }
+    zeichnen();
+  }
+
   // ---------- Zeichnen ----------
 
   function zeichnen() {
     feld.replaceChildren();
+    if (!s) { feld.append(tourStartSchirm()); return; }
     if (ui.schirm === "welt") feld.append(weltSchirm());
     else if (ui.schirm === "region") feld.append(regionSchirm());
     else if (ui.schirm === "vorstellung") feld.append(vorstellungSchirm());
@@ -229,7 +254,8 @@
       wert("symbol-brot", r.food, r.food < n * 2),
       wert("symbol-muenze", r.coins),
       k ? el("span", { class: "trenner" }) : null,
-      k ? zielAnzeige(k) : null);
+      k ? zielAnzeige(k) : null,
+      s.tour ? el("span", { class: "tour-stand", title: "Winterquartier: " + welt.ort(s.tour.finale).name + " · " + s.tour.ziel + " Applaus im Finale", text: s.tour.schritte + "/" + L.TOUR_LIMIT + " Etappen" }) : null);
   }
 
   // Kapitelziel: Fähnchen, Zielort und wie viel Gold noch fehlt, als Balken.
@@ -324,22 +350,23 @@
     for (const weg of welt.roads) {
       const a = welt.ort(weg.from), b = welt.ort(weg.to);
       if (a.region !== region.id || b.region !== region.id) continue;
-      const vonHier = !ui.reise && (weg.from === s.location || weg.to === s.location);
-      const farbe = vonHier ? "#F3D27A" : "rgba(27,42,43,.85)";
-      const strich = weg.kind === "forest" ? "10 8" : "none";
+      const offen = L.tourWeg(s, weg);
+      const vonHier = offen && !ui.reise && (weg.from === s.location || weg.to === s.location);
+      const farbe = !offen ? "#9c635c" : vonHier ? "#F3D27A" : "rgba(27,42,43,.85)";
+      const strich = !offen ? "3 7" : weg.kind === "forest" ? "10 8" : "none";
       const pos = { x1: a.position.x * 100 + "%", y1: a.position.y * 100 + "%", x2: b.position.x * 100 + "%", y2: b.position.y * 100 + "%" };
       wege.append(svg("line", Object.assign({ stroke: "rgba(0,0,0,.35)", "stroke-width": (vonHier ? 5 : 3) + 3, "stroke-linecap": "round", "stroke-dasharray": strich }, pos)));
       wege.append(svg("line", Object.assign({ stroke: farbe, "stroke-width": vonHier ? 5 : 3, "stroke-linecap": "round", "stroke-dasharray": strich }, pos)));
       const mx = ((a.position.x + b.position.x) / 2) * 100 + "%";
       const my = ((a.position.y + b.position.y) / 2) * 100 + "%";
       wege.append(svg("circle", { cx: mx, cy: my, r: 11, fill: "rgba(13,23,24,.88)", stroke: farbe, "stroke-width": 1.5 }));
-      wege.append(svg("text", { x: mx, y: my, dy: "0.35em", "text-anchor": "middle", fill: "#E8EDE6", "font-family": "Cinzel, Georgia, serif", "font-size": 13, "font-weight": 700 }, String(L.wegKosten(s, weg))));
+      wege.append(svg("text", { x: mx, y: my, dy: "0.35em", "text-anchor": "middle", fill: "#E8EDE6", "font-family": "Cinzel, Georgia, serif", "font-size": 13, "font-weight": 700 }, offen ? String(L.wegKosten(s, weg)) : "×"));
     }
     flaeche.append(wege);
 
     for (const ort of orte) {
       const hier = ort.id === s.location && !ui.reise;
-      const erreichbar = !!welt.weg(s.location, ort.id);
+      const erreichbar = L.tourWeg(s, welt.weg(s.location, ort.id));
       flaeche.append(el("button", {
         class: "ort" + (erreichbar || hier ? "" : " fern") + (ui.gewaehlt === ort.id ? " gewaehlt" : ""),
         style: { left: ort.position.x * 100 + "%", top: ort.position.y * 100 + "%" },
@@ -352,7 +379,8 @@
           zeichnen();
         },
       }, symbol(ORT_BILD[ort.kind], 44), el("span", { class: "name", text: ort.name }),
-      L.kapitel(s, welt) && L.kapitel(s, welt).place === ort.id ? el("span", { class: "fahne" }, symbol("symbol-ziel", 26)) : null));
+      (s.tour ? s.tour.finale === ort.id : L.kapitel(s, welt) && L.kapitel(s, welt).place === ort.id) ? el("span", { class: "fahne" }, symbol("symbol-ziel", 26)) : null,
+      s.tour && s.tour.jahrmarkt === ort.id ? el("span", { class: "tour-markt", title: "Jahrmarkt", text: "✦" }) : null));
     }
 
     const start = ui.reise ? welt.ort(ui.reise.von).position : ortHier().position;
@@ -486,24 +514,33 @@
       LOHN_BILD[ort.kind].map((b) => symbol(b, 22)),
       k && k.place === ort.id ? el("span", { class: "aenderung" }, symbol("symbol-ziel", 20), symbol("symbol-muenze", 18), String(k.coins)) : null);
     let unten;
-    if (weg) {
+    if (weg && L.tourWeg(s, weg)) {
       const kosten = L.wegKosten(s, weg);
+      const zeit = s.tour && L.TOUR_LIMIT - s.tour.schritte - 1;
+      const zuSpaet = !!s.tour && L.tourRestweg(s, welt, ort.id) > zeit;
+      const vorFinale = s.tour && ort.id === s.tour.finale && s.tour.schritte + 1 < L.TOUR_FINALE_AB;
       unten = [
         el("div", { class: "reihe" },
           aenderung("symbol-brot", -kosten, 20),
           kosten > s.resources.food ? el("span", { class: "minus", text: "Hunger!" }) : null,
           weg.kind === "forest" ? [symbol("symbol-wald", 20), symbol("symbol-gefahr", 18)] : null),
+        vorFinale ? el("span", { class: "tour-detail", text: "Das Winterfinale öffnet ab Etappe " + L.TOUR_FINALE_AB + "." }) : null,
+        zuSpaet ? el("span", { class: "tour-detail", text: "Danach reicht die Zeit nicht mehr fürs Winterfinale." }) : null,
         el("div", {}, hauptknopf("Aufbrechen", (e) => { e.stopPropagation(); aufbrechen(ort.id); })),
       ];
     } else if (hier) {
-      unten = el("div", { class: "reihe" }, symbol("wagen", 28));
+      unten = el("div", { class: "reihe" }, symbol("wagen", 28),
+        s.tour && s.tour.schritte === 0 && !s.tour.startAuftritt ? hauptknopf("Erste Vorstellung", () => { ui.gewaehlt = null; ankommen(); }) : null);
     } else {
-      unten = el("div", { class: "reihe", style: { opacity: ".65" } }, symbol("symbol-schloss", 16), "Kein direkter Weg");
+      unten = el("div", { class: "reihe", style: { opacity: ".65" } }, symbol("symbol-schloss", 16), weg ? "Auf dieser Tour gesperrt" : "Kein direkter Weg");
     }
     return el("div", { class: "tafel", onclick: (e) => e.stopPropagation() },
       el("div", { class: "reihe" }, symbol(ORT_BILD[ort.kind], 30),
         el("div", {}, el("h2", { text: ort.name }), el("span", { class: "art", text: L.ORTSART[ort.kind] }))),
-      geschmack, unten);
+      geschmack,
+      s.tour && ort.id === s.tour.jahrmarkt ? el("span", { class: "tour-detail", text: "Jahrmarkt: extra Gold für deinen Auftritt." }) : null,
+      s.tour && ort.id === s.tour.finale ? el("span", { class: "tour-detail", text: "Winterfinale · " + s.tour.ziel + " Applaus nötig." }) : null,
+      unten);
   }
 
   // ---------- Reise ----------
@@ -542,6 +579,7 @@
   function ankommen() {
     ui.karte = null;
     if (L.spielVorbei(s)) {
+      if (s.tour) { s.tour.halt = null; speichern(); }
       ui.schirm = "ende";
     } else if (L.zielErreichbar(s, welt)) {
       ui.karte = { art: "ziel", kapitel: L.kapitel(s, welt) };
@@ -608,6 +646,7 @@
             class: "option",
             onclick: () => {
               const folge = L.entscheiden(s, o, e, welt);
+              if (s.tour) s.tour.halt = { art: "folge", ereignis: e.id, folge, geheilt: k.geheilt };
               speichern();
               ui.karte = { art: "folge", ereignis: e, folge, geheilt: k.geheilt };
               zeichnen();
@@ -667,6 +706,7 @@
       el("div", { class: "hintergrund" }, grossesBild(BUEHNE_BILD[ort.kind])),
       el("div", { class: "verlauf" }),
       el("div", { class: "kopfzeile" }, symbol(ORT_BILD[ort.kind], 26), el("h1", { text: ort.name }), leiste()),
+      L.tourFinale(s) ? el("span", { class: "finale-badge", text: "Winterfinale · " + s.tour.ziel + " Applaus" }) : null,
     ];
 
     if (!sh) {
@@ -718,17 +758,31 @@
         return figurKarte(m, kann && sh.offen ? L.showVorschau(s, m) : null, gespielt.has(m.id));
       })));
 
+    const hut = L.hutVorschau(s, welt);
+    const auszahlung = [hut.food ? hut.food + " Brot" : "", hut.coins ? hut.coins + " Gold" : ""].filter(Boolean).join(" · ") || "0";
+    const impro = L.improvisationsKandidat(s);
+    const improKnopf = () => impro && el("button", { class: "zweitknopf", onclick: improvisieren,
+      title: "Sicher, einmal pro Vorstellung" }, impro.name + " improvisiert");
     // Knöpfe
     if (sh.vorbei) {
       teile.push(el("div", { class: "entscheiden" },
         geht ? el("div", { class: "schild schlecht", text: "Das Publikum läuft davon!" }) : el("div", { class: "schild", text: "Alle sind aufgetreten" }),
+        el("span", { class: "tour-kassiert", text: auszahlung }),
         hauptknopf("🎩 Hut rumgehen lassen", kassieren)));
     } else if (!sh.offen) {
       teile.push(el("div", { class: "entscheiden" },
+        sh.naechsterRuf ? el("div", { class: "tour-naechster", "data-next-call": sh.naechsterRuf },
+          symbol(GEFUEHL_BILD[sh.naechsterRuf], 20), "Als Nächstes: " + L.GEFUEHL[sh.naechsterRuf]) : null,
         el("button", { class: "hauptknopf wagen-knopf", onclick: nochEine }, "Noch eine!"),
-        el("button", { class: "zweitknopf", onclick: kassieren }, "🎩 Hut rumgehen lassen")));
+        improKnopf(),
+        el("button", { class: "zweitknopf", onclick: kassieren }, "🎩 Hut rumgehen lassen", el("span", { class: "tour-kassiert", text: auszahlung }))));
     } else if (!frei.length) {
       teile.push(el("div", { class: "entscheiden" }, hauptknopf("Weiterziehen", zurKarte)));
+    } else if (impro) {
+      teile.push(el("div", { class: "entscheiden" }, improKnopf(),
+        sh.gespielt.length ? el("button", { class: "zweitknopf", onclick: kassieren }, "🎩 Hut rumgehen lassen", el("span", { class: "tour-kassiert", text: auszahlung })) : null));
+    } else if (sh.gespielt.length) {
+      teile.push(el("div", { class: "entscheiden" }, el("button", { class: "zweitknopf", onclick: kassieren }, "🎩 Hut rumgehen lassen", el("span", { class: "tour-kassiert", text: auszahlung }))));
     }
 
     if (!s.tutorial || !s.tutorial.vorstellung) teile.push(bertaHilfe(sh));
@@ -750,7 +804,7 @@
     vorschau
       ? el("span", { class: "vorschau " + (vorschau.passt ? "gut" : "schlecht") },
         vorschau.passt ? "+" + vorschau.punkte : GEDULD_WEG,
-        vorschau.riskant ? symbol("symbol-gefahr", 13) : null)
+        vorschau.riskant ? el("span", { class: "nummer-risiko", title: "Pannenrisiko", text: Math.round(vorschau.risiko * 100) + " %" }) : null)
       : el("span", { class: "reihe", style: { gap: "3px" } }, symbol(DISZIPLIN_BILD[m.discipline], 14),
         el("span", { class: "sterne-klein", text: "★".repeat(m.skill) })));
     return karte;
@@ -772,12 +826,27 @@
     zeichnen();
   }
 
+  function improvisieren(e) {
+    if (e) e.stopPropagation();
+    ui.vorst.letzte = L.showImprovisieren(s, welt);
+    speichern();
+    zeichnen();
+  }
+
   function kassieren(e) {
     if (e) e.stopPropagation();
     ui.vorst.ergebnis = L.showKassieren(s, welt);
+    if (s.tour && s.tour.status === "gewonnen" && !wagenFreiVorSieg()) {
+      s.tour.freigeschaltet = true;
+      try { localStorage.setItem(WAGEN_SPEICHER, "ja"); } catch (e) { /* optional */ }
+    }
     ui.vorst.letzte = null;
     speichern();
     zeichnen();
+  }
+
+  function wagenFreiVorSieg() {
+    try { return localStorage.getItem(WAGEN_SPEICHER) === "ja"; } catch (e) { return false; }
   }
 
   // Die alte Gauklerin erklärt die erste Vorstellung mit einem Satz und
@@ -793,7 +862,7 @@
       satz = "Noch eine wagen? Die Serie bringt immer mehr. Aber sind die Leute dreimal enttäuscht, laufen sie davon.";
       ziel = ".wagen-knopf";
     } else if (sh.offen) {
-      satz = "Passt keiner? Dann wird das Publikum ungeduldig. Schick trotzdem jemanden.";
+      satz = "Passt keiner? Dann kannst du einmal pro Vorstellung sicher improvisieren.";
     } else {
       return null;
     }
@@ -827,13 +896,15 @@
   function ergebnisTafel(ort) {
     const e = ui.vorst.ergebnis;
     const markt = [];
-    if (ort.kind === "village" || ort.kind === "market") {
+    const t = s.tour;
+    const weiter = !t || !t.angebot.length;
+    if ((!t || t.status === "unterwegs") && (ort.kind === "village" || ort.kind === "market")) {
       markt.push(el("button", {
         class: "handel", disabled: !L.kannBrotKaufen(s, ort),
         onclick: (ev) => { ev.stopPropagation(); L.brotKaufen(s, ort); speichern(); zeichnen(); },
       }, aenderung("symbol-muenze", -L.BROT_KAUF.preis), "→", aenderung("symbol-brot", L.BROT_KAUF.menge)));
     }
-    const b = L.bewerber(s, welt);
+    const b = (!t || t.status === "unterwegs") && L.bewerber(s, welt);
     if (b) {
       markt.push(el("button", {
         class: "handel bewerber", disabled: s.resources.coins < b.price,
@@ -856,12 +927,25 @@
         el("div", { class: "reihe", style: { gap: "6px", fontFamily: "var(--titel)", fontSize: "20px" } }, "🎩", symbol("symbol-jubel", 24), String(e.applaus), el("span", { style: { opacity: ".6" }, text: "→" }), aenderungen(e.reward)),
         markt.length ? el("div", { class: "reihe", style: { gap: "12px", justifyContent: "center" } }, markt) : null,
         markt.length ? kopie : null,
-        hauptknopf("Weiter", zurKarte)));
+        t && t.auszahlung.finale ? el("p", { class: "tour-detail", text: t.auszahlung.erfolg ? "Das Winterquartier öffnet seine Tore." : "Finale: " + t.auszahlung.applaus + "/" + t.ziel + " Applaus." }) : null,
+        t && t.angebot.length ? el("div", { class: "tour-perks" },
+          el("strong", { text: "Wähle eine Verbesserung für diese Tour" }),
+          el("div", { class: "tour-perk-paar" }, t.angebot.map((id) =>
+            el("button", { class: "zweitknopf", "data-perk": id, onclick: () => { L.tourVerbessern(s, id); speichern(); zeichnen(); } },
+              el("strong", { text: L.VERBESSERUNGEN[id].name }), el("span", { text: L.VERBESSERUNGEN[id].text }))))) : null,
+        t && t.perks.length && weiter ? el("p", { class: "tour-detail", text: "Aktiv: " + t.perks.map((id) => L.VERBESSERUNGEN[id].name).join(" · ") }) : null,
+        hauptknopf(t && t.status !== "unterwegs" ? "Tour abschließen" : "Weiter", zurKarte, !weiter)));
   }
 
   function zurKarte(e) {
     if (e) e.stopPropagation();
     if (ui.vorst) clearTimeout(ui.vorst.timer);
+    if (s.tour && s.tour.auszahlung) {
+      if (s.tour.angebot.length) return;
+      L.tourAufbruch(s);
+    } else if (s.tour && s.show && !L.showFrei(s).length && !s.show.gespielt.length) {
+      L.tourOhneAuftritt(s);
+    }
     ui.vorst = null;
     s.show = null;
     speichern();
@@ -873,14 +957,31 @@
 
   // ---------- Ende ----------
 
+  function tourStartSchirm() {
+    const frei = wagenFrei();
+    return el("div", { class: "schirm ende tour-start" },
+      el("div", { class: "kapitel-nr", text: "Die Fahrenden" }),
+      el("h1", { text: "Die Wintertour" }),
+      el("p", { text: "Sechs Etappen. Spiel ab Etappe fünf im Kloster St. Ilgen um dein Winterquartier. Wege und Jahrmarkt wechseln bei jeder Tour." }),
+      el("div", { class: "tour-perk-paar" }, Object.entries(L.WAGEN).map(([id, wagen]) =>
+        el("button", { class: "zweitknopf tour-wagen", disabled: id === "leicht" && !frei, "data-wagen": id,
+          onclick: () => tourStarten(id) }, el("strong", { text: wagen.name }),
+          el("span", { text: id === "leicht" && !frei ? "Nach deiner ersten erfolgreichen Tour." : wagen.text })))));
+  }
+
   function endeSchirm() {
-    return el("div", { class: "schirm ende" },
-      el("h1", { text: "Die Reise endet hier" }),
+    const sieg = s.tour.status === "gewonnen";
+    return el("div", { class: "schirm ende tour-start" },
+      el("div", { class: "kapitel-nr", text: "Ende der Tour" }),
+      el("h1", { text: sieg ? "Das Winterquartier ist erreicht!" : "Die Tour endet hier" }),
+      el("p", { text: sieg ? s.tour.freigeschaltet ? "Freigeschaltet: der leichtere Wagen." : "Deine Truppe hat es geschafft." :
+        L.lebende(s).length ? "Bis zum Winterfinale hat es diesmal nicht gereicht." : "Die Truppe ist auseinandergegangen." }),
       el("div", { class: "reihe", style: { gap: "10px", justifyContent: "center" } }, s.troupe.map((m) => portrait(m, 54))),
-      hauptknopf("Neu beginnen", () => {
-        s = L.neuesSpiel(welt, neuerStartwert());
-        speichern();
-        Object.assign(ui, { schirm: "region", region: ortHier().region, gewaehlt: null, reise: null, karte: { art: "start", kapitel: L.kapitel(s, welt) }, pan: null, vorst: null });
+      hauptknopf("Neue Tour", () => {
+        if (sieg) try { localStorage.setItem(WAGEN_SPEICHER, "ja"); } catch (e) { /* optional */ }
+        s = null;
+        try { localStorage.removeItem(SPEICHER); } catch (e) { /* optional */ }
+        ui.karte = null;
         zeichnen();
       }));
   }
@@ -895,14 +996,19 @@
       const liste = await fetch("grafiken/vorhanden.json").then((r) => (r.ok ? r.json() : []));
       for (const datei of liste) dateien.set(datei.replace(/\.(png|jpe?g|webp)$/i, ""), datei);
     } catch (e) { /* ohne Bilderliste: nur Platzhalter */ }
-    s = (hot && hot.s && welt.ort(hot.s.location) && hot.s) || laden();
-    if (!s) {
-      s = L.neuesSpiel(welt, neuerStartwert());
-      ui.karte = { art: "start", kapitel: L.kapitel(s, welt) };
-    }
-    ui.region = ortHier().region;
-    if (s.show) { ui.schirm = "vorstellung"; ui.vorst = { letzte: null, ergebnis: null }; }
+    s = (hot && hot.s && hot.s.tour && welt.ort(hot.s.location) && hot.s) || laden();
     if (window.claude && window.claude.hot) window.claude.hot.snapshot(() => ({ s }));
+    if (!s) { zeichnen(); return; }
+    ui.region = ortHier().region;
+    if (s.show || s.tour.auszahlung) {
+      ui.schirm = "vorstellung";
+      ui.vorst = { letzte: null, ergebnis: s.tour.auszahlung };
+    } else if (L.spielVorbei(s)) {
+      ui.schirm = "ende";
+    } else if (s.tour.halt) {
+      tourAnkunftWiederherstellen();
+      return;
+    }
     zeichnen();
   }
 
