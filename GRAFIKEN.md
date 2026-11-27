@@ -151,14 +151,15 @@ Gemeinsamer Zusatz: *Einfaches, kräftiges Symbol, wenig Details, klar erkennbar
 |---|---|
 | App-Symbol | Gauklerwagen mit weinrotem Dach vor einem goldenen Mond, kräftige Formen, kein Text. In Xcode unter `Assets` → `AppIcon` hineinziehen. |
 
-### Spielauswahl (1024 × 832, Querformat-Kachel)
+### Spielauswahl (1536 × 1024)
 
-Die Kacheln auf dem Startbildschirm, auf dem man das Spiel wählt. Datei nach `web/grafiken/` legen und in `web/grafiken/vorhanden.json` eintragen. Bis dahin zeigt Die Fahrenden die Weltkarte und der Turmwächter eine Laterne.
+Die Kacheln auf dem Startbildschirm. Datei nach `web/grafiken/` legen, mehr ist nicht nötig: Die Bildliste `vorhanden.json` entsteht beim Veröffentlichen automatisch.
 
 | Datei | Prompt |
 |---|---|
 | `auswahl-fahrenden.png` | Ein Gauklerwagen mit weinrotem Dach zieht bei Abenddämmerung durch einen nebligen Märchenwald, goldene Laternen am Wagen, Platz unten im Bild frei für den Spielnamen, kein Text. |
-| `auswahl-turmwaechter.png` | Ein einsamer alter Wachturm aus Stein auf einer Lichtung bei Nacht, ringsum Laternen, aus dem blaugrünen Nebel schauen schemenhafte Nebelwesen mit leuchtenden Augen, unten im Bild frei für den Spielnamen, kein Text. |
+
+Die Bilder für **Clan-Viertel** stehen mit Prompts in [BILDER-AUFTRAG.md](BILDER-AUFTRAG.md).
 
 ## Neue Bilder hinzufügen
 

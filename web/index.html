@@ -87,16 +87,16 @@ h1 { margin: 0; font-family: var(--titel); font-size: 22px; letter-spacing: 3px;
   <div id="feld">
     <h1>Was wollt ihr spielen?</h1>
     <div class="spiele">
-      <!-- Bildname auswahl-fahrenden.png (siehe GRAFIKEN.md); bis dahin die Weltkarte. -->
-      <a class="spiel" href="fahrenden.html" data-spiel="fahrenden">
-        <img class="bild" data-bild="auswahl-fahrenden" data-ersatz="karte-welt" alt="">
-        <div class="unten"><span class="name">Die Fahrenden</span><span class="los">▶</span></div>
-      </a>
-      <!-- Zweites Spiel, noch in Planung (Bildname auswahl-turmwaechter.png). -->
-      <div class="spiel bald" data-spiel="bald" role="button" aria-disabled="true" aria-label="Der Turmwächter, kommt bald">
-        <img class="bild" data-bild="auswahl-turmwaechter" alt="">
+      <!-- Bildname auswahl-clanviertel.png (siehe BILDER-AUFTRAG.md); bis dahin ein Platzhalter. -->
+      <a class="spiel" href="clanviertel/" data-spiel="clanviertel">
+        <img class="bild" data-bild="auswahl-clanviertel" alt="">
         <div class="platzhalter">🏮</div>
-        <div class="unten"><span class="name">Der Turmwächter<small>kommt bald</small></span><span class="los">🔒</span></div>
+        <div class="unten"><span class="name">Clan-Viertel</span><span class="los">▶</span></div>
+      </a>
+      <!-- Die Fahrenden ist pausiert. Wieder einschalten: dieses div durch einen Link auf fahrenden.html ersetzen. -->
+      <div class="spiel bald" data-spiel="fahrenden" role="button" aria-disabled="true" aria-label="Die Fahrenden, pausiert">
+        <img class="bild" data-bild="auswahl-fahrenden" data-ersatz="karte-welt" alt="">
+        <div class="unten"><span class="name">Die Fahrenden<small>pausiert</small></span><span class="los">🔒</span></div>
       </div>
     </div>
   </div>
@@ -123,16 +123,16 @@ h1 { margin: 0; font-family: var(--titel); font-size: 22px; letter-spacing: 3px;
   skalieren();
 
   // Bilder: eigenes Auswahlbild, sonst Ersatzbild, sonst unsichtbar.
-  fetch("grafiken/vorhanden.json?v=2", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
+  fetch("grafiken/vorhanden.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
     const da = new Set(liste);
     for (const img of document.querySelectorAll("img[data-bild]")) {
       const name = [img.dataset.bild, img.dataset.ersatz].find((n) => n && da.has(n + ".png"));
-      if (name) img.src = "grafiken/" + name + ".png?v=2";
+      if (name) img.src = "grafiken/" + name + ".png";
       else img.remove();
     }
   });
 
-  const bald = document.querySelector('[data-spiel="bald"]');
+  const bald = document.querySelector(".spiel.bald");
   bald.addEventListener("click", () => {
     bald.classList.remove("wackeln");
     void bald.offsetWidth;
