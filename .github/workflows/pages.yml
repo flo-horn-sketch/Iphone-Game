@@ -70,8 +70,9 @@ jobs:
                       url = root + path + join + "verify=" + rev
                       with urllib.request.urlopen(url, timeout=10) as response:
                           return response.read() if limit is None else response.read(limit)
-                  assert 'href="clanviertel/"' in get("").decode(), "Spielauswahl nicht auf der neuen Version"
+                  assert 'href="airline/"' in get("").decode(), "Spielauswahl nicht auf der neuen Version"
                   assert 'clan-spiel.js' in get("clanviertel/").decode(), "Clan-Viertel fehlt"
+                  assert 'airline-spiel.js' in get("airline/").decode(), "Luftlinie fehlt"
                   assert 'spiel.js?v=3' in get("fahrenden.html").decode(), "HTML nicht auf der neuen Version"
                   assert 'BILD_VERSION = "2"' in get("spiel.js?v=3").decode(), "Skript nicht auf der neuen Version"
                   names = set(json.loads(get("grafiken/vorhanden.json?v=2")))

@@ -98,3 +98,68 @@ Die Bilder werden als kleine runde Spielsteine gezeigt. Gesicht groß und mittig
 ## Kontrolle
 
 Nach dem Hochladen: Die Seite https://flo-horn-sketch.github.io/Iphone-Game/ ein paar Minuten später neu laden. Das Bild erscheint dann im Spiel Clan-Viertel.
+
+---
+
+# Bildauftrag für ChatGPT: Luftlinie (Airline-Manager)
+
+Gleiche Regeln wie oben (Repository, Branch `main`, Ordner `web/grafiken/`, Dateiname exakt, PNG, **kein Text im Bild**, nur Bilder hochladen). Die Clan-Viertel-Bilder sind fertig, bitte nicht anfassen.
+
+Die Europakarte im Spiel zeichnet das Spiel selbst aus echten Landkarten-Daten. Dafür ist **kein** Bild nötig.
+
+## Stil (vor jeden Prompt setzen)
+
+> Moderne, freundliche Illustration im Stil eines hochwertigen Reiseplakats, leicht gemalt, klare Formen, sanfte Verläufe. Farben: Nachtblau, Himmelblau, warmes Gold, etwas Abendrot. Erfundene Flugzeuge und erfundene Airlines, keine echten Logos, keine echten Flugzeugmodelle nachgebaut, keine Markennamen. Keine Schrift, kein Text, keine Buchstaben, keine Zahlen.
+
+## Die Bilder (in dieser Reihenfolge)
+
+### 1. Start und Spielauswahl
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `auswahl-airline.png` | 1536 × 1024 | Ein Passagierflugzeug steigt in der Abenddämmerung über einer europäischen Stadt mit Fluss und Brücken in den goldenen Himmel, Wolken leuchten. Unten etwas ruhige Fläche für den Spielnamen. |
+| `air-start.png` | 1536 × 1024 | Blick aus einem großen Terminalfenster auf ein Vorfeld bei Nacht: mehrere Flugzeuge an Gates, Lichter, ein Tower, in der Ferne startet ein Flugzeug. Eher dunkel und ruhig, weil Text darüber liegt. |
+
+### 2. Die drei Servicelinien
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-service-billig.png` | 1536 × 1024 | Flugzeugkabine einer Billig-Airline: enge, bunte Sitzreihen, fröhliche Urlauber mit Rucksäcken und Sonnenhüten, alles voll, helle freundliche Farben. |
+| `air-service-standard.png` | 1536 × 1024 | Gepflegte Flugzeugkabine einer normalen Linien-Airline: bequeme blaue Sitze, eine Flugbegleiterin reicht Getränke, Geschäftsleute und Familien gemischt. |
+| `air-service-premium.png` | 1536 × 1024 | Luxuriöse Premium-Kabine: breite Ledersessel, die sich zum Bett ausklappen, Champagnerglas, warmes Licht, Holz und Gold, ruhige Eleganz. |
+
+### 3. Die vier Flugzeugtypen (Seitenansicht, schlichter Hintergrund)
+
+Die Bilder werden klein als Symbol gezeigt. Flugzeug groß und mittig, von der Seite, leicht schräg, schlichter heller Himmel als Hintergrund. Alle in derselben Lackierung: weiß mit goldenem Streifen und nachtblauem Leitwerk, ohne Logo und ohne Schrift.
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-flugzeug-libelle.png` | 1024 × 1024 | Kleines Regionalflugzeug mit zwei Propellern und hohen Flügeln, etwa 50 Sitze, wirkt flink und leicht. |
+| `air-flugzeug-falke.png` | 1024 × 1024 | Mittelgroßes Kurzstrecken-Düsenflugzeug mit zwei Triebwerken unter den Flügeln, schlank, etwa 130 Sitze. |
+| `air-flugzeug-kranich.png` | 1024 × 1024 | Größeres Mittelstrecken-Düsenflugzeug, langer Rumpf, zwei große Triebwerke, nach oben gebogene Flügelspitzen, etwa 190 Sitze. |
+| `air-flugzeug-albatros.png` | 1024 × 1024 | Großes Langstrecken-Großraumflugzeug mit zwei riesigen Triebwerken und sehr langen Flügeln, majestätisch, etwa 320 Sitze. |
+
+### 4. Die Chefs der drei Rivalen (Porträts, quadratisch)
+
+Werden klein und rund gezeigt. Gesicht groß und mittig, schlichter dunkler Hintergrund in der Farbe der Airline. Erfundene Personen.
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-chef-kontinentia.png` | 1024 × 1024 | Harald Brenner, Chef einer alten großen Airline, um die sechzig, graue Haare, strenger selbstsicherer Blick, dunkler Anzug mit roter Krawatte, Hintergrund dunkelrot. |
+| `air-chef-spatzflug.png` | 1024 × 1024 | Bruno Kiesel, Chef einer Billig-Airline, Mitte vierzig, breites Verkäufergrinsen, offenes orangefarbenes Hemd, Daumen hoch, Hintergrund orange. |
+| `air-chef-aurelia.png` | 1024 × 1024 | Valérie Morand, Chefin einer Luxus-Airline, Anfang fünfzig, elegant, kühles Lächeln, Perlenohrringe, violetter Blazer, Hintergrund violett. |
+
+### 5. Ereignisse (breit)
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-ereignis-slot.png` | 1536 × 1024 | Eine Start- und Landebahn eines großen Flughafens in der Dämmerung, eine Lücke in einer Reihe wartender Flugzeuge, ein grünes Licht leuchtet auf. |
+| `air-ereignis-gebraucht.png` | 1536 × 1024 | Ein gebrauchtes Passagierflugzeug ohne Lackierung steht in einem großen Hangar, Mechaniker davor, ein Schild ohne Schrift hängt am Bugrad. |
+| `air-ereignis-messe.png` | 1536 × 1024 | Eine riesige moderne Messehalle mit vielen Ständen und Geschäftsleuten mit Koffern, durch die Glasfassade sieht man ein landendes Flugzeug. |
+| `air-ereignis-kerosin.png` | 1536 × 1024 | Ein Tankwagen betankt ein Flugzeug auf dem Vorfeld im Morgenlicht, Schläuche, Hitzeflimmern. |
+| `air-ereignis-uebernahme.png` | 1536 × 1024 | Ein dunkler Besprechungsraum ganz oben in einem Hochhaus, ein Vertrag und ein Füller auf einem langen Tisch, draußen ein Flughafen bei Nacht. Bedrohliche, ernste Stimmung. |
+| `air-ende.png` | 1536 × 1024 | Ein leeres, stilles Vorfeld bei Regen, ein einzelnes geparktes Flugzeug mit abgedeckten Triebwerken, melancholisch. |
+
+## Kontrolle (Luftlinie)
+
+Nach dem Hochladen die Seite https://flo-horn-sketch.github.io/Iphone-Game/ ein paar Minuten später neu laden und „Luftlinie“ öffnen. Fehlende Bilder zeigt das Spiel als Symbol.
