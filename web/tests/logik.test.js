@@ -8,110 +8,114 @@ const L = require("../logik.js");
 const pfad = path.join(__dirname, "..", "welt.json");
 const laden = () => L.welt(JSON.parse(fs.readFileSync(pfad, "utf8")));
 
-test("welt.json ist gültig und gleich wie in GameCore", () => {
-  const w = laden();
-  assert.deepEqual(L.pruefen(w), []);
-  const swift = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "GameCore/Sources/GameCore/Resources/welt.json"), "utf8"));
-  assert.deepEqual(JSON.parse(fs.readFileSync(pfad, "utf8")), swift);
+test("welt.json ist gültig", () => {
+  assert.deepEqual(L.pruefen(laden()), []);
 });
 
-test("Zufall ist gleich wie SplitMix64 in Swift", () => {
-  const r = L.neuerZufall(42);
-  const a = L.einheit(r);
-  const r2 = L.neuerZufall(42);
-  assert.equal(L.einheit(r2), a);
-  assert.ok(a >= 0 && a < 1);
+test("Zufall ist wiederholbar", () => {
+  assert.equal(L.einheit(L.neuerZufall(42)), L.einheit(L.neuerZufall(42)));
 });
 
-const dorf = { id: "v", kind: "village", likes: ["humor"], banned: ["fire"] };
-const m = (id, feeling, discipline = "music") => ({ id, feeling, discipline, skill: 3, health: 100, fatigue: 0, isAlive: true });
-
-test("Stimmungskurve folgt den Regeln", () => {
-  const gemocht = L.erwarteteKurve([m("a", "humor")], dorf, 60);
-  const anders = L.erwarteteKurve([m("a", "wonder")], dorf, 60);
-  assert.ok(gemocht[1] > anders[1]);
-  const drei = L.erwarteteKurve([m("a", "wonder"), m("b", "wonder"), m("c", "wonder")], dorf, 60);
-  assert.ok(drei[3] < drei[2]);
-  const ruhe = L.erwarteteKurve([m("a", "heart"), m("b", "tension")], dorf, 60);
-  const ohne = L.erwarteteKurve([m("a", "wonder"), m("b", "tension")], dorf, 60);
-  assert.ok(ruhe[2] - ruhe[1] > ohne[2] - ohne[1]);
-  assert.ok(L.wertung([20, 20, 80]) > L.wertung([20, 80, 20]));
-});
-
-test("Reise verbraucht Brot und Holz", () => {
+test("Reisen kostet Brot, ohne Brot kommt das Hunger-Ereignis", () => {
   const w = laden();
   const s = L.neuesSpiel(w, 1);
-  const b = L.reisen(s, "weidenau", w);
-  assert.equal(s.day, 3);
-  assert.equal(b.foodEaten, 10);
-  assert.equal(s.resources.wood, w.start.resources.wood - 2);
-  assert.throws(() => L.reisen(s, "furtheim", w));
+  s.resources.food = 20;
+  const r = L.reisen(s, "weidenau", w); // 2 Tage, 5 Leute → 2 × 3
+  assert.equal(r.brot, 6);
+  assert.equal(s.resources.food, 14);
+  assert.equal(s.location, "weidenau");
+  s.resources.food = 1;
+  const r2 = L.reisen(s, "kesselgrund", w);
+  assert.equal(r2.hunger, true);
+  assert.equal(s.resources.food, 0);
+  assert.equal(r2.event.id, "hunger");
 });
 
-test("Hunger schadet und löst das Hunger-Ereignis aus", () => {
+test("Verletzt, nochmal getroffen: tot. Kloster heilt.", () => {
+  const w = laden();
+  const s = L.neuesSpiel(w, 1);
+  const lene = L.mitglied(s, "lene");
+  const fieber = w.ereignis("fieber");
+  let f = L.entscheiden(s, fieber.options[1], fieber, w);
+  assert.equal(lene.zustand, "verletzt");
+  assert.deepEqual(f.hurt, ["lene"]);
+  f = L.entscheiden(s, fieber.options[1], fieber, w);
+  assert.equal(lene.zustand, "tot");
+  assert.deepEqual(f.deaths, ["lene"]);
+  L.mitglied(s, "jorin").zustand = "verletzt";
+  const r = L.reisen(s, "sankt-ilgen", w);
+  assert.deepEqual(r.geheilt, ["jorin"]);
+  assert.equal(L.mitglied(s, "jorin").zustand, "fit");
+  assert.equal(lene.zustand, "tot");
+});
+
+test("Vorstellung: passende Nummer baut Serie auf, falsche kostet Geduld", () => {
   const w = laden();
   const s = L.neuesSpiel(w, 7);
-  s.resources.food = 0;
-  const b = L.reisen(s, "weidenau", w);
-  assert.equal(b.hungryDays, 2);
-  assert.equal(b.event.id, "hunger");
-  assert.ok(L.lebende(s).every((x) => x.health <= 70));
+  L.showStarten(s, w);
+  s.show.ruf = "humor";
+  const n1 = L.showNummer(s, "jorin"); // Narr, Humor, Können 4
+  assert.equal(n1.passt, true);
+  assert.equal(n1.punkte, 4);
+  assert.equal(s.show.serie, 2);
+  assert.throws(() => L.showNummer(s, "berta"));
+  L.showWeiter(s, w);
+  s.show.ruf = "heart";
+  assert.equal(L.showVorschau(s, L.mitglied(s, "berta")).punkte, 6); // 3 × Serie 2
+  assert.throws(() => L.showWeiter(s, w)); // nicht erlaubt, solange offen
 });
 
-test("Ereignis nimmt Mitglied auf, gesperrte Option braucht Disziplin", () => {
+test("Vorstellung: ohne Geduld laufen die Leute davon, der halbe Hut ist weg", () => {
   const w = laden();
-  const s = L.neuesSpiel(w, 1);
-  const e = w.ereignis("fluechtlinge");
-  const r = L.entscheiden(s, e.options[0], e, w);
-  assert.deepEqual(r.joined, ["mira"]);
-  assert.equal(r.change.food, -6);
-  const woelfe = w.ereignis("woelfe");
-  s.troupe = s.troupe.filter((x) => x.discipline !== "music");
-  assert.equal(L.optionMoeglich(s, woelfe.options[2]), false);
+  const s = L.neuesSpiel(w, 3);
+  L.showStarten(s, w);
+  s.show.applaus = 20;
+  for (const id of ["berta", "wenzel", "jorin"]) {
+    if (!s.show.offen) L.showWeiter(s, w);
+    s.show.ruf = "wonder";
+    L.showNummer(s, id);
+  }
+  assert.equal(s.show.vorbei, true);
+  assert.equal(s.show.verlaufen, true);
+  assert.equal(s.show.applaus, 11); // 23 − 12
+  const e = L.showKassieren(s, w);
+  assert.equal(e.sterne, 1);
+  assert.equal(s.show, null);
 });
 
-test("Vorstellung zahlt, Kloster verbietet Feuer, Handel kostet Münzen", () => {
+test("Verletzte treten nicht auf, Lohn hängt vom Ort ab", () => {
   const w = laden();
-  const s = L.neuesSpiel(w, 5);
-  const vorher = s.resources.food;
-  const e = L.auftreten(s, ["jorin", "berta", "lene"], w);
-  assert.equal(e.acts.length, 3);
-  assert.equal(s.resources.food, Math.min(vorher + e.reward.food, Infinity));
-  assert.equal(L.mitglied(s, "jorin").fatigue, 10);
-  s.location = "sankt-ilgen";
-  const k = L.auftreten(s, ["tamo", "berta"], w);
-  assert.deepEqual(k.acts.map((a) => a.memberID), ["berta"]);
-  s.resources.coins = 4;
-  L.kaufen(s, "food");
-  assert.equal(s.resources.coins, 1);
-  assert.throws(() => L.kaufen(s, "food"));
+  const s = L.neuesSpiel(w, 3);
+  L.mitglied(s, "lene").zustand = "verletzt";
+  L.showStarten(s, w);
+  assert.ok(!L.showFrei(s).some((m) => m.id === "lene"));
+  assert.ok(L.lohn(20, w.ort("hollerbach")).food > L.lohn(20, w.ort("weidenau")).food);
+  assert.ok(L.lohn(20, w.ort("rabenstein")).coins > L.lohn(20, w.ort("weidenau")).coins);
 });
 
-test("Wünsche: passende Nummer bringt mehr, Wiederholung langweilt", () => {
-  const ort = { kind: "village", likes: ["humor"], banned: [] };
-  const w = L.programmBewerten([m("a", "humor"), m("b", "humor"), m("c", "heart")], ["humor", "tension", "heart"]);
-  assert.equal(w[0].punkte, 3);
-  assert.equal(w[1].gaehnen, true);
-  assert.equal(w[1].punkte, 0);
-  assert.equal(w[2].punkte, 3);
-  const lueckeWertung = L.programmBewerten([m("a", "humor"), null, m("c", "humor")], ["humor", "x", "humor"]);
-  assert.equal(lueckeWertung[2].gaehnen, false);
-  const wuensche = L.wuenscheErzeugen(ort, L.neuerZufall(3));
-  assert.equal(wuensche.length, 3);
-  for (let i = 1; i < wuensche.length; i++) assert.notEqual(wuensche[i], wuensche[i - 1]);
-});
-
-test("Vorstellung mit Wünschen zahlt Applaus aus", () => {
+test("Markt: Bewerber anwerben kostet Gold", () => {
   const w = laden();
-  const s = L.neuesSpiel(w, 11);
-  const wuensche = L.wuenscheFuer(s, w);
-  const vorher = s.resources.food;
-  const e = L.auftretenMitWuenschen(s, ["jorin", null, "berta"], w);
-  assert.equal(e.nummern.length, 2);
-  assert.deepEqual(e.nummern.map((n) => n.brett), [0, 2]);
-  assert.equal(e.applaus, e.nummern.reduce((a, n) => a + n.punkte, 0));
-  assert.equal(s.resources.food, vorher + e.reward.food);
-  assert.equal(s.wuensche, null);
-  assert.equal(s.tutorial.vorstellung, true);
-  assert.ok(wuensche.length === 3);
+  const s = L.neuesSpiel(w, 3);
+  s.location = "weidenau";
+  const b = L.bewerber(s, w);
+  assert.ok(b && b.price > 0);
+  s.resources.coins = b.price;
+  L.anwerben(s, w);
+  assert.equal(s.resources.coins, 0);
+  assert.equal(L.mitglied(s, b.id).zustand, "fit");
+  s.location = "hollerbach";
+  assert.equal(L.bewerber(s, w), null);
+});
+
+test("Kapitelziel: mit genug Gold am Zielort einlösen", () => {
+  const w = laden();
+  const s = L.neuesSpiel(w, 3);
+  const k = L.kapitel(s, w);
+  s.location = k.place;
+  s.resources.coins = k.coins - 1;
+  assert.equal(L.zielErreichbar(s, w), false);
+  s.resources.coins = k.coins + 2;
+  L.zielEinloesen(s, w);
+  assert.equal(s.resources.coins, 2);
+  assert.equal(s.kapitel, 1);
 });

@@ -13,6 +13,9 @@ const { chromium } = require("playwright");
 
   await seite.goto(url);
   await seite.waitForTimeout(800);
+  await foto("0-kapitel");
+  await seite.click("text=Los geht");
+  await seite.waitForTimeout(200);
   await foto("1-region");
   await seite.click('[data-ort="weidenau"]');
   await seite.waitForTimeout(200);
@@ -27,23 +30,19 @@ const { chromium } = require("playwright");
     if (weiter) { await weiter.click(); await seite.waitForTimeout(200); }
   }
   await foto("4-vorstellung");
-  const karten = await seite.$$(".hand .nummer:not(.gesperrt)");
-  await karten[0].click();
-  await seite.waitForTimeout(100);
-  const zweite = (await seite.$$(".hand .nummer:not(.gesperrt)"))[0];
-  const a = await zweite.boundingBox();
-  const z = await (await seite.$('[data-brett="2"]')).boundingBox();
-  await seite.mouse.move(a.x + 30, a.y + 30);
-  await seite.mouse.down();
-  await seite.mouse.move(a.x + 60, a.y - 20, { steps: 5 });
-  await seite.mouse.move(z.x + 40, z.y + 50, { steps: 8 });
-  await seite.mouse.up();
-  await seite.waitForTimeout(150);
-  await foto("5-programm");
-  await seite.click("text=Vorhang auf");
-  await seite.waitForTimeout(1500);
-  await foto("6-spielt");
-  await seite.waitForTimeout(4500);
+  for (let runde = 0; runde < 3; runde++) {
+    const karte = (await seite.$(".hand .nummer.passt")) || (await seite.$(".hand .nummer:not([disabled])"));
+    if (!karte) break;
+    await karte.click();
+    await seite.waitForTimeout(400);
+    await foto("5-nummer-" + runde);
+    const nochEine = await seite.$(".wagen-knopf");
+    if (!nochEine || runde === 2) break;
+    await nochEine.click({ force: true });
+    await seite.waitForTimeout(300);
+  }
+  await seite.click("text=Hut rumgehen lassen", { force: true });
+  await seite.waitForTimeout(400);
   await foto("7-ergebnis");
   await seite.click(".ergebnis .hauptknopf");
   await seite.waitForTimeout(300);

@@ -6,7 +6,7 @@
   const L = window.Logik;
   const FELD_B = 844;
   const FELD_H = 390;
-  const SPEICHER = "diefahrenden-spielstand-v1";
+  const SPEICHER = "diefahrenden-spielstand-v2";
   const BEARBEITEN = location.hash === "#bearbeiten";
 
   const feld = document.getElementById("feld");
@@ -73,7 +73,7 @@
     "symbol-brot": "🍞", "symbol-muenze": "🪙", "symbol-holz": "🪵", "symbol-moral": "🙂",
     "symbol-tag": "☀️", "symbol-gefahr": "⚠️", "symbol-wald": "🌲", "symbol-jubel": "👏",
     "symbol-panne": "💥", "symbol-gaehnen": "🥱", "symbol-schloss": "🔒", "symbol-krank": "🤒",
-    "symbol-tod": "✝️", "symbol-pflege": "🌿",
+    "symbol-tod": "✝️", "symbol-pflege": "🌿", "symbol-verletzt": "🩹", "symbol-ziel": "🚩",
     "gefuehl-spannung": "⚡", "gefuehl-humor": "🎭", "gefuehl-staunen": "✨", "gefuehl-herz": "❤️",
     "disziplin-akrobatik": "🤸", "disziplin-narretei": "🃏", "disziplin-tiere": "🐾",
     "disziplin-gaukelei": "🤹", "disziplin-musik": "🎵", "disziplin-feuer": "🔥", "disziplin-erzaehlung": "📖",
@@ -128,10 +128,9 @@
   }
 
   function ringFarbe(m) {
-    if (!m.isAlive) return "#777";
-    if (m.health > 60) return "var(--gut)";
-    if (m.health > 30) return "var(--mittel)";
-    return "var(--schlecht)";
+    if (m.zustand === "tot") return "#777";
+    if (m.zustand === "verletzt") return "var(--schlecht)";
+    return "var(--gut)";
   }
 
   function portrait(m, px) {
@@ -141,14 +140,15 @@
     else kopf.textContent = m.name[0];
     const r = 46;
     const umfang = 2 * Math.PI * r;
-    const anteil = m.isAlive ? m.health / 100 : 1;
+    const anteil = 1;
     const ring = svg("svg", { viewBox: "0 0 100 100" },
       svg("circle", { cx: 50, cy: 50, r, fill: "none", stroke: "rgba(0,0,0,.35)", "stroke-width": 7 }),
       svg("circle", { cx: 50, cy: 50, r, fill: "none", stroke: ringFarbe(m), "stroke-width": 7, "stroke-linecap": "round", "stroke-dasharray": `${umfang * anteil} ${umfang}` }));
-    const p = el("div", { class: "portrait" + (m.isAlive ? "" : " tot"), style: { width: px + "px", height: px + "px" }, title: m.name },
+    const tot = m.zustand === "tot";
+    const p = el("div", { class: "portrait" + (tot ? " tot" : ""), style: { width: px + "px", height: px + "px" }, title: m.name },
       kopf, ring);
-    if (m.isAlive && m.isSick) p.append(el("span", { class: "marke" }, symbol("symbol-krank", Math.round(px * 0.4))));
-    if (!m.isAlive) p.append(el("span", { class: "marke" }, symbol("symbol-tod", Math.round(px * 0.4))));
+    if (m.zustand === "verletzt") p.append(el("span", { class: "marke" }, symbol("symbol-verletzt", Math.round(px * 0.4))));
+    if (tot) p.append(el("span", { class: "marke" }, symbol("symbol-tod", Math.round(px * 0.4))));
     return p;
   }
 
@@ -161,8 +161,6 @@
     const teile = [];
     if (r.food) teile.push(aenderung("symbol-brot", r.food));
     if (r.coins) teile.push(aenderung("symbol-muenze", r.coins));
-    if (r.wood) teile.push(aenderung("symbol-holz", r.wood));
-    if (r.morale) teile.push(aenderung("symbol-moral", r.morale));
     return teile;
   }
 
@@ -226,13 +224,22 @@
     const r = s.resources;
     const n = L.lebende(s).length;
     const wert = (bild, zahl, warn) => el("span", { class: "wert" + (warn ? " warn" : "") }, symbol(bild, 19), String(zahl));
+    const k = L.kapitel(s, welt);
     return el("div", { class: "leiste" },
       wert("symbol-brot", r.food, r.food < n * 2),
       wert("symbol-muenze", r.coins),
-      wert("symbol-holz", r.wood, r.wood < 2),
-      wert("symbol-moral", r.morale, r.morale < 25),
-      el("span", { class: "trenner" }),
-      el("span", { class: "wert" }, symbol("symbol-tag", 17), String(s.day), el("span", { class: "zeit", text: L.jahreszeit(s) })));
+      k ? el("span", { class: "trenner" }) : null,
+      k ? zielAnzeige(k) : null);
+  }
+
+  // Kapitelziel: Fähnchen, Zielort und wie viel Gold noch fehlt, als Balken.
+  function zielAnzeige(k) {
+    const ziel = welt.ort(k.place);
+    const anteil = Math.min(1, s.resources.coins / k.coins);
+    return el("span", { class: "ziel-anzeige" + (anteil >= 1 ? " voll" : ""), title: k.title },
+      symbol("symbol-ziel", 17), symbol(ORT_BILD[ziel.kind], 17),
+      el("span", { class: "ziel-balken" }, el("span", { style: { width: anteil * 100 + "%" } })),
+      el("span", { class: "ziel-zahl", text: Math.min(s.resources.coins, k.coins) + "/" + k.coins }));
   }
 
   function truppenLeiste() {
@@ -256,7 +263,7 @@
         el("span", { class: "art", text: m.role }),
         el("span", { class: "reihe" }, symbol(DISZIPLIN_BILD[m.discipline], 19), symbol(GEFUEHL_BILD[m.feeling], 19),
           el("span", { style: { color: "var(--gold)" }, text: "★".repeat(m.skill) }),
-          m.fatigue > 50 ? el("span", { class: "aenderung" }, symbol("symbol-gaehnen", 16), String(m.fatigue)) : null))));
+          L.RISKANT.has(m.discipline) ? symbol("symbol-gefahr", 16) : null))));
     }
     return wrap;
   }
@@ -326,7 +333,7 @@
       const mx = ((a.position.x + b.position.x) / 2) * 100 + "%";
       const my = ((a.position.y + b.position.y) / 2) * 100 + "%";
       wege.append(svg("circle", { cx: mx, cy: my, r: 11, fill: "rgba(13,23,24,.88)", stroke: farbe, "stroke-width": 1.5 }));
-      wege.append(svg("text", { x: mx, y: my, dy: "0.35em", "text-anchor": "middle", fill: "#E8EDE6", "font-family": "Cinzel, Georgia, serif", "font-size": 13, "font-weight": 700 }, String(weg.days)));
+      wege.append(svg("text", { x: mx, y: my, dy: "0.35em", "text-anchor": "middle", fill: "#E8EDE6", "font-family": "Cinzel, Georgia, serif", "font-size": 13, "font-weight": 700 }, String(L.wegKosten(s, weg))));
     }
     flaeche.append(wege);
 
@@ -344,7 +351,8 @@
           ui.zeige = null;
           zeichnen();
         },
-      }, symbol(ORT_BILD[ort.kind], 44), el("span", { class: "name", text: ort.name })));
+      }, symbol(ORT_BILD[ort.kind], 44), el("span", { class: "name", text: ort.name }),
+      L.kapitel(s, welt) && L.kapitel(s, welt).place === ort.id ? el("span", { class: "fahne" }, symbol("symbol-ziel", 26)) : null));
     }
 
     const start = ui.reise ? welt.ort(ui.reise.von).position : ortHier().position;
@@ -371,8 +379,8 @@
     const nachbar = welt.nachbarn(s.location).map((id) => welt.ort(id)).filter((o) => o.region === ui.region)
       .sort((a, b) => welt.weg(s.location, a.id).days - welt.weg(s.location, b.id).days)[0];
     const satz = ui.gewaehlt
-      ? "Jeder Reisetag kostet Brot und Holz. Los geht's!"
-      : "Wir müssen weiter, die Vorräte reichen nicht ewig. Tipp einen Ort an.";
+      ? "Jeder Weg kostet Brot. Im Ort spielen wir, und es gibt neues. Los geht's!"
+      : "Wir müssen weiter, das Brot reicht nicht ewig. Tipp einen Ort an.";
     const ziel = ui.gewaehlt ? ".tafel .hauptknopf" : nachbar ? `[data-ort="${nachbar.id}"]` : null;
     const hilfe = el("div", { class: "berta", style: ui.gewaehlt ? { bottom: "auto", top: "52px" } : {} },
       berta ? portrait(berta, 40) : null, el("div", { class: "blase", text: satz }));
@@ -465,22 +473,26 @@
     });
   }
 
+  // Was zahlt ein Ort? Dorf und Kloster in Brot, Markt und Burg in Gold.
+  const LOHN_BILD = { village: ["symbol-brot"], market: ["symbol-muenze"], castle: ["symbol-muenze", "symbol-muenze"], monastery: ["symbol-brot", "symbol-pflege"] };
+
   function ortTafel(ort) {
     const weg = welt.weg(s.location, ort.id);
     const hier = ort.id === s.location;
-    const muender = L.lebende(s).length;
+    const k = L.kapitel(s, welt);
     const geschmack = el("div", { class: "reihe" },
-      ort.likes.map((f) => symbol(GEFUEHL_BILD[f], 22)),
-      ort.banned.map((d) => symbol(DISZIPLIN_BILD[d], 22, "verboten")),
-      el("span", { class: "reihe", style: { gap: "3px" }, title: "Bühnenbretter" }, Array.from({ length: L.BRETTER[ort.kind] }, () => el("span", { class: "brett-mini" }))));
+      ort.likes.map((f) => symbol(GEFUEHL_BILD[f], 24)),
+      el("span", { style: { opacity: ".5" }, text: "→" }),
+      LOHN_BILD[ort.kind].map((b) => symbol(b, 22)),
+      k && k.place === ort.id ? el("span", { class: "aenderung" }, symbol("symbol-ziel", 20), symbol("symbol-muenze", 18), String(k.coins)) : null);
     let unten;
     if (weg) {
+      const kosten = L.wegKosten(s, weg);
       unten = [
         el("div", { class: "reihe" },
-          el("span", { class: "aenderung" }, symbol("symbol-tag", 18), String(weg.days)),
-          aenderung("symbol-brot", -weg.days * muender),
-          aenderung("symbol-holz", -weg.days),
-          weg.kind === "forest" ? [symbol("symbol-wald", 18), symbol("symbol-gefahr", 18)] : null),
+          aenderung("symbol-brot", -kosten, 20),
+          kosten > s.resources.food ? el("span", { class: "minus", text: "Hunger!" }) : null,
+          weg.kind === "forest" ? [symbol("symbol-wald", 20), symbol("symbol-gefahr", 18)] : null),
         el("div", {}, hauptknopf("Aufbrechen", (e) => { e.stopPropagation(); aufbrechen(ort.id); })),
       ];
     } else if (hier) {
@@ -521,8 +533,8 @@
   function reiseFertig() {
     const r = ui.reise.bericht;
     ui.reise = null;
-    if (r.hungryDays || r.coldDays || r.deaths.length || r.fellSick.length) ui.karte = { art: "bericht", bericht: r };
-    else if (r.event) ui.karte = { art: "ereignis", ereignis: r.event };
+    if (r.event) ui.karte = { art: "ereignis", ereignis: r.event, geheilt: r.geheilt };
+    else if (r.geheilt.length) ui.karte = { art: "heilung", geheilt: r.geheilt };
     else return ankommen();
     zeichnen();
   }
@@ -531,51 +543,77 @@
     ui.karte = null;
     if (L.spielVorbei(s)) {
       ui.schirm = "ende";
+    } else if (L.zielErreichbar(s, welt)) {
+      ui.karte = { art: "ziel", kapitel: L.kapitel(s, welt) };
     } else {
       ui.schirm = "vorstellung";
-      ui.vorst = { bretter: Array(L.BRETTER[ortHier().kind]).fill(null), ergebnis: null, gespielt: 0, fertig: false, timer: null };
+      if (!s.show) L.showStarten(s, welt);
+      speichern();
+      ui.vorst = { letzte: null, ergebnis: null };
     }
     zeichnen();
   }
 
-  // ---------- Tafeln: Reisebericht, Ereignis, Folgen ----------
+  // ---------- Tafeln: Ereignis, Folgen, Heilung, Kapitel ----------
+
+  function leuteReihe(ids, zeichen) {
+    return ids.map((id) => L.mitglied(s, id)).filter(Boolean).map((m) =>
+      el("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" } },
+        portrait(m, 52), el("span", { style: { fontFamily: "var(--titel)", fontSize: "12px" }, text: m.name }), zeichen ? symbol(zeichen, 20) : null));
+  }
 
   function karteSchirm() {
     const k = ui.karte;
     let inhalt;
-    if (k.art === "bericht") {
-      const r = k.bericht;
-      const leute = r.fellSick.filter((id) => !r.deaths.includes(id)).concat(r.deaths).map((id) => L.mitglied(s, id)).filter(Boolean);
+    if (k.art === "heilung") {
       inhalt = el("div", { class: "bericht" },
-        el("div", { class: "reihe", style: { gap: "18px" } },
-          el("span", { class: "aenderung gross" }, symbol("symbol-tag", 24), String(r.days)),
-          r.foodEaten ? aenderung("symbol-brot", -r.foodEaten, 20) : null, r.woodBurned ? aenderung("symbol-holz", -r.woodBurned, 20) : null),
-        r.hungryDays || r.coldDays ? el("div", { class: "reihe" },
-          Array.from({ length: r.hungryDays }, () => symbol("symbol-brot", 26, "verboten")),
-          Array.from({ length: r.coldDays }, () => symbol("symbol-holz", 26, "verboten"))) : null,
-        leute.length ? el("div", { class: "reihe", style: { gap: "14px" } },
-          leute.map((m) => el("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" } }, portrait(m, 52), el("span", { class: "nummer-name", style: { fontFamily: "var(--titel)", fontSize: "12px" }, text: m.name })))) : null,
-        hauptknopf("Weiter", () => {
-          if (r.event) { ui.karte = { art: "ereignis", ereignis: r.event }; zeichnen(); }
-          else ankommen();
+        el("div", { class: "reihe" }, symbol("ort-kloster", 30), symbol("symbol-pflege", 30)),
+        el("div", { class: "reihe", style: { gap: "14px" } }, leuteReihe(k.geheilt)),
+        hauptknopf("Weiter", ankommen));
+    } else if (k.art === "ziel" || k.art === "start") {
+      const kap = k.kapitel;
+      const ort = welt.ort(kap.place);
+      const geschafft = k.art === "ziel";
+      inhalt = el("div", { class: "bericht kapitel" },
+        el("div", { class: "kapitel-nr", text: geschafft ? "Kapitel geschafft!" : "Kapitel " + (s.kapitel + 1) }),
+        el("h2", { text: kap.title }),
+        geschafft ? el("div", { class: "jubel", text: "🎉" }) : el("p", { text: kap.text }),
+        el("div", { class: "reihe", style: { gap: "12px", fontFamily: "var(--titel)", fontSize: "18px" } },
+          symbol("symbol-ziel", 26), symbol(ORT_BILD[ort.kind], 30), ort.name, symbol("symbol-muenze", 22), (geschafft ? "−" : "") + kap.coins),
+        hauptknopf(geschafft ? "Feiern!" : "Los geht's", () => {
+          if (geschafft) {
+            L.zielEinloesen(s, welt);
+            speichern();
+            const naechstes = L.kapitel(s, welt);
+            if (naechstes) { ui.karte = { art: "start", kapitel: naechstes, nachZiel: true }; zeichnen(); return; }
+            ui.karte = { art: "frei" };
+            zeichnen();
+            return;
+          }
+          ui.karte = null;
+          if (k.nachZiel) ankommen(); else zeichnen();
         }));
+    } else if (k.art === "frei") {
+      inhalt = el("div", { class: "bericht kapitel" },
+        el("h2", { text: "Die Geschichte ist erzählt" }),
+        el("p", { text: "Ab jetzt zieht ihr frei durchs Land, so lange Brot und Glück reichen." }),
+        hauptknopf("Weiterziehen", () => { ui.karte = null; ankommen(); }));
     } else {
       const e = k.ereignis;
       const seite = el("div", { class: "seite" }, el("h2", { text: e.title }));
       if (k.art === "ereignis") {
         seite.append(el("p", { text: e.text }), el("div", { class: "luft" }));
         for (const o of e.options) {
-          const frei = L.optionMoeglich(s, o);
           seite.append(el("button", {
-            class: "option", disabled: !frei,
+            class: "option",
             onclick: () => {
               const folge = L.entscheiden(s, o, e, welt);
               speichern();
-              ui.karte = { art: "folge", ereignis: e, folge };
+              ui.karte = { art: "folge", ereignis: e, folge, geheilt: k.geheilt };
               zeichnen();
             },
           },
-          el("span", { class: "label" }, !frei ? symbol("symbol-schloss", 14) : null, o.requires ? symbol(DISZIPLIN_BILD[o.requires], 16) : null, o.label),
+          el("span", { class: "label" }, o.label),
           el("span", { class: "reihe" }, folgenSymbole(o.effect))));
         }
       } else {
@@ -584,9 +622,12 @@
           el("div", { class: "reihe" }, aenderungen(f.change),
             f.joined.map((id) => mini(L.mitglied(s, id), "+")),
             f.left.map((id) => mini(welt.troupe.find((m) => m.id === id) || welt.recruits.find((m) => m.id === id), "−")),
-            f.deaths.map((id) => portrait(L.mitglied(s, id), 30))),
+            f.hurt.concat(f.deaths).map((id) => portrait(L.mitglied(s, id), 34))),
           el("div", { class: "luft" }),
-          el("div", {}, hauptknopf("Weiter", ankommen)));
+          el("div", {}, hauptknopf("Weiter", () => {
+            if (k.geheilt && k.geheilt.length) { ui.karte = { art: "heilung", geheilt: k.geheilt }; zeichnen(); }
+            else ankommen();
+          })));
       }
       inhalt = el("div", { class: "ereignis" }, el("div", {}, grossesBild(e.image)), seite);
     }
@@ -595,126 +636,171 @@
 
   function mini(m, zeichen) {
     if (!m) return null;
-    const lebend = Object.assign({ health: 100, isAlive: true }, m);
-    return el("span", { class: "aenderung" }, el("span", { class: zeichen === "+" ? "plus" : "minus", text: zeichen }), portrait(lebend, 20));
+    const lebend = Object.assign({ zustand: "fit" }, m);
+    return el("span", { class: "aenderung" }, el("span", { class: zeichen === "+" ? "plus" : "minus", text: zeichen }), portrait(lebend, 22));
   }
 
   function folgenSymbole(e) {
-    const teile = aenderungen({ food: e.food || 0, coins: e.coins || 0, wood: e.wood || 0, morale: e.morale || 0 });
-    if (e.healthAll) teile.push(el("span", { class: "aenderung" }, "👥", aenderung("symbol-pflege", e.healthAll)));
-    if (e.healthRandom) teile.push(el("span", { class: "aenderung" }, "❔", aenderung("symbol-pflege", e.healthRandom)));
+    const teile = aenderungen({ food: e.food || 0, coins: e.coins || 0 });
+    if (e.hurt) teile.push(el("span", { class: "aenderung" }, "❔", symbol("symbol-verletzt", 18)));
+    if (e.hurtMember) {
+      const m = L.mitglied(s, e.hurtMember);
+      if (m) teile.push(el("span", { class: "aenderung" }, portrait(m, 22), symbol(m.zustand === "verletzt" ? "symbol-tod" : "symbol-verletzt", 16)));
+    }
     if (e.recruit) teile.push(mini(welt.recruits.find((m) => m.id === e.recruit), "+"));
     if (e.removeMember) teile.push(mini(L.mitglied(s, e.removeMember), "−"));
-    if (e.makeSick) {
-      const m = L.mitglied(s, e.makeSick);
-      if (m) teile.push(el("span", { class: "aenderung" }, portrait(m, 20), symbol("symbol-krank", 14)));
-    }
     return teile;
   }
 
-  // ---------- Vorstellung ----------
-  // Über jedem Brett wünscht sich das Publikum ein Gefühl. Man legt die
-  // passende Nummer darunter, jede Karte zeigt sofort ihren Applaus.
-  // Statt einer Kurve füllt sich beim Spielen der Hut mit Applaus.
+  // ---------- Vorstellung „Noch eine Nummer?“ ----------
+  // Das Publikum ruft einen Wunsch. Man tippt eine Figur an, sie tritt auf.
+  // Danach: „Noch eine!“ wagen oder den Hut rumgehen lassen.
+
+  const GEDULD_GUT = "🙂";
+  const GEDULD_WEG = "😠";
 
   function vorstellungSchirm() {
     const ort = ortHier();
     const v = ui.vorst;
-    const wuensche = v.ergebnis ? v.ergebnis.wuensche : L.wuenscheFuer(s, welt);
-    const spielt = v.ergebnis && !v.fertig;
-    const bretterMitglieder = v.bretter.map((id) => (id ? L.mitglied(s, id) : null));
-    const werte = L.programmBewerten(bretterMitglieder, wuensche);
-    const erwartet = werte.reduce((a, w) => a + (w ? w.punkte : 0), 0);
-
-    const kopf = el("div", { class: "kopfzeile" },
-      symbol(ORT_BILD[ort.kind], 26),
-      el("h1", { text: ort.name }),
-      leiste());
-
-    const publikum = el("div", { class: "publikum" },
-      PUBLIKUM[ort.kind].map((fig) => el("div", { class: "figur" }, symbol(fig, 24))));
-
-    // Ein Brett pro Nummer, darüber der Wunsch, darunter der Applaus.
-    const gespielt = v.ergebnis ? v.ergebnis.nummern.slice(0, v.gespielt) : [];
-    const jetzt = spielt ? v.ergebnis.nummern[v.gespielt] : null;
-    const spalten = v.bretter.map((id, i) => {
-      const m = bretterMitglieder[i];
-      const wert = werte[i];
-      const nummer = gespielt.find((n) => n.brett === i);
-      let marke = null;
-      if (nummer) {
-        marke = el("span", { class: "applaus " + (nummer.panne ? "schlecht" : nummer.punkte >= 3 ? "gut" : nummer.punkte === 0 ? "schlecht" : "") },
-          nummer.panne ? symbol("symbol-panne", 16) : nummer.punkte === 0 ? symbol("symbol-gaehnen", 16) : symbol("symbol-jubel", 16),
-          "+" + nummer.punkte);
-      } else if (wert && !v.ergebnis) {
-        marke = el("span", { class: "applaus " + (wert.gaehnen ? "schlecht" : wert.passt ? "gut" : "") },
-          wert.gaehnen ? symbol("symbol-gaehnen", 16) : symbol("symbol-jubel", 16),
-          "+" + wert.punkte,
-          wert.riskant && !wert.gaehnen ? symbol("symbol-gefahr", 14) : null);
-      }
-      const passt = wert && wert.passt && !wert.gaehnen;
-      return el("div", { class: "spalte" },
-        el("div", { class: "wunsch" + (passt ? " erfuellt" : "") }, symbol(GEFUEHL_BILD[wuensche[i]], 30)),
-        el("div", { class: "brett" + (m ? " voll" : "") + (jetzt && jetzt.brett === i ? " licht" : "") + (passt ? " passt" : ""), "data-brett": i },
-          m ? nummernKarte(m, true, "brett", i) : el("span", { class: "leer" }, symbol(GEFUEHL_BILD[wuensche[i]], 26))),
-        el("div", { class: "applaus-platz" }, marke));
-    });
-
-    const summe = v.ergebnis ? gespielt.reduce((a, n) => a + n.punkte, 0) : erwartet;
-    const hut = el("div", { class: "hut" + (spielt ? " spielt" : "") },
-      el("div", { class: "hut-zahl" }, symbol("symbol-jubel", 26), String(summe)),
-      el("div", { class: "hut-bild" }, "🎩"),
-      el("div", { class: "hut-text", text: v.ergebnis ? "Applaus" : "erwartet" }));
-
+    const sh = s.show;
     const teile = [
       el("div", { class: "hintergrund" }, grossesBild(BUEHNE_BILD[ort.kind])),
       el("div", { class: "verlauf" }),
-      kopf, publikum,
-      el("div", { class: "buehne" }, el("div", { class: "bretter" }, spalten)),
-      hut,
+      el("div", { class: "kopfzeile" }, symbol(ORT_BILD[ort.kind], 26), el("h1", { text: ort.name }), leiste()),
     ];
 
-    if (!v.ergebnis) {
-      const aufBuehne = new Set(v.bretter.filter(Boolean));
-      teile.push(el("div", { class: "hand" },
-        L.lebende(s).filter((m) => !aufBuehne.has(m.id)).map((m) => nummernKarte(m, L.darfAuftreten(m, ort), "hand"))));
-      const moeglich = L.lebende(s).some((m) => L.darfAuftreten(m, ort));
-      teile.push(el("div", { class: "vorhang" }, moeglich
-        ? hauptknopf("Vorhang auf", vorhangAuf, v.bretter.every((b) => !b))
-        : hauptknopf("Weiterziehen", zurKarte)));
-      if (!s.tutorial || !s.tutorial.vorstellung) teile.push(bertaHilfe(v, wuensche, ort));
+    if (!sh) {
+      // schon kassiert: nur noch die Ergebnistafel
+      if (v.ergebnis) teile.push(ergebnisTafel(ort));
+      return el("div", { class: "schirm vorstellung" }, teile);
     }
-    if (v.fertig) teile.push(ergebnisTafel(ort));
 
-    return el("div", {
-      class: "schirm vorstellung",
-      onclick: () => { if (ui.vorst && ui.vorst.ergebnis && !ui.vorst.fertig) ueberspringen(); },
-    }, teile);
+    const geht = sh.verlaufen;
+    teile.push(el("div", { class: "publikum" + (geht ? " geht" : "") },
+      PUBLIKUM[ort.kind].map((fig) => el("div", { class: "figur" }, symbol(fig, 26)))));
+
+    // Geduld des Publikums: drei Gesichter, die nach und nach böse werden
+    teile.push(el("div", { class: "geduld", "aria-label": "Geduld " + sh.geduld + " von " + L.GEDULD },
+      Array.from({ length: L.GEDULD }, (_, i) => el("span", { class: i < sh.geduld ? "" : "weg" + (v.letzte && !v.letzte.passt && i === sh.geduld ? " neu" : ""), text: i < sh.geduld ? GEDULD_GUT : GEDULD_WEG }))));
+
+    // Der Ruf: groß in der Mitte, solange das Publikum auf eine Nummer wartet
+    if (sh.offen) {
+      teile.push(el("div", { class: "ruf", key: sh.gespielt.length }, symbol(GEFUEHL_BILD[sh.ruf], 54)));
+    }
+
+    // Die Bühne zeigt die letzte Nummer mit ihrem Applaus
+    if (v.letzte && !sh.offen) {
+      const n = v.letzte;
+      const m = L.mitglied(s, n.memberID);
+      teile.push(el("div", { class: "auftritt" },
+        el("div", { class: "nummer gross" + (n.passt ? " passt" : " daneben") },
+          el("span", { class: "gefuehl" }, symbol(GEFUEHL_BILD[m.feeling], 26)),
+          portrait(m, 58),
+          el("span", { class: "wer", text: m.name })),
+        el("div", { class: "knall " + (n.passt ? "gut" : "schlecht") },
+          n.panne ? symbol("symbol-panne", 30) : n.passt ? symbol("symbol-jubel", 30) : symbol("symbol-gaehnen", 30),
+          n.punkte ? "+" + n.punkte : "")));
+    }
+
+    // Der Hut mit dem Applaus und der Serie
+    teile.push(el("div", { class: "hut" + (sh.vorbei ? "" : " spielt") + (geht ? " leer" : "") },
+      el("div", { class: "hut-zahl" }, symbol("symbol-jubel", 24), String(sh.applaus)),
+      el("div", { class: "hut-bild" }, "🎩"),
+      sh.serie > 1 ? el("div", { class: "serie", key: sh.serie }, "🔥 ×" + sh.serie) : el("div", { class: "hut-text", text: "Applaus" }),
+      geht ? el("div", { class: "verlust", text: "−" + sh.verloren }) : null));
+
+    // Die Hand: wer noch auftreten kann, mit Vorschau
+    const frei = L.showFrei(s);
+    const gespielt = new Set(sh.gespielt);
+    teile.push(el("div", { class: "hand" + (sh.offen ? "" : " ruht") },
+      L.lebende(s).map((m) => {
+        const kann = frei.includes(m);
+        return figurKarte(m, kann && sh.offen ? L.showVorschau(s, m) : null, gespielt.has(m.id));
+      })));
+
+    // Knöpfe
+    if (sh.vorbei) {
+      teile.push(el("div", { class: "entscheiden" },
+        geht ? el("div", { class: "schild schlecht", text: "Das Publikum läuft davon!" }) : el("div", { class: "schild", text: "Alle sind aufgetreten" }),
+        hauptknopf("🎩 Hut rumgehen lassen", kassieren)));
+    } else if (!sh.offen) {
+      teile.push(el("div", { class: "entscheiden" },
+        el("button", { class: "hauptknopf wagen-knopf", onclick: nochEine }, "Noch eine!"),
+        el("button", { class: "zweitknopf", onclick: kassieren }, "🎩 Hut rumgehen lassen")));
+    } else if (!frei.length) {
+      teile.push(el("div", { class: "entscheiden" }, hauptknopf("Weiterziehen", zurKarte)));
+    }
+
+    if (!s.tutorial || !s.tutorial.vorstellung) teile.push(bertaHilfe(sh));
+    if (v.ergebnis) teile.push(ergebnisTafel(ort));
+
+    return el("div", { class: "schirm vorstellung" }, teile);
   }
 
-  // Die alte Gauklerin zeigt die erste Vorstellung: eine Hand wandert von
-  // der passenden Karte zum Brett, dazu ein kurzer Satz.
-  function bertaHilfe(v, wuensche, ort) {
+  function figurKarte(m, vorschau, schonDran) {
+    const karte = el("button", {
+      class: "nummer" + (vorschau ? (vorschau.passt ? " passt" : " daneben") : " aus") + (schonDran ? " dran" : ""),
+      "data-id": m.id,
+      disabled: !vorschau,
+      onclick: vorschau ? (e) => { e.stopPropagation(); spielen(m.id); } : null,
+    },
+    el("span", { class: "gefuehl" }, symbol(GEFUEHL_BILD[m.feeling], 24)),
+    portrait(m, 42),
+    el("span", { class: "wer", text: m.name }),
+    vorschau
+      ? el("span", { class: "vorschau " + (vorschau.passt ? "gut" : "schlecht") },
+        vorschau.passt ? "+" + vorschau.punkte : GEDULD_WEG,
+        vorschau.riskant ? symbol("symbol-gefahr", 13) : null)
+      : el("span", { class: "reihe", style: { gap: "3px" } }, symbol(DISZIPLIN_BILD[m.discipline], 14),
+        el("span", { class: "sterne-klein", text: "★".repeat(m.skill) })));
+    return karte;
+  }
+
+  function spielen(id) {
+    const v = ui.vorst;
+    if (!s.show || !s.show.offen) return;
+    v.letzte = L.showNummer(s, id);
+    speichern();
+    zeichnen();
+  }
+
+  function nochEine(e) {
+    if (e) e.stopPropagation();
+    L.showWeiter(s, welt);
+    ui.vorst.letzte = null;
+    speichern();
+    zeichnen();
+  }
+
+  function kassieren(e) {
+    if (e) e.stopPropagation();
+    ui.vorst.ergebnis = L.showKassieren(s, welt);
+    ui.vorst.letzte = null;
+    speichern();
+    zeichnen();
+  }
+
+  // Die alte Gauklerin erklärt die erste Vorstellung mit einem Satz und
+  // einer Hand, die zeigt, wohin man tippt.
+  function bertaHilfe(sh) {
     const berta = L.mitglied(s, "berta") || L.lebende(s)[0];
-    const frei = v.bretter.indexOf(null);
-    const gelegt = v.bretter.filter(Boolean).length;
-    let satz, von = null, nach = null;
-    if (gelegt === 0 && frei >= 0) {
-      const passend = L.lebende(s).find((m) => m.feeling === wuensche[frei] && L.darfAuftreten(m, ort));
-      satz = "Schau, was sich das Publikum wünscht. Leg die passende Nummer darunter.";
-      von = passend ? `.hand .nummer[data-id="${passend.id}"]` : ".hand .nummer:not(.gesperrt)";
-      nach = `[data-brett="${frei}"]`;
-    } else if (frei >= 0) {
-      satz = "Gut! Zweimal dasselbe Gefühl hintereinander langweilt die Leute.";
-      von = ".hand .nummer:not(.gesperrt)";
-      nach = `[data-brett="${frei}"]`;
+    let satz, ziel = null;
+    if (sh.offen && !sh.gespielt.length) {
+      const passend = L.showFrei(s).find((m) => m.feeling === sh.ruf);
+      satz = "Das Publikum ruft, was es sehen will. Schick jemanden, der dazu passt!";
+      ziel = passend ? `.hand .nummer[data-id="${passend.id}"]` : ".hand .nummer:not([disabled])";
+    } else if (!sh.offen && !sh.vorbei && sh.gespielt.length === 1) {
+      satz = "Noch eine wagen? Die Serie bringt immer mehr. Aber sind die Leute dreimal enttäuscht, laufen sie davon.";
+      ziel = ".wagen-knopf";
+    } else if (sh.offen) {
+      satz = "Passt keiner? Dann wird das Publikum ungeduldig. Schick trotzdem jemanden.";
     } else {
-      satz = "Alle Bretter voll. Jetzt: Vorhang auf!";
-      nach = ".vorhang .hauptknopf";
+      return null;
     }
     const hilfe = el("div", { class: "berta" }, berta ? portrait(berta, 40) : null, el("div", { class: "blase", text: satz }));
+    if (!ziel) return hilfe;
     const hand = el("div", { class: "zeigehand", "aria-hidden": "true" }, "👆");
-    requestAnimationFrame(() => handBewegen(hand, von, nach));
+    requestAnimationFrame(() => handBewegen(hand, null, ziel));
     return [hilfe, hand];
   }
 
@@ -737,132 +823,39 @@
     hand.classList.add(a ? "zieht" : "tippt");
   }
 
-  function nummernKarte(m, erlaubt, wo, brettIndex) {
-    const muede = m.fatigue > 60 || m.health < 50;
-    const karte = el("div", {
-      class: "nummer" + (erlaubt ? "" : " gesperrt") + (muede && wo === "hand" ? " muede" : ""),
-      "data-id": m.id,
-    },
-    el("span", { class: "gefuehl" }, symbol(GEFUEHL_BILD[m.feeling], wo === "brett" ? 20 : 24)),
-    el("div", { style: { position: "relative" } }, portrait(m, wo === "brett" ? 40 : 42),
-      erlaubt ? null : el("span", { style: { position: "absolute", right: "-4px", bottom: "-2px" } }, symbol("symbol-schloss", 18))),
-    el("span", { class: "wer", text: m.name }),
-    el("span", { class: "reihe", style: { gap: "3px" } }, symbol(DISZIPLIN_BILD[m.discipline], 14),
-      el("span", { class: "sterne-klein", text: "★".repeat(m.skill) })));
-    if (erlaubt && !ui.vorst.ergebnis) karteZiehbar(karte, m.id, wo, brettIndex);
-    return karte;
-  }
-
-  // Tippen legt die Karte aufs nächste freie Brett (oder nimmt sie herunter),
-  // Ziehen legt sie auf ein bestimmtes Brett.
-  function karteZiehbar(karte, id, wo, brettIndex) {
-    karte.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const start = stufe(e);
-      let geist = null;
-      let ziel = null;
-      const bewegen = (ev) => {
-        const p = stufe(ev);
-        if (!geist && Math.hypot(p.x - start.x, p.y - start.y) > 8) {
-          geist = karte.cloneNode(true);
-          geist.classList.add("geist");
-          geist.classList.remove("muede");
-          feld.append(geist);
-        }
-        if (geist) {
-          geist.style.left = p.x + "px";
-          geist.style.top = p.y + "px";
-          geist.style.display = "none";
-          const unter = document.elementFromPoint(ev.clientX, ev.clientY);
-          geist.style.display = "";
-          const brett = unter && unter.closest(".brett");
-          if (ziel && ziel !== brett) ziel.classList.remove("ziel");
-          ziel = brett;
-          if (ziel) ziel.classList.add("ziel");
-        }
-      };
-      const ende = () => {
-        window.removeEventListener("pointermove", bewegen);
-        window.removeEventListener("pointerup", ende);
-        window.removeEventListener("pointercancel", ende);
-        const b = ui.vorst.bretter;
-        if (geist) {
-          geist.remove();
-          if (ziel) {
-            const i = Number(ziel.dataset.brett);
-            const alt = b.indexOf(id);
-            if (alt >= 0) b[alt] = b[i];
-            b[i] = id;
-          } else if (wo === "brett") {
-            b[brettIndex] = null;
-          }
-        } else if (wo === "hand") {
-          // aufs erste freie Brett, dessen Wunsch passt, sonst aufs erste freie
-          const m = L.mitglied(s, id);
-          const w = L.wuenscheFuer(s, welt);
-          let frei = b.findIndex((x, i) => x === null && w[i] === m.feeling);
-          if (frei < 0) frei = b.indexOf(null);
-          if (frei >= 0) b[frei] = id;
-        } else {
-          b[brettIndex] = null;
-        }
-        zeichnen();
-      };
-      window.addEventListener("pointermove", bewegen);
-      window.addEventListener("pointerup", ende);
-      window.addEventListener("pointercancel", ende);
-    });
-  }
-
-  function vorhangAuf(e) {
-    if (e) e.stopPropagation();
-    const v = ui.vorst;
-    if (v.bretter.every((b) => !b)) return;
-    v.ergebnis = L.auftretenMitWuenschen(s, v.bretter, welt);
-    speichern();
-    v.gespielt = 0;
-    zeichnen();
-    const schnell = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const schritt = () => {
-      if (ui.vorst !== v || v.fertig) return;
-      if (v.gespielt < v.ergebnis.nummern.length) {
-        v.gespielt += 1;
-        zeichnen();
-        v.timer = setTimeout(schritt, schnell ? 250 : 1200);
-      } else {
-        v.fertig = true;
-        zeichnen();
-      }
-    };
-    v.timer = setTimeout(schritt, schnell ? 250 : 900);
-  }
-
-  function ueberspringen() {
-    const v = ui.vorst;
-    clearTimeout(v.timer);
-    v.gespielt = v.ergebnis.nummern.length;
-    v.fertig = true;
-    zeichnen();
-  }
 
   function ergebnisTafel(ort) {
     const e = ui.vorst.ergebnis;
-    const handel = ort.kind === "monastery" ? null : el("div", { class: "reihe", style: { gap: "12px" } },
-      ["food", "wood"].map((ware) => el("button", {
-        class: "handel", disabled: !L.kannKaufen(s, ware),
-        onclick: (ev) => { ev.stopPropagation(); L.kaufen(s, ware); speichern(); zeichnen(); },
+    const markt = [];
+    if (ort.kind === "village" || ort.kind === "market") {
+      markt.push(el("button", {
+        class: "handel", disabled: !L.kannBrotKaufen(s, ort),
+        onclick: (ev) => { ev.stopPropagation(); L.brotKaufen(s, ort); speichern(); zeichnen(); },
+      }, aenderung("symbol-muenze", -L.BROT_KAUF.preis), "→", aenderung("symbol-brot", L.BROT_KAUF.menge)));
+    }
+    const b = L.bewerber(s, welt);
+    if (b) {
+      markt.push(el("button", {
+        class: "handel bewerber", disabled: s.resources.coins < b.price,
+        onclick: (ev) => { ev.stopPropagation(); L.anwerben(s, welt); speichern(); zeichnen(); },
       },
-      aenderung("symbol-muenze", -L.HANDEL[ware].preis), "→",
-      aenderung(ware === "food" ? "symbol-brot" : "symbol-holz", L.HANDEL[ware].menge))));
+      el("span", { class: "plus", text: "+" }),
+      portrait(Object.assign({ zustand: "fit" }, b), 40),
+      el("span", { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1px" } },
+        el("span", { style: { fontFamily: "var(--titel)", fontSize: "13px" }, text: b.name }),
+        el("span", { class: "reihe", style: { gap: "3px" } }, symbol(GEFUEHL_BILD[b.feeling], 16), symbol(DISZIPLIN_BILD[b.discipline], 14),
+          el("span", { class: "sterne-klein", text: "★".repeat(b.skill) }))),
+      aenderung("symbol-muenze", -b.price)));
+    }
     const kopie = leiste();
     kopie.style.position = "static";
     kopie.style.transform = "none";
     return el("div", { class: "schleier", onclick: (ev) => ev.stopPropagation() },
       el("div", { class: "ergebnis" },
         el("div", { class: "sterne", "aria-label": e.sterne + " von 5 Sternen", text: "★".repeat(e.sterne) + "☆".repeat(5 - e.sterne) }),
-        el("div", { class: "reihe", style: { gap: "6px", fontFamily: "var(--titel)", fontSize: "18px" } }, symbol("symbol-jubel", 24), String(e.applaus), el("span", { style: { opacity: ".6" }, text: "→" }), aenderungen(e.reward), e.healing ? aenderung("symbol-pflege", e.healing) : null),
-        handel, handel ? kopie : null,
+        el("div", { class: "reihe", style: { gap: "6px", fontFamily: "var(--titel)", fontSize: "20px" } }, "🎩", symbol("symbol-jubel", 24), String(e.applaus), el("span", { style: { opacity: ".6" }, text: "→" }), aenderungen(e.reward)),
+        markt.length ? el("div", { class: "reihe", style: { gap: "12px", justifyContent: "center" } }, markt) : null,
+        markt.length ? kopie : null,
         hauptknopf("Weiter", zurKarte)));
   }
 
@@ -870,6 +863,8 @@
     if (e) e.stopPropagation();
     if (ui.vorst) clearTimeout(ui.vorst.timer);
     ui.vorst = null;
+    s.show = null;
+    speichern();
     ui.schirm = L.spielVorbei(s) ? "ende" : "region";
     ui.region = ortHier().region;
     ui.pan = null;
@@ -882,11 +877,10 @@
     return el("div", { class: "schirm ende" },
       el("h1", { text: "Die Reise endet hier" }),
       el("div", { class: "reihe", style: { gap: "10px", justifyContent: "center" } }, s.troupe.map((m) => portrait(m, 54))),
-      el("div", { style: { opacity: ".7" }, text: "Tag " + s.day }),
       hauptknopf("Neu beginnen", () => {
         s = L.neuesSpiel(welt, neuerStartwert());
         speichern();
-        Object.assign(ui, { schirm: "region", region: ortHier().region, gewaehlt: null, reise: null, karte: null, pan: null, vorst: null });
+        Object.assign(ui, { schirm: "region", region: ortHier().region, gewaehlt: null, reise: null, karte: { art: "start", kapitel: L.kapitel(s, welt) }, pan: null, vorst: null });
         zeichnen();
       }));
   }
@@ -901,8 +895,13 @@
       const liste = await fetch("grafiken/vorhanden.json").then((r) => (r.ok ? r.json() : []));
       for (const datei of liste) dateien.set(datei.replace(/\.(png|jpe?g|webp)$/i, ""), datei);
     } catch (e) { /* ohne Bilderliste: nur Platzhalter */ }
-    s = (hot && hot.s && welt.ort(hot.s.location) && hot.s) || laden() || L.neuesSpiel(welt, neuerStartwert());
+    s = (hot && hot.s && welt.ort(hot.s.location) && hot.s) || laden();
+    if (!s) {
+      s = L.neuesSpiel(welt, neuerStartwert());
+      ui.karte = { art: "start", kapitel: L.kapitel(s, welt) };
+    }
     ui.region = ortHier().region;
+    if (s.show) { ui.schirm = "vorstellung"; ui.vorst = { letzte: null, ergebnis: null }; }
     if (window.claude && window.claude.hot) window.claude.hot.snapshot(() => ({ s }));
     zeichnen();
   }

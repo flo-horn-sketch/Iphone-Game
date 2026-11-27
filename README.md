@@ -2,7 +2,7 @@
 
 Ein iPhone-Spiel im Querformat: Du führst eine mittelalterliche Gauklertruppe durch ein erfundenes Königreich. Reisen kostet Vorräte, Vorstellungen bringen Brot und Münzen, und unterwegs warten Entscheidungen ohne gute Wahl.
 
-Dies ist der **erste spielbare Ausschnitt**: das Mittelreich mit sechs Orten, Reise auf der Karte, Vorstellungen mit Stimmungskurve und sechs Ereignisse.
+Dies ist ein **spielbarer Ausschnitt**: das Mittelreich mit sechs Orten, drei Kapiteln und acht Ereignissen. Im November 2026 wurde das Spiel stark vereinfacht: nur noch Brot und Gold, Figuren sind fit, verletzt oder tot, und die Vorstellung ist ein Wagnis („Noch eine Nummer?“).
 
 ## Web-Version (ohne Mac)
 
@@ -11,6 +11,8 @@ Im Ordner `web/` liegt derselbe Ausschnitt als Webseite, mit denselben Regeln (`
 Tests: `node --test web/tests/logik.test.js`
 
 ## iPhone-App starten
+
+> Die SwiftUI-App ruht vorerst und hat die Vereinfachung noch nicht bekommen. Gespielt wird die Web-Version.
 
 Du brauchst einen Mac mit **Xcode 16 oder neuer**.
 
@@ -22,10 +24,12 @@ Für dein eigenes iPhone einmal unter *Target DieFahrenden → Signing & Capabil
 
 ## So spielt sich der Ausschnitt
 
-- **Regionskarte:** Ort antippen, die Tafel zeigt Reisetage, Verbrauch, Geschmack des Publikums und Gefahren. Ein Knopf: *Aufbrechen*. Mit dem Globus oben links geht es zur Weltkarte.
-- **Reise:** Der Wagen fährt, jeder Tag kostet 1 Brot pro Person und 1 Holz. Ohne Brot wird gehungert, ohne Holz gefroren, beides kostet Gesundheit (Ring um das Porträt). Bei 0 stirbt ein Mitglied.
-- **Ereignis:** gemalte Tafel mit zwei oder drei Optionen, die Folgen stehen als Symbole daneben. Gesperrte Optionen zeigen, welche Disziplin fehlt.
-- **Vorstellung:** Nummernkarten antippen oder auf die Bühnenbretter ziehen, der goldene Faden zeigt die erwartete Stimmung. *Vorhang auf* spielt die Nummern nacheinander, Tippen spult vor. Danach Lohn, und auf dem Markt kann man Brot und Holz kaufen.
+- **Ziel:** Jedes Kapitel nennt einen Ort und eine Summe Gold (Fähnchen auf der Karte, Balken oben). Wer mit genug Gold dort ankommt, schafft das Kapitel. Nach drei Kapiteln geht es frei weiter.
+- **Karte:** Ort antippen, die Tafel zeigt, was das Publikum mag, was der Ort zahlt (Dorf und Kloster Brot, Markt und Burg Gold) und wie viel Brot der Weg kostet. Ein Knopf: *Aufbrechen*. Waldwege sind gefährlicher.
+- **Ereignis:** gemalte Tafel mit genau zwei Wahlen, die Folgen stehen als Symbole daneben.
+- **Vorstellung:** Das Publikum ruft einen Wunsch (⚡ Spannung, 🎭 Humor, ✨ Staunen, ❤️ Herz). Passende Figur antippen: Applaus = Können × Serie, die Serie wächst bis ×5. Passt die Figur nicht, wird das Publikum ungeduldig (😠). Riskante Nummern (Akrobatik, Feuer, Tiere) bringen mehr, können aber misslingen, dann ist die Figur verletzt. Nach jeder Nummer: *Noch eine!* oder *Hut rumgehen lassen*. Bei drei 😠 laufen die Leute weg und der halbe Hut ist leer.
+- **Figuren:** fit, verletzt (🩹, tritt nicht auf) oder tot. Wer verletzt nochmal getroffen wird, stirbt. Das Kloster heilt alle.
+- **Markt:** Nach der Vorstellung Brot kaufen und einen neuen Künstler anwerben.
 
 Der Spielstand wird automatisch gespeichert.
 
