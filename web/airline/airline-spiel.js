@@ -132,13 +132,17 @@
     const defs = sv("defs");
     const verlauf = sv("radialGradient", { id: "meerlicht", cx: "50%", cy: "35%", r: "75%" });
     verlauf.append(sv("stop", { offset: "0%", "stop-color": "#173A55" }), sv("stop", { offset: "100%", "stop-color": "#0A1828" }));
-    defs.append(verlauf);
+    const clip = sv("clipPath", { id: "kartenrand" });
+    clip.append(sv("rect", { x: 0, y: 0, width: K.B, height: K.H }));
+    defs.append(verlauf, clip);
     svg.append(defs, sv("rect", { x: 0, y: 0, width: FELD_B, height: FELD_H, fill: "url(#meerlicht)" }));
     const g = sv("g");
     const netz = sv("g", { class: "netz" });
     for (let x = 0; x <= K.B; x += 50) netz.append(sv("line", { x1: x, y1: 0, x2: x, y2: K.H }));
     for (let y = 0; y <= K.H; y += 50) netz.append(sv("line", { x1: 0, y1: y, x2: K.B, y2: y }));
-    g.append(netz, sv("path", { class: "land", d: K.land }), sv("path", { class: "grenze", d: K.grenzen }));
+    const landG = sv("g", { "clip-path": "url(#kartenrand)" });
+    landG.append(netz, sv("path", { class: "land", d: K.land }), sv("path", { class: "grenze", d: K.grenzen }));
+    g.append(landG);
     const fremd = sv("g"), routen = sv("g"), staedte = sv("g"), schilder = sv("g"), flieger = sv("g"), effekte = sv("g");
     g.append(fremd, routen, flieger, staedte, schilder, effekte);
     svg.append(g);
@@ -734,7 +738,7 @@
     speichern();
   }
 
-  const MELDUNG_ICON = { mahnung: "⚠️", kredit: "🏦", uebernahme: "🤝", gerettet: "✅", aufstieg: "🏆", stufe: "✈️", welt: "🌍", saison: "🗓️", slotweg: "🎟️", slotverloren: "🔨", kerosin: "⛽", rivale: "📰" };
+  const MELDUNG_ICON = { mahnung: "⚠️", kredit: "🏦", uebernahme: "🤝", gerettet: "✅", aufstieg: "🏆", stufe: "✈️", welt: "🌍", saison: "🗓️", slotweg: "🎟️", slotverloren: "🔨", kerosin: "⛽", rivale: "📰", angriff: "⚔️", abstieg: "📉" };
   function meldungenZeigen() {
     const neu = st.meldungen.splice(0);
     let verzoegerung = 0;

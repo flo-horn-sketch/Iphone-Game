@@ -889,6 +889,7 @@
   function rangPruefen(st) {
     const pl = platz(st);
     if (st.letzterPlatz && pl < st.letzterPlatz) melden(st, { art: "aufstieg", text: `Du bist auf Platz ${pl} aufgestiegen!`, platz: pl });
+    if (st.letzterPlatz && pl > st.letzterPlatz) melden(st, { art: "abstieg", text: `${rangliste(st)[pl - 2].name} hat dich überholt. Jetzt Platz ${pl}.`, platz: pl });
     st.letzterPlatz = pl;
     st.bestPlatz = Math.min(st.bestPlatz || 9, pl);
     if (st.stufe < 2 && firmenwert(st, SPIELER) >= REGELN.stufe2Wert) {
@@ -962,6 +963,10 @@
       const kost = kostenFuer(st, aid, c.x, c.y, c.typ).gesamt;
       if (pr.delta > 0 && (kost / pr.delta) <= stil.amortisation) {
         fliegen(st, aid, c.x, c.y, c.typ);
+        const p = st.airlines[SPIELER];
+        if (aid !== SPIELER && !(opt && opt.start) && routeVon(p, c.x, c.y)) {
+          melden(st, { art: "angriff", wer: aid, text: `${a.name} fliegt jetzt auch ${STADT[c.x].name}–${STADT[c.y].name}! „${RIVALEN[aid].sprueche.gegen}“` });
+        }
         return true;
       }
     }

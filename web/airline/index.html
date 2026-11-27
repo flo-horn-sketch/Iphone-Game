@@ -185,7 +185,8 @@ button:disabled { opacity: .4; cursor: default; }
 .tipp.pfeil-rechts::after { right: -5px; top: 14px; }
 .tipp.pfeil-unten::after { bottom: -5px; left: 22px; }
 .tipp.pfeil-links::after { left: -5px; top: 14px; }
-.tipp button { margin-top: 5px; background: #1E1A0E; color: #FFF6DA; border-radius: 8px; padding: 3px 10px; font-weight: 800; font-size: 11px; }
+.tipp { pointer-events: none; }
+.tipp button { pointer-events: auto; margin-top: 5px; background: #1E1A0E; color: #FFF6DA; border-radius: 8px; padding: 3px 10px; font-weight: 800; font-size: 11px; }
 
 /* Vollbild-Seiten: Start, Ende, Übernahme */
 .seite { position: absolute; inset: 0; z-index: 10; background: radial-gradient(ellipse at 50% 0%, #1d3a58 0%, var(--nacht) 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 14px; box-sizing: border-box; }
