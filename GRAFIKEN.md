@@ -151,6 +151,16 @@ Gemeinsamer Zusatz: *Einfaches, kräftiges Symbol, wenig Details, klar erkennbar
 |---|---|
 | App-Symbol | Gauklerwagen mit weinrotem Dach vor einem goldenen Mond, kräftige Formen, kein Text. In Xcode unter `Assets` → `AppIcon` hineinziehen. |
 
+### Spielauswahl (1536 × 1024)
+
+Die Kacheln auf dem Startbildschirm. Datei nach `web/grafiken/` legen, mehr ist nicht nötig: Die Bildliste `vorhanden.json` entsteht beim Veröffentlichen automatisch.
+
+| Datei | Prompt |
+|---|---|
+| `auswahl-fahrenden.png` | Ein Gauklerwagen mit weinrotem Dach zieht bei Abenddämmerung durch einen nebligen Märchenwald, goldene Laternen am Wagen, Platz unten im Bild frei für den Spielnamen, kein Text. |
+
+Die Bilder für **Clan-Viertel** stehen mit Prompts in [BILDER-AUFTRAG.md](BILDER-AUFTRAG.md).
+
 ## Neue Bilder hinzufügen
 
 Ein neues Porträt oder eine neue Ereignistafel braucht nur einen Eintrag in `welt.json` (Feld `portrait` oder `image`) und die passende Datei im Grafik-Ordner. Damit es auch in der Bilderübersicht erscheint, trägt man es zusätzlich in `DieFahrenden/Darstellung/GrafikListe.swift` ein.

@@ -11,7 +11,7 @@ const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
   if (pathname === "/grafiken/vorhanden.json") { res.setHeader("content-type", "application/json"); res.end("[]"); return; }
-  const file = path.resolve(root, "." + (pathname === "/" ? "/index.html" : pathname));
+  const file = path.resolve(root, "." + (pathname.endsWith("/") ? pathname + "index.html" : pathname));
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
   res.setHeader("content-type", types[path.extname(file)] || "application/octet-stream");
   fs.createReadStream(file).pipe(res);
@@ -27,6 +27,25 @@ async function smoke() {
     page.on("pageerror", e => errors.push(e.message));
     await page.route("**/*", route => route.request().url().startsWith(url) ? route.continue() : route.abort());
     await page.goto(url);
+    // Spielauswahl: Clan-Viertel ist spielbar, Die Fahrenden pausiert.
+    assert.equal(await page.locator('[data-spiel="fahrenden"]').getAttribute("aria-disabled"), "true");
+    await page.locator('[data-spiel="clanviertel"]').tap();
+    await page.waitForURL(/clanviertel\/$/);
+    await page.locator('[data-aktion="neu"]').tap();
+    await page.locator('[data-tipp="d1a"]').waitFor();
+    await page.locator('.karte[data-typ="laeufer"]').tap();
+    await page.locator('[data-viertel="fechtschule"]').tap();
+    await page.locator('[data-aktion="aufdecken"]').tap();
+    await page.locator('[data-aktion="weiter"]').waitFor({ timeout: 20000 });
+    await page.locator('[data-aktion="weiter"]').tap();
+    assert.equal(await page.locator(".tag").first().textContent(), "Tag 2von 20");
+    await page.reload();
+    await page.locator('[data-aktion="weiterspielen"]').tap();
+    await page.locator('[data-viertel="fechtschule"]').waitFor();
+    await page.locator('a.rund[href="../"]').tap();
+    await page.waitForURL(u => new URL(u).pathname === "/");
+    // Die Fahrenden bleibt unter fahrenden.html erreichbar.
+    await page.goto(url + "/fahrenden.html");
     await page.locator('[data-wagen="buehne"]').waitFor();
     assert.ok(await page.locator('[data-wagen="leicht"]').isDisabled());
     await page.locator('[data-wagen="buehne"]').tap();
