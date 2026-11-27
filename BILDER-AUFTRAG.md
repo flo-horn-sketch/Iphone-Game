@@ -12,7 +12,7 @@ Diese Datei ist der komplette Auftrag. Bitte alles hier lesen und dann die Bilde
 6. **Nur Bilder hochladen.** Keine anderen Dateien ändern. Die Liste `web/grafiken/vorhanden.json` wird beim Veröffentlichen automatisch erzeugt.
 7. Ein Commit pro Bild oder mehrere Bilder in einem Commit sind beide in Ordnung. Commit-Text zum Beispiel: `Bild clan-hafen hinzugefügt`.
 8. Ein Bild, das schon existiert, nur ersetzen, wenn ausdrücklich gewünscht.
-9. Reihenfolge: von oben nach unten. Nach jedem Bild ist es sofort im Spiel sichtbar (ein paar Minuten nach dem Hochladen). Fehlende Bilder zeigt das Spiel als Platzhalter.
+9. Reihenfolge: von oben nach unten, die Stadtkarte zuerst. Nach jedem Bild ist es sofort im Spiel sichtbar (ein paar Minuten nach dem Hochladen). Fehlende Bilder zeigt das Spiel als Platzhalter.
 
 ## Stil (vor jeden Prompt setzen)
 
@@ -24,16 +24,40 @@ Die beiden Clans:
 
 ## Die Bilder
 
+### 0. Die Stadtkarte (das wichtigste Bild)
+
+Die Karte ist das Spielbrett. Das Spiel legt die neun Viertel als runde Plätze genau an die unten genannten Stellen. Deshalb müssen die Orte im Bild ungefähr dort liegen.
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `clan-karte.png` | 1024 × 1024 | Gemalte Landkarte einer Inselstadt, Blick schräg von oben, wie eine Brettspiel-Karte. Die Insel füllt fast das ganze Bild, ringsum dunkles Meer. Oben in der Mitte ein hoher Berggipfel, links oben und rechts oben je ein kleinerer Felshang. Unten rechts ein Hafenbecken mit Schiffen, unten links ein kleiner Fischersteg. Neun deutlich erkennbare Plätze, verbunden durch helle Wege und Treppen (genaue Lage siehe Liste darunter). Die Plätze selbst bleiben eher ruhig und leer, weil das Spiel dort Spielsteine anzeigt. Links soll die Seite des Kranich-Clans etwas grünlicher wirken, rechts die Seite des Natter-Clans etwas rötlicher, die Mitte neutral. Keine Schrift, keine Beschriftungen, keine Wappen mit Buchstaben. |
+
+**Lage der neun Plätze** (von links nach rechts und von oben nach unten gemessen, in Prozent der Bildbreite und -höhe):
+
+| Platz | Links | Oben | Was dort zu sehen ist |
+|---|---|---|---|
+| Klippenmine | 20 % | 22 % | Mineneingang am linken Felshang |
+| Hohe Mine | 50 % | 16 % | Mine am Berggipfel |
+| Schlotmine | 80 % | 22 % | Mine am rechten Felshang |
+| Kranichhaus | 20 % | 50 % | befestigtes Anwesen mit grünen Laternen |
+| Fechtschule | 50 % | 47 % | Platz mit Übungshof in der Stadtmitte |
+| Natternhaus | 80 % | 50 % | befestigtes Anwesen mit roten Laternen |
+| Fischmarkt | 20 % | 79 % | Markt am Fischersteg |
+| Nachtmarkt | 50 % | 76 % | Markt auf einer Treppe |
+| Hafen | 80 % | 81 % | Hafenkai am Hafenbecken |
+
+**Wege** verbinden nur diese Nachbarn: jeder Platz mit dem direkt links, rechts, darüber und darunter (wie ein Gitter aus drei mal drei, aber als geschwungene Wege gemalt). Keine diagonalen Wege.
+
 ### 1. Hintergrund und Spielauswahl
 
 | Datei | Größe | Prompt |
 |---|---|---|
-| `clan-stadt.png` | 1536 × 1024 | Blick von oben schräg auf die ganze Inselstadt bei Nacht, viele leuchtende Laternen in Grün und Rot, Hafen unten, Minen oben am Berg. Eher dunkel und ruhig, weil Spielfiguren darüber liegen. |
+| `clan-stadt.png` | 1536 × 1024 | Stimmungsbild für den Startbildschirm: die Inselstadt bei Nacht von weitem, viele leuchtende Laternen in Grün und Rot, Hafen unten, Minen oben am Berg. Eher dunkel und ruhig, weil Text darüber liegt. |
 | `auswahl-clanviertel.png` | 1536 × 1024 | Zwei Laternen hängen sich gegenüber über einer engen Gasse, eine jadegrün, eine rot, dahinter die nächtliche Inselstadt. Unten im Bild etwas Ruhe für den Spielnamen. |
 
-### 2. Die neun Viertel (quadratische Kacheln)
+### 2. Die neun Viertel (runde Medaillons)
 
-Jedes Viertel als eigene Szene, frontal oder leicht von oben, die Mitte des Bildes ist das Wichtigste (die Ränder werden teilweise von Spielsteinen verdeckt). Keine Personen im Vordergrund.
+Jedes Viertel als kleines Bild, das im Spiel rund ausgeschnitten und klein auf der Karte gezeigt wird. Ein klares Motiv genau in der Mitte, wenig Details am Rand, keine Personen im Vordergrund.
 
 | Datei | Größe | Prompt |
 |---|---|---|

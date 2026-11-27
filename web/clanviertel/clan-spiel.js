@@ -147,33 +147,100 @@
       el("i", { class: "laterne" + (besitzer && i < an ? " " + besitzer : "") + (neu && i === an - 1 ? " neu" : "") })));
   }
 
+  // Lage der Viertel auf der Karte (Anteil 0–1 von Breite und Höhe). Muss zu clan-karte.png passen,
+  // siehe BILDER-AUFTRAG.md.
+  const LAGE = {
+    klippenmine: { x: 0.2, y: 0.22 }, hohemine: { x: 0.5, y: 0.16 }, schlotmine: { x: 0.8, y: 0.22 },
+    kranichhaus: { x: 0.2, y: 0.5 }, fechtschule: { x: 0.5, y: 0.47 }, natternhaus: { x: 0.8, y: 0.5 },
+    fischmarkt: { x: 0.2, y: 0.79 }, nachtmarkt: { x: 0.5, y: 0.76 }, hafen: { x: 0.8, y: 0.81 },
+  };
+  const KARTE = { x: 230, y: 6, b: 384, h: 378 };
+
+  // Platzhalter-Insel, solange es clan-karte.png noch nicht gibt.
+  function ersatzKarte() {
+    const ns = "http://www.w3.org/2000/svg";
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("viewBox", "0 0 100 100");
+    s.setAttribute("preserveAspectRatio", "none");
+    s.setAttribute("class", "karte-ersatz");
+    s.innerHTML = `
+      <defs>
+        <radialGradient id="insel" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#3f5a44"/><stop offset="1" stop-color="#22362c"/></radialGradient>
+        <linearGradient id="berg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a9a90"/><stop offset="1" stop-color="#3a4a42"/></linearGradient>
+      </defs>
+      <path d="M8,55 C4,35 14,14 32,8 C45,3 58,3 70,8 C88,14 97,32 94,52 C92,68 96,84 84,94 C70,99 52,95 40,97 C24,99 10,90 8,76 Z" fill="url(#insel)" stroke="#6d8a73" stroke-width=".6"/>
+      <path d="M30,24 L42,6 L50,2 L58,6 L70,24 Z" fill="url(#berg)" opacity=".75"/>
+      <path d="M12,30 L20,14 L28,30 Z M72,30 L80,14 L88,30 Z" fill="url(#berg)" opacity=".55"/>
+      <path d="M68,90 C72,82 86,80 96,86 L100,100 L66,100 Z" fill="#14343c" opacity=".9"/>
+      <path d="M10,88 C14,84 24,86 28,92 L28,100 L6,100 Z" fill="#14343c" opacity=".8"/>`;
+    return s;
+  }
+
+  // Wege zwischen benachbarten Vierteln.
+  function wege() {
+    const ns = "http://www.w3.org/2000/svg";
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("class", "wege");
+    s.setAttribute("viewBox", `0 0 ${KARTE.b} ${KARTE.h}`);
+    const gesehen = new Set();
+    for (const v of L.VIERTEL) for (const n of L.nachbarn(v.id)) {
+      const k = [v.id, n].sort().join("-");
+      if (gesehen.has(k)) continue;
+      gesehen.add(k);
+      const a = LAGE[v.id], b = LAGE[n];
+      const linie = document.createElementNS(ns, "path");
+      const mx = (a.x + b.x) / 2 * KARTE.b + (a.y - b.y) * 12, my = (a.y + b.y) / 2 * KARTE.h + (b.x - a.x) * 12;
+      linie.setAttribute("d", `M${a.x * KARTE.b},${a.y * KARTE.h} Q${mx},${my} ${b.x * KARTE.b},${b.y * KARTE.h}`);
+      linie.setAttribute("fill", "none");
+      linie.setAttribute("stroke", "rgba(240,220,170,.45)");
+      linie.setAttribute("stroke-width", "3");
+      linie.setAttribute("stroke-dasharray", "2 6");
+      linie.setAttribute("stroke-linecap", "round");
+      s.append(linie);
+    }
+    return s;
+  }
+
+  function figurenReihe(figs, klasse) {
+    const zeilen = [];
+    const zeige = figs.slice(0, 4);
+    for (let i = 0; i < zeige.length; i += 2) zeilen.push(el("div", { class: "zeile" }, zeige.slice(i, i + 2).map((f) => token(f, 19))));
+    if (figs.length > 4) zeilen.push(el("span", { class: "mehr", text: "+" + (figs.length - 4) }));
+    return el("div", { class: klasse }, zeilen);
+  }
+
   function stadt(vs) {
     const gew = ui.gewaehlt && !ui.busy ? L.figur(st, ui.gewaehlt) : null;
     const spaeher = Object.fromEntries((vs.aufgedeckt || []).map((a) => [a.ziel, a.staerke]));
-    return el("div", { class: "stadt" + (gew ? " waehlen" : "") }, L.VIERTEL.map((v) => {
-      const besitzer = vs.besitz[v.id];
-      const pFigs = L.bereit(vs, "p").filter((f) => L.ortVon(f) === v.id);
-      const rFigs = L.bereit(vs, "r").filter((f) => L.ortVon(f) === v.id);
-      const erreichbar = gew && (v.id === L.HAUPTHAUS.p || L.erreichbar(st, "p", v.id, gew.typ));
-      const zeigeWert = !ui.anzeige && pFigs.length;
-      const mauern = v.art === "haupthaus" ? (L.clankrieg(vs) ? L.REGELN.mauernKrieg : L.REGELN.mauern) : 0;
-      return el("div", {
-        class: "viertel" + (besitzer ? " " + besitzer : "") + (erreichbar ? " erreichbar" : "") +
-          (!ui.anzeige && vs.ansage === v.id ? " ansage" : "") + (ui.fokus === v.id ? " fokus" : ""),
-        "data-viertel": v.id,
-        onclick: () => viertelTippen(v.id),
-      },
-      bildEl("clan-viertel-" + v.id, "bildchen") || el("div", { class: "wappen", text: WAPPEN[v.art] }),
-      laternenEl(vs, v),
-      el("div", { class: "ertrag", text: ERTRAG[v.art] }),
-      el("div", { class: "reihe-r" }, rFigs.map((f) => token(f, 22))),
-      el("div", { class: "reihe-p" }, pFigs.map((f) => token(f, 24))),
-      zeigeWert ? el("div", { class: "wert", title: "Deine Stärke hier", text: "⚔ " + L.spielerWertung(st, v.id).summe }) : null,
-      !ui.anzeige && vs.ansage === v.id ? el("div", { class: "ziel", html: "🎯 " + rivalName(vs) + (spaeher[v.id] != null ? " · " + spaeher[v.id] : "") }) : null,
-      !ui.anzeige && spaeher[v.id] != null && vs.ansage !== v.id ? el("div", { class: "ziel spaeher", text: "👁 " + spaeher[v.id] }) : null,
-      v.art === "haupthaus" && vs.tag < L.REGELN.friedenBis && !ui.anzeige ? el("div", { class: "frieden", text: "🕊 Frieden bis Tag " + L.REGELN.friedenBis }) : null,
-      el("div", { class: "name", text: v.name + (mauern ? "  🧱" + mauern : "") }));
-    }));
+    return el("div", { class: "stadt" + (gew ? " waehlen" : "") },
+      bildEl("clan-karte", "karte-bild") || ersatzKarte(),
+      wege(),
+      L.VIERTEL.map((v) => {
+        const besitzer = vs.besitz[v.id];
+        const pFigs = L.bereit(vs, "p").filter((f) => L.ortVon(f) === v.id);
+        const rFigs = L.bereit(vs, "r").filter((f) => L.ortVon(f) === v.id);
+        const erreichbar = gew && (v.id === L.HAUPTHAUS.p || L.erreichbar(st, "p", v.id, gew.typ));
+        const zeigeWert = !ui.anzeige && pFigs.length;
+        const mauern = v.art === "haupthaus" ? (L.clankrieg(vs) ? L.REGELN.mauernKrieg : L.REGELN.mauern) : 0;
+        const lage = LAGE[v.id];
+        return el("div", {
+          class: "viertel" + (besitzer ? " " + besitzer : "") + (erreichbar ? " erreichbar" : "") +
+            (!ui.anzeige && vs.ansage === v.id ? " ansage" : "") + (ui.fokus === v.id ? " fokus" : ""),
+          "data-viertel": v.id,
+          style: { left: lage.x * 100 + "%", top: lage.y * 100 + "%" },
+          onclick: () => viertelTippen(v.id),
+        },
+        laternenEl(vs, v),
+        el("div", { class: "scheibe" }, bildEl("clan-viertel-" + v.id) || el("span", { class: "wappen", text: WAPPEN[v.art] })),
+        el("div", { class: "name", text: v.name + (mauern ? " 🧱" + mauern : "") }),
+        el("div", { class: "ertrag", text: ERTRAG[v.art] }),
+        figurenReihe(pFigs, "reihe-p"),
+        figurenReihe(rFigs, "reihe-r"),
+        zeigeWert ? el("div", { class: "wert", title: "Deine Stärke hier", text: "⚔ " + L.spielerWertung(st, v.id).summe }) : null,
+        !ui.anzeige && vs.ansage === v.id ? el("div", { class: "ziel", html: "🎯 " + rivalName(vs) + (spaeher[v.id] != null ? " · " + spaeher[v.id] : "") }) : null,
+        !ui.anzeige && spaeher[v.id] != null && vs.ansage !== v.id ? el("div", { class: "ziel spaeher", text: "👁 " + spaeher[v.id] }) : null,
+        v.art === "haupthaus" && vs.tag < L.REGELN.friedenBis && !ui.anzeige ? el("div", { class: "frieden", text: "🕊 bis Tag " + L.REGELN.friedenBis }) : null);
+      }));
   }
 
   function rechteLeiste(vs) {
@@ -280,8 +347,8 @@
   // ---------- Aufdecken: der Höhepunkt jedes Tages ----------
 
   function tileMitte(id) {
-    const v = L.NACH_ID[id];
-    return { x: 214 + (v.c + 0.5) * (416 / 3), y: 6 + (v.r + 0.5) * (378 / 3) };
+    const l = LAGE[id];
+    return { x: KARTE.x + l.x * KARTE.b, y: Math.max(40, Math.min(350, KARTE.y + l.y * KARTE.h)) };
   }
 
   async function zaehlen(elem, ziel, ms) {
@@ -442,7 +509,8 @@
       [v.art === "haupthaus" ? "🧱 Mauern" : "🏮 Heim", w.heim]].filter(([, n]) => n);
     const ertragText = { mine: "Volle Laternen: jeden Abend 1 💎 Jade.", markt: "Volle Laternen: jeden Abend 2 🪙 Gold.",
       schule: `Volle Laternen: alle ${L.REGELN.schuleTage} Tage ein neuer Kämpfer (im Rückstand alle ${L.REGELN.schuleTageRueckstand}).`,
-      haupthaus: "Jeden Abend 2 🪙. Fällt es, ist die Partie verloren." }[v.art];
+      haupthaus: "Jeden Abend 2 🪙. Fällt es, ist die Partie verloren. Angreifen darf man es erst ab Tag " + L.REGELN.friedenBis +
+        " und nur aus einem Nachbarviertel mit drei Laternen (Belagerung)." }[v.art];
     return schleier(el("div", { class: "tafel" },
       el("h2", { text: WAPPEN[v.art] + " " + v.name }),
       el("p", { text: besitzer === "p" ? "Gehört dir." : besitzer === "r" ? "Gehört " + rivalName() + "." : "Gehört niemandem. Wer zuerst dort steht, nimmt es." }),
@@ -502,12 +570,12 @@
     { id: "d2a", tag: 2, text: "Rechts sagt die Rivalin jeden Tag an, wo sie angreift. Ihr Ziel pulsiert rot. Stell dich dort hin, wenn du es halten willst.",
       ziel: ".sprechblase" },
     { id: "d2b", tag: 2, text: "Die <b>🏮 Laternen</b> zeigen, wem ein Viertel treu ist. Jeder bewachte Tag zündet eine an. Erst mit drei bringt es Ertrag.",
-      ziel: '[data-viertel="fechtschule"] .laternen' },
+      ziel: '[data-viertel="klippenmine"] .laternen' },
     { id: "d3", tag: 3, text: "Deine Mine liefert <b>💎 Jade</b>. Tipp einen Kämpfer an und dann <b>Jade umhängen</b>. Der erste Stein gibt +2.",
       ziel: '[data-aktion="jade"]' },
     { id: "d4", tag: 4, text: "Mit 5 🪙 wirbst du neue Kämpfer an: <b>Wächter</b> halten, <b>Läufer</b> kommen weit, <b>Späher</b> sehen gegnerische Züge.",
       ziel: '[data-aktion="anwerben"]' },
-    { id: "d5", tag: 5, text: "Ab heute dürfen Haupthäuser angegriffen werden. Du gewinnst mit <b>7 Vierteln mit 🏮🏮🏮</b> oder mit dem Natternhaus.",
+    { id: "d5", tag: 5, text: "Ab heute dürfen Haupthäuser angegriffen werden, aber nur aus einem Nachbarviertel mit 🏮🏮🏮. Du gewinnst mit <b>7 Vierteln mit 🏮🏮🏮</b> oder mit dem Natternhaus.",
       ziel: ".fortschritt" },
   ];
 

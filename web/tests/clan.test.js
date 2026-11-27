@@ -28,13 +28,15 @@ test("Jade wirkt abnehmend: +2, +3, +4, höchstens drei", () => {
   assert.equal(st.jade.p, 2);
 });
 
-test("Erreichbar: Nachbarn, Läufer zwei weit, Haupthaus erst ab Tag 5", () => {
+test("Erreichbar: Nachbarn, Läufer zwei weit, Haupthaus erst ab Tag 5 und nur mit Belagerung", () => {
   const st = L.neuesSpiel();
   assert.ok(L.erreichbar(st, "p", "fechtschule", "waechter"));
   assert.ok(!L.erreichbar(st, "p", "schlotmine", "waechter"));
   assert.ok(L.erreichbar(st, "p", "schlotmine", "laeufer"));
   assert.ok(!L.erreichbar(st, "p", "natternhaus", "laeufer"));
-  st.tag = 5; st.besitz.fechtschule = "p";
+  st.tag = 5; st.besitz.fechtschule = "p"; st.laternen.fechtschule = 0;
+  assert.ok(!L.erreichbar(st, "p", "natternhaus", "waechter"), "Belagerung braucht volle Laternen");
+  st.laternen.fechtschule = 3;
   assert.ok(L.erreichbar(st, "p", "natternhaus", "waechter"));
 });
 
@@ -56,7 +58,7 @@ test("Stärke ohne Würfel: Figuren, Wächter, Führer, Nachbarn, Heimvorteil", 
   assert.equal(L.spielerWertung(st, "kranichhaus").summe, L.REGELN.mauern);
 });
 
-test("Kampf: Gleichstand hält der Verteidiger, doppelte Stärke tötet und erbeutet Jade", () => {
+test("Kampf: Verteidiger gewinnt, Verlierer wird verletzt", () => {
   const st = L.neuesSpiel();
   leer(st);
   // Rivale greift den Fischmarkt mit Plan an
@@ -117,5 +119,54 @@ test("Ganze Partien enden spätestens an Tag 20 und laufen ohne Fehler", () => {
     assert.ok(st.ende, riv);
     assert.ok(st.tag <= L.REGELN.letzterTag);
     assert.ok(st.tag >= L.REGELN.friedenBis, "nicht vor Tag 5 entschieden");
+  }
+});
+
+test("Doppelte Stärke: Verlierer fällt, Sieger erbeutet seine Jade", () => {
+  const st = L.neuesSpiel();
+  for (const f of L.figurenVon(st, "p")) L.platzieren(st, f.id, null);
+  st.plan = {};
+  for (const f of L.bereit(st, "r")) st.plan[f.id] = "natternhaus";
+  const opfer = L.bereit(st, "r").find((f) => f.typ === "laeufer");
+  opfer.jade = 1; // Stärke 4
+  st.plan[opfer.id] = "hohemine";
+  for (const f of L.figurenVon(st, "p").filter((f) => f.typ !== "anfuehrer")) { f.jade = 1; L.platzieren(st, f.id, "hohemine"); }
+  const vorher = st.jade.p;
+  const b = L.tagAufloesen(st);
+  const k = b.kaempfe.find((x) => x.viertel === "hohemine");
+  assert.equal(k.sieger, "p");
+  assert.equal(k.folge, "gefallen");
+  assert.equal(k.beute, 1);
+  assert.ok(!L.figur(st, opfer.id));
+  assert.ok(st.jade.p >= vorher + 1);
+});
+
+test("Gleichstand auf eigenem Boden: Verteidiger hält, niemand verletzt", () => {
+  const st = L.neuesSpiel();
+  for (const f of L.figurenVon(st, "p")) L.platzieren(st, f.id, null);
+  st.plan = {};
+  for (const f of L.bereit(st, "r")) st.plan[f.id] = "natternhaus";
+  const w = L.figurenVon(st, "p").find((f) => f.typ === "waechter");
+  L.platzieren(st, w.id, "fischmarkt"); // 2 + Wächter 2 + Nachbar 1 + Heim 1 + Ilka 1 = 7
+  const angreifer = L.bereit(st, "r").filter((f) => f.typ !== "anfuehrer");
+  angreifer[0].jade = 2; angreifer[1].jade = 0; // 5 + 2 = 7
+  st.plan[angreifer[0].id] = "fischmarkt"; st.plan[angreifer[1].id] = "fischmarkt";
+  const b = L.tagAufloesen(st);
+  const k = b.kaempfe.find((x) => x.viertel === "fischmarkt");
+  assert.equal(k.spieler.summe, k.rivale.summe);
+  assert.equal(k.folge, "gleichstand");
+  assert.equal(st.besitz.fischmarkt, "p");
+  assert.equal(k.verluste.length, 0);
+});
+
+test("Wer nichts tut, verliert gegen jeden Rivalen", () => {
+  // Wer gar nichts tut, verliert gegen jeden Rivalen.
+  for (const riv of Object.keys(L.RIVALEN)) {
+    const st = L.neuesSpiel(riv);
+    while (!st.ende) {
+      if (st.ereignis) L.ereignisWaehlen(st, 1);
+      L.tagAufloesen(st);
+    }
+    assert.ok(st.ende.sieger === "r", "Wer nichts tut, verliert (" + riv + ")");
   }
 });
