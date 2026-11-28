@@ -41,7 +41,7 @@ body {
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   background: var(--nacht);
 }
-#feld { position: absolute; width: 844px; height: 390px; overflow: hidden; font-size: 12px; background: var(--meer); }
+#feld { position: absolute; left: 0; top: 0; width: 844px; height: 390px; transform-origin: 0 0; --sl: 0px; --sr: 0px; --st: 0px; --sb: 0px; overflow: hidden; font-size: 12px; background: var(--meer); }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 button:disabled { opacity: .4; cursor: default; }
 .zahl { font-variant-numeric: tabular-nums; }
@@ -49,7 +49,7 @@ button:disabled { opacity: .4; cursor: default; }
 .minus { color: var(--rot); }
 
 /* Karte */
-#karte { position: absolute; inset: 0; width: 844px; height: 390px; display: block; }
+#karte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #karte .land { fill: var(--land); stroke: var(--land-rand); stroke-width: .6; }
 #karte .grenze { fill: none; stroke: rgba(160, 210, 200, .18); stroke-width: .5; }
 #karte .netz { fill: none; stroke: rgba(255,255,255,.035); stroke-width: .5; }
@@ -66,7 +66,7 @@ button:disabled { opacity: .4; cursor: default; }
 @keyframes hoch { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-14px); } }
 
 /* Kopfleiste */
-.oben { position: absolute; top: 6px; left: 6px; right: 6px; height: 38px; display: flex; gap: 6px; align-items: stretch; z-index: 5; pointer-events: none; }
+.oben { position: absolute; top: calc(6px + var(--st)); left: calc(6px + var(--sl)); right: calc(6px + var(--sr)); height: 38px; display: flex; gap: 6px; align-items: stretch; z-index: 5; pointer-events: none; }
 .oben > * { pointer-events: auto; }
 .kachel { background: var(--tafel); border: 1px solid var(--linie); border-radius: 12px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 .rundknopf { width: 38px; justify-content: center; padding: 0; font-size: 17px; text-decoration: none; color: var(--text); }
@@ -96,7 +96,7 @@ button:disabled { opacity: .4; cursor: default; }
 .warnung button { background: #fff; color: #5a0d0d; border-radius: 8px; padding: 4px 10px; font-weight: 800; }
 
 /* Gelegenheiten links */
-.gelegenheiten { position: absolute; left: 6px; top: 50px; width: 214px; display: flex; flex-direction: column; gap: 6px; z-index: 4; }
+.gelegenheiten { position: absolute; left: calc(6px + var(--sl)); top: calc(50px + var(--st)); width: 214px; display: flex; flex-direction: column; gap: 6px; z-index: 4; }
 .gel { position: relative; overflow: hidden; background: var(--tafel); border: 1px solid rgba(242,193,78,.55); border-radius: 12px; display: flex; gap: 8px; padding: 7px; animation: rein .35s ease-out; }
 .gel.info { border-color: var(--linie); }
 @keyframes rein { from { transform: translateX(-30px); opacity: 0; } }
@@ -111,7 +111,7 @@ button:disabled { opacity: .4; cursor: default; }
 .gel .rest { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--gold); }
 
 /* Seitentafel rechts */
-.tafel { position: absolute; right: 6px; top: 50px; bottom: 6px; width: 262px; z-index: 6; background: var(--tafel); border: 1px solid var(--linie);
+.tafel { position: absolute; right: calc(6px + var(--sr)); top: calc(50px + var(--st)); bottom: calc(6px + var(--sb)); width: 262px; z-index: 6; background: var(--tafel); border: 1px solid var(--linie);
   border-radius: 14px; box-shadow: 0 8px 26px rgba(0,0,0,.45); display: flex; flex-direction: column; overflow: hidden; animation: tafelRein .2s ease-out; }
 @keyframes tafelRein { from { transform: translateX(24px); opacity: 0; } }
 .tafel .kopf { display: flex; align-items: center; gap: 8px; padding: 9px 10px 6px; }
@@ -167,14 +167,14 @@ button:disabled { opacity: .4; cursor: default; }
 .spruch { font-style: italic; font-size: 10.5px; color: var(--blass); }
 
 /* Tagesabschluss */
-.abschluss { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 5; background: var(--tafel); border: 1px solid var(--linie);
+.abschluss { position: absolute; left: 50%; bottom: calc(8px + var(--sb)); transform: translateX(-50%); z-index: 5; background: var(--tafel); border: 1px solid var(--linie);
   border-radius: 14px; padding: 7px 12px; display: flex; gap: 12px; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.45); animation: abschluss 6s ease forwards; pointer-events: none; }
 @keyframes abschluss { 0% { opacity: 0; transform: translate(-50%, 20px); } 6%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 10px); } }
 .abschluss .gross { font-size: 22px; }
 .abschluss .liste { display: flex; flex-direction: column; gap: 1px; font-size: 10.5px; }
 
 /* Meldungen */
-.meldung { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); z-index: 7; max-width: 380px; background: var(--tafel); border: 1px solid var(--gold);
+.meldung { position: absolute; left: 50%; top: calc(50px + var(--st)); transform: translateX(-50%); z-index: 7; max-width: 380px; background: var(--tafel); border: 1px solid var(--gold);
   border-radius: 12px; padding: 7px 12px; display: flex; gap: 8px; align-items: center; font-weight: 600; animation: meldung 4.2s ease forwards; pointer-events: none; }
 @keyframes meldung { 0% { opacity: 0; transform: translate(-50%, -10px); } 8%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
 
@@ -190,7 +190,7 @@ button:disabled { opacity: .4; cursor: default; }
 .tipp button { pointer-events: auto; margin-top: 5px; background: #1E1A0E; color: #FFF6DA; border-radius: 8px; padding: 3px 10px; font-weight: 800; font-size: 11px; }
 
 /* Vollbild-Seiten: Start, Ende, Übernahme */
-.seite { position: absolute; inset: 0; z-index: 10; background: radial-gradient(ellipse at 50% 0%, #1d3a58 0%, var(--nacht) 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 14px; box-sizing: border-box; }
+.seite { position: absolute; inset: 0; z-index: 10; background: radial-gradient(ellipse at 50% 0%, #1d3a58 0%, var(--nacht) 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: calc(14px + var(--st)) calc(14px + var(--sr)) calc(14px + var(--sb)) calc(14px + var(--sl)); box-sizing: border-box; }
 .seite .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .38; pointer-events: none; }
 .seite > *:not(.bg) { position: relative; }
 .seite h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: 1px; }
@@ -225,7 +225,7 @@ button:disabled { opacity: .4; cursor: default; }
 .linienknopf { font-weight: 800; font-size: 13px; padding: 0 12px; border-color: rgba(242,193,78,.55); }
 
 /* Ziel unten */
-.zielleiste { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 5; width: 470px; height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px;
+.zielleiste { position: absolute; left: 50%; bottom: calc(6px + var(--sb)); transform: translateX(-50%); z-index: 5; width: 470px; height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px;
   background: var(--tafel); border: 1px solid rgba(242,193,78,.5); border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.35); text-align: left; }
 .zielnr { font-size: 17px; }
 .zieltext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -240,7 +240,7 @@ button:disabled { opacity: .4; cursor: default; }
 .editor-an .meldung { top: 92px; }
 
 /* Menü */
-.menue { position: absolute; top: 48px; right: 6px; z-index: 8; width: 210px; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 5px;
+.menue { position: absolute; top: calc(48px + var(--st)); right: calc(6px + var(--sr)); z-index: 8; width: 210px; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 5px;
   display: flex; flex-direction: column; gap: 2px; box-shadow: 0 8px 26px rgba(0,0,0,.5); animation: rein .2s ease-out; }
 .menue-punkt { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; font-weight: 600; font-size: 13px; text-align: left; }
 .menue-punkt:active { background: rgba(255,255,255,.08); }
@@ -269,7 +269,7 @@ button:disabled { opacity: .4; cursor: default; }
 .gesperrt-text { margin-top: auto !important; text-align: center; color: var(--blass); font-size: 11px; padding: 7px 0; border: 1px dashed var(--linie); border-radius: 10px; }
 
 /* Linien-Editor */
-.editor { position: absolute; left: 6px; top: 50px; bottom: 6px; width: 214px; z-index: 6; display: flex; flex-direction: column; gap: 6px;
+.editor { position: absolute; left: calc(6px + var(--sl)); top: calc(50px + var(--st)); bottom: calc(6px + var(--sb)); width: 214px; z-index: 6; display: flex; flex-direction: column; gap: 6px;
   background: var(--tafel); border: 1px solid rgba(242,193,78,.55); border-radius: 14px; padding: 7px; box-sizing: border-box; box-shadow: 0 8px 26px rgba(0,0,0,.45); animation: rein .2s ease-out; }
 .editor-kopf { display: flex; align-items: center; gap: 6px; }
 .editor-titel { flex: 1; font-weight: 800; font-size: 13px; }
@@ -425,7 +425,7 @@ html, body { touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjus
 .update button { font: inherit; border: 0; border-radius: 999px; background: #0B1622; color: #F2C14E; padding: 6px 12px; cursor: pointer; }
 
 /* Unten links: Rivalen einzeln auf der Karte zeigen. */
-.rivalenknopf { position: absolute; left: 6px; bottom: 8px; z-index: 5; height: 32px; display: flex; align-items: center; gap: 2px; padding: 0 3px 0 8px;
+.rivalenknopf { position: absolute; left: calc(6px + var(--sl)); bottom: calc(8px + var(--sb)); z-index: 5; height: 32px; display: flex; align-items: center; gap: 2px; padding: 0 3px 0 8px;
   background: var(--tafel); border: 1px solid var(--linie); border-radius: 999px; color: var(--blass); font: 600 11px 'Outfit', system-ui, sans-serif; }
 .rivalenknopf > span { margin-right: 2px; }
 .rivalenknopf.an { border-color: rgba(242,193,78,.6); color: var(--text); }
@@ -435,6 +435,12 @@ html, body { touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjus
 .rivale-punkt.an { border-color: var(--farbe); color: var(--text); }
 .rivale-punkt.an i { background: var(--farbe); }
 .tafel-an .rivalenknopf, .editor-an .rivalenknopf { display: none; }
+
+/* Echte Bilder füllen ihren Rahmen, ohne ihn aufzublähen (große PNGs von ChatGPT). */
+.gel .bildchen, .wahl .ic, .gesicht, .karte-wahl .bild, .store-bild, .ereignisbild, .regelbild, .art-bild { position: relative; overflow: hidden; }
+.gel .bildchen img, .wahl .ic img, .gesicht img, .karte-wahl .bild img, .store-bild img, .ereignisbild img, .regelbild img, .art-bild img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.store-bild img { object-position: center 60%; }
 </style>
 
 <div id="rahmen"><div id="feld"></div></div>
