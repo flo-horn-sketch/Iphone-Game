@@ -11,7 +11,7 @@ test("Berater: ein Tipp, der sich rechnet", () => {
     p.geld = 60e6;
     for (const [z, typ] of [["london", "a320"], ["paris", "a320"], ["rom", "falke"], ["madrid", "falke"], ["wien", "libelle"]]) L.fliegen(st, "p", "frankfurt", z, typ);
     for (let i = 0; i < 3 * 24; i++) L.schritt ? L.schritt(st, 1) : null;
-    L.einstellen(st, "p", "controller", "ines"); L.einstellen(st, "p", "preis", "paul"); L.einstellen(st, "p", "analyst", "kern");
+    L.einstellen(st, "p", "kern");
     L.beraterTag(st);
     const t = L.tipp(st);
     if (!t) continue;

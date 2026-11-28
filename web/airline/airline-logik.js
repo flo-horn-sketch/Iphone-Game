@@ -1380,40 +1380,41 @@
     return erg.filter(Boolean);
   }
 
-  // ---------- Assistenten ----------
-  // Die Analysten sind nie ganz genau: Sie nennen Spannen, und jeder hat eine Macke.
-  const ANALYSTEN = {
-    tim: { name: "Tim Brandt", bild: "air-assistent-tim", sterne: 1, gehalt: 1500, macke: 1.3, mackeText: "übertreibt gern", streuung: 0.45 },
-    mia: { name: "Mia Kaya", bild: "air-assistent-mia", sterne: 2, gehalt: 4000, macke: 1.0, mackeText: "solide", streuung: 0.25 },
-    kern: { name: "Dr. Helga Kern", bild: "air-assistent-kern", sterne: 3, gehalt: 9000, macke: 0.85, mackeText: "eher vorsichtig", streuung: 0.12 },
+  // ---------- Assistent ----------
+  // Ein einziger Assistent macht alles: Rat bei jeder Entscheidung, Tipps auf der Karte, ❗ an Linien, Wochenbericht.
+  // Er ist nie ganz genau: Er nennt Spannen und hat eine Macke. Mehr Sterne = genauer, übersieht weniger, teurer.
+  const ASSISTENTEN = {
+    tim: { name: "Tim Brandt", bild: "air-assistent-tim", sterne: 1, gehalt: 3000, macke: 1.3, mackeText: "übertreibt gern", streuung: 0.45 },
+    mia: { name: "Mia Kaya", bild: "air-assistent-mia", sterne: 2, gehalt: 8000, macke: 1.0, mackeText: "solide", streuung: 0.25 },
+    kern: { name: "Dr. Helga Kern", bild: "air-assistent-kern", sterne: 3, gehalt: 18000, macke: 0.85, mackeText: "eher vorsichtig", streuung: 0.12 },
   };
-  const PREISPROFIS = {
-    paul: { name: "Paul Wendt", bild: "air-assistent-paul", sterne: 2, gehalt: 3000, macke: 1.0, mackeText: "mag Experimente", streuung: 0.3 },
-  };
-  // Controlling: liefert jeden Sonntag (Ende der Jahreszeit) einen Wochenbericht mit den schwächsten Linien.
-  const CONTROLLER = {
-    jonas: { name: "Jonas Ritter", bild: "air-assistent-jonas", sterne: 1, gehalt: 2000, macke: 1.0, mackeText: "übersieht manches", streuung: 0.45 },
-    lena: { name: "Lena Vogt", bild: "air-assistent-lena", sterne: 2, gehalt: 4500, macke: 1.0, mackeText: "zuverlässig", streuung: 0.2 },
-    ines: { name: "Ines Falk", bild: "air-assistent-ines", sterne: 3, gehalt: 9000, macke: 1.0, mackeText: "findet fast alles", streuung: 0.08 },
-  };
-  const ROLLEN = { analyst: ANALYSTEN, preis: PREISPROFIS, controller: CONTROLLER };
-  function assistent(a, rolle) {
-    const id = a.assistenten && a.assistenten[rolle];
-    return id ? Object.assign({ id }, ROLLEN[rolle][id]) : null;
+  // Ältere Spielstände hatten drei Rollen mit sieben Leuten: Wer dort eingestellt war, wird auf einen der drei umgerechnet.
+  const ALTE_LEUTE = { tim: "tim", mia: "mia", kern: "kern", paul: "mia", jonas: "tim", lena: "mia", ines: "kern" };
+  function assistentId(a) {
+    const x = a.assistenten || {};
+    if (x.analyst && ASSISTENTEN[x.analyst]) return x.analyst;
+    // Alter Stand: den mit den meisten Sternen behalten.
+    let best = null;
+    for (const id of Object.values(x)) { const n = ALTE_LEUTE[id]; if (n && (!best || ASSISTENTEN[n].sterne > ASSISTENTEN[best].sterne)) best = n; }
+    return best;
   }
-  function einstellen(st, aid, rolle, id) {
+  // rolle wird nicht mehr gebraucht (es gibt nur noch einen), bleibt aber erlaubt, damit alte Aufrufe weiter gehen.
+  function assistent(a, rolle) {
+    const id = assistentId(a);
+    return id ? Object.assign({ id }, ASSISTENTEN[id]) : null;
+  }
+  // einstellen(st, aid, id) – id null entlässt. Die alte Form einstellen(st, aid, rolle, id) geht auch noch.
+  function einstellen(st, aid, a3, a4) {
     const a = st.airlines[aid];
-    if (!ROLLEN[rolle] || (id && !ROLLEN[rolle][id])) return false;
-    a.assistenten = a.assistenten || {};
-    a.assistenten[rolle] = id || null;
-    a.auftraege = a.auftraege || {};
-    delete a.auftraege[rolle];
+    const id = a4 !== undefined ? a4 : ASSISTENTEN[a3] || a3 == null ? a3 : undefined;
+    if (id === undefined || (id && !ASSISTENTEN[id])) return false;
+    a.assistenten = id ? { analyst: id } : {};
+    a.auftraege = {};
     return true;
   }
   function gehaelter(a) {
-    let g = 0;
-    for (const rolle of Object.keys(ROLLEN)) { const x = assistent(a, rolle); if (x) g += x.gehalt; }
-    return g;
+    const x = assistent(a);
+    return x ? x.gehalt : 0;
   }
   function umbenennen(st, aid, name, farbe) {
     const a = st.airlines[aid];
@@ -1698,14 +1699,16 @@
         return { id: r.id, a: r.a, b: r.b, gewinn: Math.round(e.gewinn), zubringer: Math.round(e.zubringer), auslastung: e.auslastung };
       }).sort((x, y) => y.gewinn - x.gewinn),
     };
-    // Controlling: täglich ein Blick auf Missstände, sonntags der Wochenbericht.
-    const ctrl = assistent(p, "controller");
+    // Der Assistent: täglich ein Blick auf Missstände, sonntags der Wochenbericht.
+    const ctrl = assistent(p);
     if (ctrl) {
       p.hinweise = missstaende(st, SPIELER, ctrl.sterne);
       // Keine eigene Meldung mehr: Die ❗ an den Linien reichen, Vorschläge kommen als Tipp (beraterTag), damit es nicht zu viel wird.
     } else p.hinweise = [];
     if (ctrl && tag % REGELN.saisonTage === 0 && p.routen.length) {
       p.wochenbericht = wochenbericht(st, SPIELER, ctrl);
+      // Dazu zwei Ideen für neue Strecken ab der Heimat (früher ein eigener Auftrag an den Analysten).
+      p.wochenbericht.neu = routenBericht(st, SPIELER, p.basis, ctrl).slice(0, 2);
       melden(st, { art: "bericht", text: "📋 " + ctrl.name + ": Dein Wochenbericht ist da!", rolle: "controller" });
     }
     // Pleite-Stufen.
@@ -3122,7 +3125,7 @@
     HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen,
     slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,
     flugzeugeAuf, freieFlugzeuge, fluegeVon, fluegeAuf, typFrei, routeVon, flugFinden, flugAnlegen, flugStreichen,
-    kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, CONTROLLER, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruestenGeht, umruesten,
+    kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ASSISTENTEN, ANALYSTEN: ASSISTENTEN, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruestenGeht, umruesten,
     drehkreuze, rechnung, berechnen, reisende, probe, schaetzen, vorruecken, position, anziehung,
     BERATER, beraterTag, tipp, tippAusfuehren, tippWeg,
     gelegenheitAnnehmen, gelegenheitAblehnen, uebernahmeAnnehmen, uebernahmeAblehnen, tilgen,

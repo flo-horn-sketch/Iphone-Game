@@ -117,17 +117,13 @@ Werden klein und rund gezeigt. Gesicht groß und mittig, schlichter dunkler Hint
 
 ### 4b. Die Assistenten (Porträts, quadratisch)
 
-Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mittig, freundlich, schlichter nachtblauer Hintergrund. Erfundene Personen.
+Seit 2026-11-28 gibt es nur noch einen Assistenten, man wählt zwischen diesen drei. Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mittig, freundlich, schlichter nachtblauer Hintergrund. Erfundene Personen.
 
 | Datei | Größe | Prompt |
 |---|---|---|
 | `air-assistent-tim.png` | 1024 × 1024 | Tim Brandt, junger Analyst Mitte zwanzig, wuschelige Haare, begeistertes Lächeln, Kopfhörer um den Hals, Kapuzenpulli, hält ein Tablet. |
 | `air-assistent-mia.png` | 1024 × 1024 | Mia Kaya, Analystin Anfang dreißig, Brille, dunkle Haare im Zopf, ruhiger aufmerksamer Blick, Blazer über T-Shirt. |
 | `air-assistent-kern.png` | 1024 × 1024 | Dr. Helga Kern, erfahrene Analystin um die sechzig, kurze graue Haare, Lesebrille auf der Nase, skeptisch hochgezogene Augenbraue, eleganter Rollkragen. |
-| `air-assistent-paul.png` | 1024 × 1024 | Paul Wendt, Preis-Experte um die vierzig, Bart, Hemd mit hochgekrempelten Ärmeln, verschmitztes Lächeln, Taschenrechner in der Brusttasche. |
-| `air-assistent-jonas.png` | 1024 × 1024 | Jonas Ritter, Controller Anfang zwanzig, Praktikant, zu großes Sakko, etwas verlegenes Lächeln, Kugelschreiber hinter dem Ohr. |
-| `air-assistent-lena.png` | 1024 × 1024 | Lena Vogt, Controllerin Mitte dreißig, blonder Kurzhaarschnitt, klarer freundlicher Blick, dunkelblaue Bluse, Ordner unter dem Arm. |
-| `air-assistent-ines.png` | 1024 × 1024 | Ines Falk, erfahrene Controllerin um die fünfzig, graue Strähne im dunklen Haar, schmale Brille, leichtes wissendes Lächeln, Perlenohrringe. |
 
 ### 4c. Du als Manager (Porträts, quadratisch, neu)
 
