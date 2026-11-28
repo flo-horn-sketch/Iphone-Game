@@ -10,7 +10,7 @@
   const SPEICHER = "luftlinie-v2";
   const EINFUEHRUNG = "luftlinie-einfuehrung-v2";
   const RIVALEN_AN = "luftlinie-rivalen";
-  const FELD_B = 844, FELD_H = 390;
+  let FELD_B = 844, FELD_H = 390;    // wächst mit dem Bildschirm; die Bedienung bleibt im sicheren Bereich 844 × 390
   const SEK_PRO_STUNDE = 2.5;          // ein Tag dauert eine Minute
   const SVG = "http://www.w3.org/2000/svg";
   const TEMPI = [0, 1, 2, 4];
@@ -23,11 +23,20 @@
     const cs = getComputedStyle(rahmen);
     const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
     const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
-    const w = rahmen.clientWidth - pl - pr, h = rahmen.clientHeight - pt - pb;
-    ui.skala = Math.max(0.2, Math.min(w / FELD_B, h / FELD_H));
-    feld.style.left = pl + w / 2 + "px";
-    feld.style.top = pt + h / 2 + "px";
-    feld.style.transform = `translate(-50%, -50%) scale(${ui.skala})`;
+    const W = rahmen.clientWidth, H = rahmen.clientHeight;
+    // Die Bedienung passt in den sicheren Bereich (ohne Kamera-Insel und Home-Balken), die Karte füllt den ganzen Bildschirm.
+    ui.skala = Math.max(0.2, Math.min((W - pl - pr) / 844, (H - pt - pb) / 390));
+    FELD_B = W / ui.skala; FELD_H = H / ui.skala;
+    feld.style.width = FELD_B + "px"; feld.style.height = FELD_H + "px";
+    feld.style.transform = `scale(${ui.skala})`;
+    // Ränder in Spielfeld-Pixeln; dazu kommt Luft, damit die Bedienung mittig im sicheren Bereich sitzt.
+    const extraB = (FELD_B - (pl + pr) / ui.skala - 844) / 2;
+    feld.style.setProperty("--sl", pl / ui.skala + extraB + "px");
+    feld.style.setProperty("--sr", pr / ui.skala + extraB + "px");
+    feld.style.setProperty("--st", pt / ui.skala + "px");
+    feld.style.setProperty("--sb", pb / ui.skala + "px");
+    const svg = document.getElementById("karte");
+    if (svg) { svg.setAttribute("viewBox", `0 0 ${FELD_B} ${FELD_H}`); const hg = svg.querySelector("rect"); if (hg) { hg.setAttribute("width", FELD_B); hg.setAttribute("height", FELD_H); } }
   }
   function el(tag, props, ...kinder) {
     const e = document.createElement(tag);
