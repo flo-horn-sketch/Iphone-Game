@@ -1171,7 +1171,7 @@
     const k = x.aktion;
     if (k.art === "preis") preisStufe(st, SPIELER, x.id, k.stufe);
     else if (k.art === "sitze") klassenSetzen(st, SPIELER, x.id, k.business, k.first);
-    else if (k.art === "abziehen") abziehen(st, SPIELER, x.id);
+    else if (k.art === "abziehen") { if (flugzeugeAuf(a, x.id).length < 2) return false; abziehen(st, SPIELER, x.id); }   // nie die Linie nebenbei schließen
     else if (k.art === "schliessen") routeSchliessen(st, SPIELER, x.id);
     x.erledigt = true;
     geaendert(st);
@@ -1413,12 +1413,13 @@
   function auktionVerloren(st, g) {
     const p = st.airlines[SPIELER];
     const r = p.routen.find((x) => x.id === g.route);
+    const letztes = r && flugzeugeAuf(p, r.id).length === 1;
     if (r) abziehen(st, SPIELER, r.id);
     p.slots[g.stadt] = Math.max(0, (p.slots[g.stadt] || 0) - 1);
     // Ein Rivale schnappt sich den Slot gern.
     const k = st.airlines.k;
     if (slotsFrei(st, g.stadt) > 0) k.slots[g.stadt] = (k.slots[g.stadt] || 0) + 1;
-    melden(st, { art: "slotverloren", text: `Landerecht in ${STADT[g.stadt].name} verloren. Ein Flugzeug steht jetzt frei.` });
+    melden(st, { art: "slotverloren", text: `Landerecht in ${STADT[g.stadt].name} verloren. Ein Flugzeug steht jetzt frei.` + (letztes ? ` Die Linie ${STADT[r.a].name}–${STADT[r.b].name} ist damit geschlossen.` : "") });
     geaendert(st);
   }
 
