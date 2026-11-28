@@ -1516,7 +1516,7 @@
       beraterEl = el("div", { class: "berater" },
         el("div", { class: "berater-kopf" },
           el("span", { class: "berater-gesicht" }, bildEl(wer.bild, "🧑‍💼")),
-          el("div", { class: "berater-name" }, el("b", { text: wer.name }), el("small", { text: { analyst: "Neue Strecke", preis: "Preise", controller: "Deine Linien" }[t.rolle] })),
+          el("div", { class: "berater-name" }, el("b", { text: wer.name }), el("small", { text: ({ neu: "Neue Strecke", plan: "Neue Strecke", mitfliegen: "Neue Strecke", bieten: "Slot", preis: "Preise" }[t.art] || "Deine Linien") })),
           el("button", { class: "berater-zu", text: "✕", "aria-label": "Später", onclick: () => { L.tippWeg(st); speichern(); karteZeichnen(); } })),
         el("div", { class: "berater-text", text: inhalt.text }),
         inhalt.sicher ? sicherKnopf(inhalt.knopf, () => tippAnnehmen(t)) : el("button", { class: "hauptknopf klein", text: inhalt.knopf, onclick: () => tippAnnehmen(t) }));
