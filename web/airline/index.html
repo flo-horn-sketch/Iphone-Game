@@ -442,6 +442,19 @@ html, body { touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjus
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .store-bild img { object-position: center 60%; }
 
+/* Spielregeln zum Nachschlagen. */
+.regel-gitter { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; overflow-y: auto; padding: 2px 2px 8px; flex: 1; min-height: 0; }
+.regel-kachel { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid var(--linie); color: var(--text); font: inherit; }
+.regel-kachel b { font-size: 10.5px; line-height: 1.15; text-align: center; }
+.regel-kachel.zu-karte { opacity: .45; }
+.regel-kachelbild { width: 64px; height: 64px; border-radius: 10px; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; font-size: 30px; position: relative; overflow: hidden; }
+.regel-kachelbild > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Eigene Symbole (ico-*.png). Feste Größe, egal wie groß das Bild von ChatGPT ist. Bis dahin: Platzhalter-Zeichen im selben Kästchen. */
+.ico { display: inline-block; width: 1.25em; height: 1.25em; flex: none; vertical-align: -0.25em; line-height: 1.25em; text-align: center; overflow: hidden; }
+img.ico { position: static !important; inset: auto !important; width: 1.25em !important; height: 1.25em !important; max-width: none; object-fit: contain !important; }
+.ico + .ico { margin-left: 0.05em; }
+.ersatz > .ico { width: 1.1em; height: 1.1em; }
+
 /* Preiskampf: Linien nebeneinander. */
 .vergleich { display: flex; gap: 6px; }
 .vergleich-spalte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; padding: 7px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--linie); border-top: 3px solid var(--farbe); }

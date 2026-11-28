@@ -45,12 +45,12 @@
       if (k === "class") e.className = v;
       else if (k === "style" && typeof v === "object") for (const [sk, sv2] of Object.entries(v)) { if (sk.startsWith("--")) e.style.setProperty(sk, sv2); else e.style[sk] = sv2; }
       else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
-      else if (k === "text") e.textContent = v;
+      else if (k === "text") e.replaceChildren(...mitIcons(v));
       else e.setAttribute(k, v === true ? "" : v);
     }
     for (const kind of kinder.flat(Infinity)) {
       if (kind == null || kind === false) continue;
-      e.append(kind.nodeType ? kind : String(kind));
+      if (kind.nodeType) e.append(kind); else e.append(...mitIcons(kind));
     }
     return e;
   }
@@ -99,6 +99,55 @@
   function bildEl(name, ersatz) {
     const pfad = bild(name);
     return pfad ? el("img", { src: pfad, alt: "" }) : ersatz != null ? el("span", { class: "ersatz", text: ersatz }) : null;
+  }
+  // ---------- Eigene Symbole ----------
+  // Jedes Symbol im Spiel ist ein eigenes Bild (ico-*.png, malt ChatGPT, siehe BILDER-AUFTRAG.md).
+  // Bis das Bild da ist, steht das Zeichen als Platzhalter in einem festen Kästchen gleicher Größe.
+  const ICONS = {
+    "✏": "stift", "🛒": "store", "✈": "flugzeug", "🛩": "propeller", "🛫": "start", "🛬": "landung", "⚔": "duell", "🔥": "mode",
+    "▲": "hoch", "▼": "runter", "📈": "trend-hoch", "📉": "trend-runter", "🎪": "messe", "☀": "sonne", "⛷": "ski", "🌴": "palme", "🌧": "regen",
+    "🌱": "fruehling", "🍂": "herbst", "❄": "winter", "🎟": "landerecht", "🔨": "hammer", "📣": "ankuendigung", "🏛": "versteigerung",
+    "🤝": "aufkauf", "✊": "streik", "⛈": "sturm", "⛽": "kerosin", "⬇": "pfeil-runter", "⬆": "pfeil-hoch", "🔻": "billiger", "🔺": "teurer",
+    "👥": "rivalen", "🏁": "rennen", "🏆": "pokal", "🥇": "gold", "🥈": "silber", "🥉": "bronze", "⏳": "sanduhr", "⏱": "stoppuhr",
+    "📋": "bericht", "🎯": "ziel", "🎁": "geschenk", "👔": "geschaeft", "🏖": "urlaub", "🎫": "ticket", "💸": "kosten", "💰": "kasse",
+    "💶": "preis", "🪙": "muenze", "🏦": "bank", "🍽": "essen", "🥂": "premium", "🧳": "koffer", "💺": "sitz", "📏": "reichweite",
+    "👩": "crew", "🔁": "umsteiger", "🔄": "neu", "⭐": "stern", "★": "stern", "☆": "stern-leer", "🏳": "aufgeben", "🏗": "ausbau",
+    "🔎": "lupe", "🔬": "gruendlich", "⚡": "schnell", "➕": "extra", "🛡": "sicher", "🎲": "risiko", "✅": "ok", "✨": "beste",
+    "🔒": "schloss", "⚠": "warnung", "🌍": "welt", "🗓": "kalender", "📰": "zeitung", "💥": "pleite", "📖": "regeln", "🏠": "heimat",
+  };
+  const ICON_RE = new RegExp("(" + Object.keys(ICONS).join("|") + ")[\\uFE0F\\u200D\\u2708]*", "gu");
+  function icon(zeichen) {
+    const name = ICONS[zeichen];
+    const pfad = name && bild("ico-" + name);
+    if (pfad) return el("img", { class: "ico", src: pfad, alt: "" });
+    const e = document.createElement("span");
+    e.className = "ico ico-ersatz";
+    e.textContent = zeichen;
+    return e;
+  }
+  function textSetzen(e, t) { if (e._t !== t) { e._t = t; e.replaceChildren(...mitIcons(t)); } }
+  // Text in Stücke zerlegen: normale Wörter bleiben Text, bekannte Zeichen werden Symbole.
+  function mitIcons(text) {
+    const s = String(text);
+    ICON_RE.lastIndex = 0;
+    if (!ICON_RE.test(s)) return [s];
+    const teile = [];
+    let rest = 0;
+    ICON_RE.lastIndex = 0;
+    for (const m of s.matchAll(ICON_RE)) {
+      if (m.index > rest) teile.push(s.slice(rest, m.index));
+      teile.push(icon(m[1]));
+      rest = m.index + m[0].length;
+    }
+    if (rest < s.length) teile.push(s.slice(rest));
+    return teile;
+  }
+  // Symbol auf der Karte (SVG): Bild, wenn vorhanden, sonst das Zeichen.
+  function svIcon(zeichen, x, y, groesse, props) {
+    const name = ICONS[zeichen.replace(/[️]/g, "")];
+    const pfad = name && bild("ico-" + name);
+    if (pfad) return sv("image", { href: pfad, x: x - groesse / 2, y: y - groesse / 2, width: groesse, height: groesse, class: props && props.class });
+    return sv("text", Object.assign({ x, y: y + groesse * 0.35, "font-size": groesse, "text-anchor": "middle", text: zeichen }, props));
   }
   const TYP_TEXT = {
     libelle: "Sparsamer Propeller für kurze Strecken und Zubringer.", dash8: "Schnellerer Propeller, etwas mehr Plätze.",
@@ -353,13 +402,13 @@
           const [dx, dy] = punktAuf(r.a, r.b, 0.68);
           const grp = sv("g", { "data-duell": r.id, class: "huepfen" });
           grp.append(sv("circle", { cx: dx, cy: dy, r: 8.5 * s, fill: "rgba(9,18,28,.92)", stroke: st.airlines[r.duell.gegen].farbe, "stroke-width": 1.4 * s }));
-          grp.append(sv("text", { x: dx, y: dy + 3.4 * s, "font-size": 9.5 * s, "text-anchor": "middle", text: "⚔️" }));
+          grp.append(svIcon("⚔️", dx, dy, 10 * s));
           karte.schilder.append(grp);
         }
         const t = L.trendVon(st, r.a, r.b);
         if (t) {
           const [tx, ty] = punktAuf(r.a, r.b, 0.32);
-          if (frei(tx, ty, 12 * s, 12 * s)) karte.schilder.append(sv("text", { x: tx, y: ty + 3.5 * s, "font-size": 10 * s, "text-anchor": "middle", class: "trendpfeil", fill: t > 0 ? "#4ADE80" : "#F87171", "stroke-width": 2.4 * s, text: t === 2 ? "🔥" : t > 0 ? "▲" : "▼" }));
+          if (frei(tx, ty, 12 * s, 12 * s)) karte.schilder.append(svIcon(t === 2 ? "🔥" : t > 0 ? "▲" : "▼", tx, ty, 10 * s, { class: "trendpfeil", fill: t > 0 ? "#4ADE80" : "#F87171", "stroke-width": 2.4 * s }));
         }
       }
     }
@@ -385,7 +434,7 @@
       if (p && (hubs.has(c.id) || p.basis === c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 3.2 * s, fill: "none", stroke: "#F2C14E", "stroke-width": 1.6 * s }));
       if (p && L.ausgebaut(p, c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 6 * s, fill: "none", stroke: "#F2C14E", "stroke-width": 1.2 * s }));
       const ct = st && !ui.heimat ? L.stadtTrend(st, c.id) : 0;
-      if (ct && z > 0.6) g.append(sv("text", { x: x + r * 0.6, y: y - r - 1.5 * s, "font-size": 8 * s, class: "trendpfeil", fill: ct > 0 ? "#4ADE80" : "#F87171", "stroke-width": 2 * s, text: ct > 0 ? "▲" : "▼" }));
+      if (ct && z > 0.6) g.append(svIcon(ct > 0 ? "▲" : "▼", x + r * 0.6, y - r - 4 * s, 8 * s, { class: "trendpfeil", fill: ct > 0 ? "#4ADE80" : "#F87171", "stroke-width": 2 * s }));
       if (fokus === c.id || (ui.editor && ui.editor.ziel === c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 7 * s, fill: "none", stroke: "#fff", "stroke-width": 1.6 * s, class: "puls" }));
       const fuell = eigen ? p.farbe : c.k === 3 ? "#EAF2F8" : c.k === 2 ? "#C5D6E2" : "#93A9B8";
       g.append(sv("circle", { cx: x, cy: y, r, fill: fuell, class: "stadt-punkt", "stroke-width": 1.2 * s }));
@@ -397,7 +446,7 @@
       if (messen.has(c.id)) zeichen = "🎪";
       else if ((c.t === "sonne" && sai.sonne > 1.2) || (c.t === "sued" && sai.sued > 1.2) || (c.t === "tropen" && sai.tropen > 1.2)) zeichen = "☀️";
       else if (c.t === "schnee" && sai.schnee > 1.2) zeichen = "⛷️";
-      if (zeichen && !ui.heimat && z > 0.7) g.append(sv("text", { x: x - r - 1 * s, y: y - r - 1 * s, "font-size": 9 * s, "text-anchor": "end", text: zeichen }));
+      if (zeichen && !ui.heimat && z > 0.7) g.append(svIcon(zeichen, x - r - 4.5 * s, y - r - 4 * s, 9 * s));
       karte.staedte.append(g);
     }
     symboleZeichnen();
@@ -421,7 +470,7 @@
       const umfang = 2 * Math.PI * (r + 2 * s);
       const rest = Math.max(0, (g.bis - st.zeit) / g.dauer);
       grp.append(sv("circle", { cx, cy, r: r + 2 * s, fill: "none", stroke: "#F2C14E", "stroke-width": 2 * s, "stroke-dasharray": `${umfang * rest} ${umfang}`, transform: `rotate(-90 ${cx} ${cy})`, class: "uhrring" }));
-      grp.append(sv("text", { x: cx, y: cy + 3.5 * s, "font-size": 10 * s, "text-anchor": "middle", text: gelIcon(g) }));
+      grp.append(svIcon(gelIcon(g), cx, cy, 10 * s));
       karte.symbole.append(grp);
     }
   }
@@ -528,8 +577,8 @@
     hud.geldS.textContent = (p.kredit > 0 ? "Kredit " + geld(p.kredit) + " · " : "") + (gestern == null ? "noch kein Tag" : "gestern " + geld(gestern, true));
     hud.tag.textContent = "Tag " + tag + " · " + L.WOCHENTAGE[L.wochentag(tag)];
     const sai = L.saison(tag);
-    hud.saison.textContent = sai.icon + " " + sai.name;
-    hud.kerosin.textContent = st.kerosin !== 1 ? (st.kerosin < 1 ? "⛽⬇" : "⛽⬆") : "";
+    textSetzen(hud.saison, sai.icon + " " + sai.name);
+    textSetzen(hud.kerosin, st.kerosin !== 1 ? (st.kerosin < 1 ? "⛽⬇" : "⛽⬆") : "");
     hud.kerosin.title = st.kerosin < 1 ? "Kerosin billiger" : "Kerosin teurer";
     hud.balken.style.width = ((st.zeit % 24) / 24 * 100).toFixed(1) + "%";
     hud.tempo.textContent = ["❚❚", "▶", "▶▶", "▶▶▶"][TEMPI.indexOf(ui.tempo)];
@@ -542,7 +591,7 @@
     const au = Object.values(p.auftraege || {}).filter(Boolean);
     const fertig = au.some((x) => x.bericht && !x.gelesen), laeuft = au.some((x) => !x.bericht);
     hud.bericht.style.display = au.length ? "" : "none";
-    hud.bericht.textContent = laeuft && !fertig ? "⏳" : "📋";
+    textSetzen(hud.bericht, laeuft && !fertig ? "⏳" : "📋");
     hud.bericht.classList.toggle("neu", fertig);
     zielZeichnen();
     warnungZeichnen();
@@ -771,6 +820,7 @@
             el("div", { class: "spur" }, el("i", { style: { width: (r.wert / max * 100).toFixed(1) + "%", background: r.farbe } })),
             spruch ? el("div", { class: "spruch", text: "„" + spruch + "“" }) : null));
       }));
+    erklaeren("rangliste");
   }
 
   // ---------- Meine Airline ----------
@@ -819,6 +869,7 @@
           assistKarte("analyst", neu), assistKarte("preis", neu))));
     feld.append(seite);
     seite.querySelector(".meine-spalte.breit").scrollTop = scroll;
+    erklaeren("meine");
   }
   function assistKarte(rolle, neu) {
     const p = ich();
@@ -1148,6 +1199,7 @@
       klassenEditor(r, e),
       el("button", { class: "nebenknopf", text: "Linie schließen", onclick: () => { L.routeSchliessen(st, L.SPIELER, rid); nachAktion(); ui.editor = { start: p.basis, ziel: null, linie: null, typ: null, stufe: "normal" }; editorZeichnen(); } }),
       el("div", { class: "blass mini", text: "Abgezogene Flugzeuge stehen danach frei." }));
+    if (einf.gesehen["erste-linie"] && !tippEl) erklaeren("linie");
   }
 
   // Sitzaufteilung: Flugzeug von oben, zwei Schieber, ein Knopf für die beste Aufteilung.
@@ -1218,6 +1270,7 @@
       })),
       el("div", { class: "blass mini mitte-text", text: "Tipp: Kleine Flugzeuge für kleine Städte und Zubringer, große für volle Strecken zwischen Großstädten." }));
     feld.append(seite);
+    erklaeren("store");
   }
 
   // ---------- Menü ----------
@@ -1233,6 +1286,7 @@
       punkt("✏️", "Linien-Editor", () => editorOeffnen()),
       punkt("🏆", "Rangliste", zeigeRang),
       punkt("💰", "Kasse", zeigeKasse),
+      punkt("📖", "Spielregeln", regelbuch),
       punkt("↺", "Neue Airline gründen", neuStartFragen));
     feld.append(m);
   }
@@ -1248,6 +1302,15 @@
 
   // ---------- Regeln nach und nach (Bildkarten) ----------
   const REGELKARTEN = {
+    start: { bild: "air-regel-start", icon: "✈️", titel: "So fängst du an", text: "Kaufe im 🛒 Store ein Flugzeug. Gib ihm im ✏️ Linien-Editor eine Strecke. Dann landet es immer wieder und bringt Geld. Unten steht immer dein nächstes 🎯 Ziel." },
+    store: { bild: "air-regel-store", icon: "🛒", titel: "Der Flugzeug-Store", text: "Oben die Reiter: von kleinen Propellern bis zu Riesen-Jets. 💺 Plätze, 📏 Reichweite, ⛽ Verbrauch. 🔒 Größere Flugzeuge gibt es, wenn deine Airline mehr wert ist." },
+    farben: { bild: "air-regel-farben", icon: "📈", titel: "Grün, Gelb, Rot", text: "Deine Linien leuchten nach Gewinn pro Tag: grün lohnt sich, gelb gerade so, rot kostet Geld. Tippe eine Linie an, dann siehst du warum." },
+    tempo: { bild: "air-regel-tempo", icon: "⏳", titel: "Die Zeit läuft", text: "Ein Tag dauert eine Minute. Oben neben der Uhr machst du schneller oder hältst an. Abends wird abgerechnet." },
+    linie: { bild: "air-regel-linie", icon: "✏️", titel: "Deine Linie einstellen", text: "Hier machst du alles für eine Linie: Flugzeuge ＋ dazu oder − weg, Preis 🔻 billiger oder 🔺 teurer, und die Sitze für Economy, Business und First. ✨ findet die beste Aufteilung." },
+    meine: { bild: "air-regel-meine", icon: "✈️", titel: "Meine Airline", text: "Im Menü ☰ unter „Meine Airline“: Name, Farbe und deine Grundsätze wie Essen, Koffer und Sitzplatzwahl. Mehr Service bringt ⭐ Qualität, kostet aber Geld pro Gast." },
+    assistenten: { bild: "air-regel-assistenten", icon: "🔎", titel: "Assistenten", text: "In „Meine Airline“ stellst du Leute ein: 🔎 sucht neue Strecken, 💶 prüft deine Preise. ⚡ schnell ist ungenau, 🔬 gründlich dauert länger. Ihre Berichte liegen unter 📋." },
+    rangliste: { bild: "air-regel-rangliste", icon: "🏆", titel: "Die Rangliste", text: "Gezählt wird, was deine Airline wert ist. Werde 🥇 Nummer eins, dann öffnet sich die ganze 🌍 Welt." },
+    pleite: { bild: "air-regel-pleite", icon: "⚠️", titel: "Achtung, Minus!", text: "Ist dein Konto im Minus, mahnt die 🏦 Bank. Drei Stufen: Mahnung, Kredit, dann will dich ein Rivale kaufen. Schließe rote Linien oder verkaufe ein Flugzeug." },
     drehkreuz: { bild: "air-regel-drehkreuz", icon: "🔁", titel: "Dein Drehkreuz!", text: "Ab drei Linien steigen Gäste in deiner Stadt um. Kleine Zubringer füllen so deine großen Flugzeuge." },
     rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Fliegen sie dieselbe Strecke, teilt ihr euch die Gäste. Ihre Linien zeigst du unten links: Kon, Spa und Aur antippen." },
     landerechte: { bild: "air-regel-saison", icon: "🎟️", titel: "Landerechte und Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. Am Ende der Woche verfallen ungenutzte Landerechte, und halb leere Linien müssen ihres neu ersteigern." },
@@ -1261,11 +1324,21 @@
     aufkauf: { bild: "air-regel-aufkauf", icon: "🤝", titel: "Rivalen in Not", text: "Rivalen können in die Krise geraten oder pleitegehen. Dann gibt es ihre Flugzeuge und Landerechte günstig, aber nur kurz." },
     gelegenheiten: { bild: "air-ereignis-messe", icon: "🎪", titel: "Gelegenheiten", text: "Ab jetzt tauchen Symbole auf der Karte auf: Messen, freie Landerechte, gebrauchte Flugzeuge. Der gelbe Ring zeigt, wie lange sie noch gelten." },
   };
+  const REGEL_FOLGE = ["start", "store", "farben", "tempo", "linie", "meine", "assistenten", "drehkreuz", "rivalen", "rangliste", "landerechte", "gelegenheiten", "plaene", "duell", "trends", "versteigerung", "wahl", "rennen", "ausbau", "aufkauf", "pleite"];
+  // Erklärung beim ersten Auftauchen einer Funktion (z. B. beim ersten Öffnen des Stores).
+  function erklaeren(id) { if (!einf.gesehen["regel-" + id]) regelkarte(id); }
   function regelnPruefen() {
     if (!st || ui.modal) return;
     const tag = L.tagVon(st), p = ich();
     let id = null;
-    if (L.drehkreuze(p).length && !einf.gesehen["regel-drehkreuz"]) id = "drehkreuz";
+    const g = (x) => !einf.gesehen["regel-" + x];
+    if (st.pleite && st.pleite.stufe && g("pleite")) id = "pleite";
+    else if (p.routen.length && st.letzterTag && g("farben")) id = "farben";
+    else if (p.routen.length && tag >= 2 && g("tempo")) id = "tempo";
+    else if (L.drehkreuze(p).length && !einf.gesehen["regel-drehkreuz"]) id = "drehkreuz";
+    else if (tag >= 4 && p.routen.length && g("meine")) id = "meine";
+    else if (tag >= 6 && p.routen.length && g("assistenten")) id = "assistenten";
+    else if (tag >= 10 && g("rangliste")) id = "rangliste";
     else if (tag >= 8 && !einf.gesehen["regel-rivalen"]) id = "rivalen";
     else if (tag >= 15 && !einf.gesehen["regel-landerechte"]) id = "landerechte";
     else if (tag >= L.REGELN.gelegenheitAb && !einf.gesehen["regel-gelegenheiten"]) id = "gelegenheiten";
@@ -1279,15 +1352,34 @@
     else if (st.gelegenheiten.some((g) => g.art === "aufkauf") && !einf.gesehen["regel-aufkauf"]) id = "aufkauf";
     if (id) regelkarte(id);
   }
-  function regelkarte(id) {
-    gesehen("regel-" + id);
+  function regelkarte(id, zurueck) {
+    if (!zurueck) gesehen("regel-" + id);
     const k = REGELKARTEN[id];
+    const vorher = ui.modal;
     ui.modal = true;
     const seite = el("div", { class: "seite regelkarte-seite" },
       el("div", { class: "regelkarte" },
         el("div", { class: "regelbild" }, bildEl(k.bild, k.icon), id === "rivalen" ? el("div", { class: "chefs" }, ["k", "s", "a"].map((aid) => el("div", { class: "gesicht", style: { background: st.airlines[aid].farbe } }, bildEl(CHEF[aid], L.RIVALEN[aid].chef[0])))) : null),
         el("div", { class: "regeltext" }, el("b", { text: k.titel }), el("p", { text: k.text }),
-          el("button", { class: "hauptknopf", text: "Verstanden", onclick: () => { seite.remove(); ui.modal = false; } }))));
+          el("button", { class: "hauptknopf", text: zurueck ? "◀ Zurück" : "Verstanden", onclick: () => { seite.remove(); ui.modal = vorher; if (zurueck) zurueck(); } }))));
+    feld.append(seite);
+  }
+  // Alle Erklärungen zum Nachschlagen. Was noch nicht vorkam, bleibt zu (die Regeln kommen nach und nach).
+  function regelbuch() {
+    const alt = feld.querySelector(".regelbuch");
+    if (alt) alt.remove();
+    ui.modal = true;
+    const offen = (id) => id === "start" || einf.gesehen["regel-" + id];
+    const seite = el("div", { class: "seite store regelbuch" },
+      el("div", { class: "store-kopf" }, el("h1", { text: "📖 Spielregeln" }),
+        el("span", { class: "store-geld", text: REGEL_FOLGE.filter(offen).length + " von " + REGEL_FOLGE.length + " entdeckt" }),
+        el("button", { class: "zu", text: "✕", "aria-label": "Schließen", onclick: () => { seite.remove(); ui.modal = false; } })),
+      el("div", { class: "regel-gitter" }, REGEL_FOLGE.map((id) => {
+        const k = REGELKARTEN[id];
+        return offen(id)
+          ? el("button", { class: "regel-kachel", onclick: () => regelkarte(id, regelbuch) }, el("div", { class: "regel-kachelbild" }, bildEl(k.bild, k.icon)), el("b", { text: k.titel }))
+          : el("div", { class: "regel-kachel zu-karte" }, el("div", { class: "regel-kachelbild" }, el("span", { class: "ersatz", text: "🔒" })), el("b", { text: "Kommt noch" }));
+      })));
     feld.append(seite);
   }
 
