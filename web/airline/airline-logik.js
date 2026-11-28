@@ -145,8 +145,8 @@
   // First gibt es fast nur auf Langstrecken zwischen großen Städten (siehe klassenNachfrage).
   const KLASSEN = {
     eco: { name: "Economy", farbe: "#7FC4E8", platz: 1, preis: 1, service: 1, anteil: 0.67 },
-    business: { name: "Business", farbe: "#F2C14E", platz: 2, preis: 2.6, service: 3, anteil: 0.25 },
-    first: { name: "First", farbe: "#C9A0F0", platz: 3, preis: 4.5, service: 6, anteil: 0.03 },
+    business: { name: "Business", farbe: "#F2C14E", platz: 2, preis: 3.2, service: 3, anteil: 0.25 },
+    first: { name: "First", farbe: "#C9A0F0", platz: 3, preis: 6, service: 6, anteil: 0.03 },
   };
   const KLASSEN_START = { billig: { business: 0, first: 0 }, standard: { business: 0.2, first: 0 }, premium: { business: 0.3, first: 0 } };
   const KLASSEN_MAX = { business: 0.5, first: 0.2 };
@@ -159,12 +159,26 @@
     const lang = Math.max(0, Math.min(1, (e.km - 2500) / 4500));
     const kMin = Math.min(STADT[e.a].k, STADT[e.b].k);
     const gross = kMin >= 3 ? 1 : kMin >= 2 ? 0.5 : 0.1;
-    const kurz = Math.min(1, 0.5 + e.km / 3000);
+    const kurz = Math.max(0.2, Math.min(1, (e.km - 400) / 3600));   // auf Kurzstrecke bucht kaum jemand Business
     const first = g * KLASSEN.first.anteil * lang * gross * vorne;
     const business = (g * KLASSEN.business.anteil * kurz + u * 0.02) * vorne;
     return { first, business, eco: u + g - first - business };
   }
-  function klassenVon(r, a) { return r.klassen || KLASSEN_START[profil(a).klassen]; }
+  // Wie viel Business und First überhaupt in die Flugzeuge der Linie passt (wie in echt):
+  // Propeller und kleine Jets nur Economy, Mittelstrecke etwas Business, große Langstreckenjets auch First.
+  function klassenGrenzen(a, rid) {
+    const fs = a.flotte.filter((f) => f.route === rid);
+    const sitze = fs.length ? Math.min(...fs.map((f) => TYPEN[f.typ].sitze)) : 999;
+    if (sitze < 100) return { business: 0, first: 0 };
+    if (sitze < 250) return { business: 0.2, first: 0 };
+    if (sitze < 500) return { business: 0.4, first: 0.1 };
+    return { business: KLASSEN_MAX.business, first: KLASSEN_MAX.first };
+  }
+  function klassenVon(r, a) {
+    const k = r.klassen || KLASSEN_START[profil(a).klassen];
+    const g = klassenGrenzen(a, r.id);
+    return { business: Math.min(g.business, k.business), first: Math.min(g.first, k.first) };
+  }
 
   // Preis pro Route: angreifen, normal, abschöpfen.
   const STUFEN = {
@@ -673,8 +687,9 @@
   function klassenSetzen(st, aid, rid, business, first) {
     const r = st.airlines[aid].routen.find((x) => x.id === rid);
     if (!r) return false;
-    business = Math.max(0, Math.min(KLASSEN_MAX.business, Math.round(business * 10) / 10));
-    first = Math.max(0, Math.min(KLASSEN_MAX.first, Math.round(first * 10) / 10));
+    const g = klassenGrenzen(st.airlines[aid], rid);
+    business = Math.max(0, Math.min(g.business, Math.round(business * 10) / 10));
+    first = Math.max(0, Math.min(g.first, Math.round(first * 10) / 10));
     r.klassen = { business, first };
     geaendert(st);
     return true;
@@ -682,8 +697,9 @@
   // Probiert alle Aufteilungen durch und nimmt die beste.
   function besteKlassen(st, aid, rid) {
     let best = null;
-    for (let b = 0; b <= KLASSEN_MAX.business + 0.0001; b += 0.1) {
-      for (let f = 0; f <= KLASSEN_MAX.first + 0.0001; f += 0.1) {
+    const gr = klassenGrenzen(st.airlines[aid], rid);
+    for (let b = 0; b <= gr.business + 0.0001; b += 0.1) {
+      for (let f = 0; f <= gr.first + 0.0001; f += 0.1) {
         const k = klonen(st);
         klassenSetzen(k, aid, rid, b, f);
         const g = berechnen(k, tagVon(k)).summe[aid];
@@ -2035,7 +2051,7 @@
 
   return {
     SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
-    KLASSEN, KLASSEN_START, KLASSEN_MAX, klassenVon, klassenSetzen, besteKlassen,
+    KLASSEN, KLASSEN_START, KLASSEN_MAX, klassenGrenzen, klassenVon, klassenSetzen, besteKlassen,
     neuesSpiel, laden, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     flugzeugeAuf, freieFlugzeuge, slotsBelegt, slotsFrei, slotPreis, slotsGenutzt, slotsUebrig, typFrei, routeVon,
     kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, kaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, CONTROLLER, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruesten,

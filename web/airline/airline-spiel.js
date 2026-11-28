@@ -1479,6 +1479,7 @@
   function klassenEditor(r, e) {
     const p = ich();
     const kl = L.klassenVon(r, p);
+    const gr = L.klassenGrenzen(p, r.id);
     const k = e.klassen;
     const reihen = 18;
     const fR = Math.round(reihen * kl.first), bR = Math.round(reihen * kl.business);
@@ -1501,10 +1502,11 @@
     return el("div", { class: "klassen" },
       el("div", { class: "blass mini", text: "Sitzaufteilung (Gäste / Plätze pro Richtung und Tag):" }),
       kabine,
-      zeile("first", kl.first, L.KLASSEN_MAX.first, 0.1, (v) => setzen(kl.business, v)),
-      zeile("business", kl.business, L.KLASSEN_MAX.business, 0.1, (v) => setzen(v, kl.first)),
+      gr.first > 0 ? zeile("first", kl.first, gr.first, 0.1, (v) => setzen(kl.business, v)) : null,
+      gr.business > 0 ? zeile("business", kl.business, gr.business, 0.1, (v) => setzen(v, kl.first)) : null,
       zeile("eco", 0, 0, 0, null),
-      el("button", { class: "nebenknopf", text: "✨ Beste Aufteilung finden", onclick: () => { const b = L.besteKlassen(st, L.SPIELER, r.id); setzen(b.business, b.first); } }));
+      gr.business > 0 ? el("button", { class: "nebenknopf", text: "✨ Beste Aufteilung finden", onclick: () => { const b = L.besteKlassen(st, L.SPIELER, r.id); setzen(b.business, b.first); } })
+        : el("div", { class: "blass mini", text: "In so kleinen Flugzeugen gibt es nur Economy." }));
   }
 
   // ---------- Flugzeug-Store ----------
