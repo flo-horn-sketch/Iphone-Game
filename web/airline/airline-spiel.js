@@ -114,6 +114,7 @@
     "👩": "crew", "🔁": "umsteiger", "🔄": "neu", "⭐": "stern", "★": "stern", "☆": "stern-leer", "🏳": "aufgeben", "🏗": "ausbau",
     "🔎": "lupe", "🔬": "gruendlich", "⚡": "schnell", "➕": "extra", "🛡": "sicher", "🎲": "risiko", "✅": "ok", "✨": "beste",
     "🔒": "schloss", "⚠": "warnung", "🌍": "welt", "🗓": "kalender", "📰": "zeitung", "💥": "pleite", "📖": "regeln", "🏠": "heimat", "❗": "hinweis", "📊": "statistik", "🏢": "verwaltung", "📺": "werbung", "📤": "teilen", "📲": "homescreen",
+    "🔊": "ton-an", "🔇": "ton-aus", "🎵": "musik",
   };
   const ICON_RE = new RegExp("(" + Object.keys(ICONS).join("|") + ")[\\uFE0F\\u200D\\u2708]*", "gu");
   function icon(zeichen) {
@@ -641,8 +642,11 @@
     hud.frei = el("span", { class: "abzeichen" });
     hud.linien = el("button", { class: "kachel linienknopf knopf-mit", onclick: () => editorOeffnen() }, "✏️ Linien", hud.frei);
     hud.menue = el("button", { class: "kachel rundknopf", onclick: menueZeigen, "aria-label": "Menü" }, "☰");
+    // Ton an/aus, immer sichtbar (Töne stehen in airline-ton.js).
+    hud.ton = el("button", { class: "kachel rundknopf tonknopf", onclick: tonFenster, "aria-label": "Ton" });
+    tonKnopf();
     hud.bericht = el("button", { class: "kachel rundknopf berichtknopf", onclick: zeigeBericht, "aria-label": "Berichte" });
-    oben.append(hud.geldK, hud.uhr, hud.tempo, el("div", { class: "luecke" }), hud.bericht, hud.platz, hud.store, hud.linien, hud.menue);
+    oben.append(hud.geldK, hud.uhr, hud.tempo, el("div", { class: "luecke" }), hud.bericht, hud.platz, hud.store, hud.linien, hud.ton, hud.menue);
     hud.ziel = el("button", { class: "zielleiste", onclick: zielAntippen });
     hud.warn = el("div");
     // Schalter unten links: Rivalen-Linien auf der Karte zeigen oder ausblenden.
@@ -651,6 +655,32 @@
     rivalenKnopf();
     hudAktualisieren();
   }
+
+  function tonKnopf() {
+    const an = !window.Ton || window.Ton.an;
+    hud.ton.classList.toggle("aus", !an);
+    hud.ton.replaceChildren(icon(an ? "🔊" : "🔇"));
+  }
+  // Kleines Fenster unter dem Lautsprecher: zwei Schalter, Töne und Hintergrundklang.
+  function tonFenster() {
+    const alt = feld.querySelector(".tonfenster");
+    if (alt) { alt.remove(); return; }
+    if (!window.Ton) return;
+    const T = window.Ton;
+    const zeile = (zeichen, text, an, f) => el("button", { class: "ton-zeile" + (an ? " an" : ""), onclick: () => { f(); tonKnopf(); fenster.remove(); tonFenster(); } },
+      el("span", { class: "gross-icon" }, icon(zeichen)), el("span", { text }), el("span", { class: "schieber" }, el("i")));
+    const fenster = el("div", { class: "tonfenster" },
+      zeile(T.an ? "🔊" : "🔇", "Töne", T.an, () => T.anSetzen(!T.an)),
+      zeile("🎵", "Hintergrundklang", T.an && T.musik, () => { if (T.an && T.musik) T.musikSetzen(false); else { T.anSetzen(true); T.musikSetzen(true); } }));
+    feld.append(fenster);
+    // Tippen daneben schließt das Fenster.
+    const weg = (e) => {
+      if (fenster.isConnected && !fenster.contains(e.target) && !hud.ton.contains(e.target)) fenster.remove();
+      if (!fenster.isConnected) document.removeEventListener("pointerdown", weg, true);
+    };
+    document.addEventListener("pointerdown", weg, true);
+  }
+  const ton = (name) => { if (window.Ton) window.Ton.spielen(name); };
 
   function rivalenKnopf() {
     if (!hud.rivalen || !st) return;
@@ -770,6 +800,7 @@
     if (!g) return;
     g.gezeigt = true;
     ui.entscheidung = { id: g.id, tempo: ui.tempo };
+    ton("entscheidung");
     tempo(0);
     zeigeGelegenheit(g.id);
   }
@@ -1401,6 +1432,7 @@
   function eroeffnen(a, b, typ, stufe, kaufen) {
     const r = L.fliegen(st, L.SPIELER, a, b, typ, kaufen ? { stufe } : { nurFrei: true, stufe });
     if (!r.ok) return;
+    ton("linie");
     L.preisStufe(st, L.SPIELER, r.route.id, stufe);
     if (ui.tempo === 0 && ich().routen.length === 1) tempo(1);
     L.zielPruefen(st);
@@ -1542,7 +1574,7 @@
           zuWeit ? el("div", { class: "gesperrt-text", text: "📏 zu weit für diese Linie" }) : offen ? el("button", {
             class: "hauptknopf", disabled: p.geld < t.preis, text: "Kaufen · " + geld(t.preis),
             onclick: () => {
-              L.kaufen(st, L.SPIELER, typ); L.zielPruefen(st); nachAktion(); meldungenZeigen();
+              L.kaufen(st, L.SPIELER, typ); ton("kauf"); L.zielPruefen(st); nachAktion(); meldungenZeigen();
               if (ui.editor) editorZeichnen();   // der Editor dahinter kennt das neue Flugzeug sofort
               seite.remove(); ui.modal = false; storeZeigen();
               if (!gesehen("gekauft")) tippZeigen("Gekauft! Jetzt öffne den ✏️ Linien-Editor und gib deinem Flugzeug eine Linie.", hud.linien, "unten", "Okay");
@@ -1823,7 +1855,7 @@
     for (const m of auswahl) {
       setTimeout(() => {
         const mitBild = /^\p{Extended_Pictographic}/u.test(m.text);   // neue Meldungen bringen ihr Zeichen selbst mit
-        const e = el("div", { class: "meldung" + (m.art === "ziel" ? " ziel" : "") }, mitBild ? null : MELDUNG_ICON[m.art] || "📰", el("span", { text: m.text }));
+        const e = el("div", { class: "meldung" + (m.art === "ziel" ? " ziel" : ""), "data-art": m.art }, mitBild ? null : MELDUNG_ICON[m.art] || "📰", el("span", { text: m.text }));
         feld.append(e);
         setTimeout(() => e.remove(), 4300);
       }, verzoegerung);
