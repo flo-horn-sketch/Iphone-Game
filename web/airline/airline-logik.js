@@ -20,7 +20,8 @@
     proKm: 0.11,
     gebuehr: { 1: 700, 2: 2200, 3: 4800 },       // pro Landung, mal Flugzeuggröße
     slotPreis: { 1: 40000, 2: 200000, 3: 500000 },
-    slotPlaetze: { 1: 99, 2: 16, 3: 10 },          // so viele Slots gibt es je Flughafen für alle zusammen
+    slotPlaetze: { 1: 8, 2: 7, 3: 6 },            // so viele Slots sind je Flughafen für alle zusammen noch frei (den Rest haben die großen Airlines der Welt)
+    heimatPlaetze: 6,        // in der eigenen Heimat hat jede Airline bis zu 6 Landerechte extra, die anderen nichts wegnehmen
     slotAufschlag: 1.5,      // Slots werden teurer, je weniger frei sind
     drehkreuzAb: 3,          // ab so vielen eigenen Routen steigen in einer Stadt Leute um
     umsteigerAnteil: 0.32,
@@ -481,10 +482,11 @@
   const freieFlugzeuge = (a) => a.flotte.filter((f) => !f.route);
   function slotsBelegt(st, stadt) {
     let n = 0;
-    for (const id of st.reihenfolge) n += st.airlines[id].slots[stadt] || 0;
+    for (const id of st.reihenfolge) { const a = st.airlines[id]; n += Math.max(0, (a.slots[stadt] || 0) - (a.basis === stadt ? REGELN.heimatPlaetze : 0)); }
     return n;
   }
   function slotsFrei(st, stadt) { return REGELN.slotPlaetze[STADT[stadt].k] + ((st.ausbau && st.ausbau[stadt]) || 0) - slotsBelegt(st, stadt); }
+  const heimatPlatz = (a, stadt) => stadt === a.basis && (a.slots[stadt] || 0) < REGELN.heimatPlaetze;
   function slotPreis(st, stadt) {
     const k = STADT[stadt].k;
     const anteil = slotsBelegt(st, stadt) / REGELN.slotPlaetze[k];
@@ -510,7 +512,7 @@
     let slots = 0, slotFehlt = false;
     for (const s of [x, y]) {
       if (slotsUebrig(a, s) > 0) continue;
-      if (slotsFrei(st, s) <= 0) slotFehlt = true;
+      if (!heimatPlatz(a, s) && slotsFrei(st, s) <= 0) slotFehlt = true;
       slots += slotPreis(st, s);
     }
     const flugzeug = frei ? 0 : TYPEN[typ].preis;
@@ -1434,7 +1436,7 @@
     // Kosten je Stadt und Typ nur einmal ausrechnen (sonst wird das späte Spiel zäh).
     const slotKost = new Map();
     const slotVon = (s) => {
-      if (!slotKost.has(s)) slotKost.set(s, slotsUebrig(a, s) > 0 ? { preis: 0, fehlt: false } : { preis: slotPreis(st, s), fehlt: slotsFrei(st, s) <= 0 });
+      if (!slotKost.has(s)) slotKost.set(s, slotsUebrig(a, s) > 0 ? { preis: 0, fehlt: false } : { preis: slotPreis(st, s), fehlt: !heimatPlatz(a, s) && slotsFrei(st, s) <= 0 });
       return slotKost.get(s);
     };
     const flugzeugPreis = {};
@@ -1548,11 +1550,11 @@
   function versteigerungAnlegen(st) {
     const p = st.airlines[SPIELER];
     const nah = new Set([p.basis, ...p.routen.flatMap((r) => [r.a, r.b])]);
-    const kandidaten = ALLE.filter((c) => c.k >= 2 && (nah.has(c.id) || entfernung(p.basis, c.id) < 1500));
+    const kandidaten = ALLE.filter((c) => (c.k >= 2 || nah.has(c.id)) && (nah.has(c.id) || entfernung(p.basis, c.id) < 1500));
     if (!kandidaten.length) return;
     const knapp = kandidaten.sort((x, y) => slotsFrei(st, x.id) - slotsFrei(st, y.id) || y.g - x.g).slice(0, 4);
     const c = waehle(st, knapp);
-    const stufe = Math.round(REGELN.slotPreis[c.k] * 1.5 / 50000) * 50000;
+    const stufe = Math.max(100000, Math.round(REGELN.slotPreis[c.k] * 1.5 / 50000) * 50000);
     neueGel(st, { art: "versteigerung", stadt: c.id, stufe, gebot: 0, bis: st.zeit + 24, dauer: 24 });
     melden(st, { art: "versteigerung", stadt: c.id, text: `🏛️ Versteigerung in ${c.name}: ${REGELN.versteigerungStueck} neue Landerechte. Biete verdeckt bis morgen.` });
   }
