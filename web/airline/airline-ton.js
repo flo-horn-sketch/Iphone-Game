@@ -129,7 +129,8 @@
     // Tagesabschluss: Münzen klimpern, oder ein leiser Abwärtston bei Verlust.
     tagPlus: [2, () => [0, 0.07, 0.13, 0.22, 0.3].forEach((t, i) => ton(NOTE(91 + (i % 3) * 2), t, 0.2, { laut: 0.1, glocke: true }))],
     tagMinus: [2, () => { ton(NOTE(67), 0, 0.35, { laut: 0.14, form: "triangle" }); ton(NOTE(63), 0.18, 0.6, { laut: 0.12, form: "triangle" }); }],
-    // Versteigerung.
+    // Versteigerung: ein neues Gebot (kurzes Holz-Klopfen), dann Sieg oder Niederlage.
+    gebot: [0.25, () => { rauschen(0, 0.03, 1800, 900, 0.14); ton(NOTE(81), 0, 0.12, { laut: 0.15, form: "triangle" }); }],
     sieg: [2, () => { [60, 64, 67, 72].forEach((n, i) => ton(NOTE(n), i * 0.12, 0.45, { laut: 0.2, form: "triangle" })); [72, 76, 79].forEach((n) => ton(NOTE(n), 0.5, 1.6, { laut: 0.13, glocke: true })); }],
     verloren: [2, () => { ton(NOTE(67), 0, 0.4, { laut: 0.16, form: "triangle" }); ton(NOTE(65), 0.25, 0.4, { laut: 0.15, form: "triangle" }); ton(NOTE(62), 0.5, 1, { laut: 0.14, form: "triangle" }); }],
     // Ein Tipp der Einführung oder eine Entscheidung erscheint.

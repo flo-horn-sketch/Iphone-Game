@@ -668,6 +668,43 @@ body.anleitung-an > :not(.anleitung) { display: none !important; }
 .tagbalken .block { position: absolute; top: 2px; height: 12px; border-radius: 4px; background: #4ADE80; overflow: hidden; box-sizing: border-box; border: 1px solid rgba(6,16,26,.6); }
 .tagbalken .block span { display: block; font-size: 8px; line-height: 10px; color: #06220f; font-weight: 800; padding: 0 2px; white-space: nowrap; }
 .tagbalken .block.neu { background: var(--gold); }
+.tagbalken.gross { height: 40px; }
+.tagbalken.gross .block { top: 4px; height: 22px; }
+.tagbalken.gross .block span { font-size: 11px; line-height: 20px; }
+.tagbalken.gross .strich small { font-size: 10px; }
+.slotkachel.frei { border-style: dashed; }
+.slotkachel.frei span { color: var(--text); }
+.slotkachel.rivale { border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); }
+.slotkachel.fremd { border: 1px solid rgba(255,255,255,.06); background: rgba(0,0,0,.35); opacity: .45; }
+.slotkachel.rivale b { color: var(--blass); }
+.slotkachel.rivale span { color: var(--blass); display: flex; align-items: center; gap: 3px; }
+.slotkachel .punkt { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.auktion-seite { z-index: 60; }
+.ergebnis-karte.auktion { width: 470px; }
+.ergebnis-karte.auktion.vorbei { border-color: rgba(255,255,255,.3); }
+.auk-mitte { display: flex; align-items: center; gap: 16px; }
+.auk-mitte > div:first-child { flex: 1; min-width: 0; }
+.auk-stand { font-size: 34px; font-weight: 900; color: var(--gold); line-height: 1.05; }
+.auk-fuehrt { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.auk-uhr { width: 120px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.auk-uhrbalken { width: 100%; height: 10px; border-radius: 5px; background: rgba(255,255,255,.1); overflow: hidden; }
+.auk-uhrbalken i { display: block; height: 100%; width: 100%; background: #4ADE80; border-radius: 5px; transition: background .2s; }
+.auk-uhrbalken.knapp i { background: #F87171; }
+.auk-sek { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.auk-liste .gebot { grid-template-columns: 10px 110px 1fr 84px 18px; }
+.auk-fuss { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ergebnis-karte .auk-knopf { width: 100%; padding: 12px 18px; font-size: 16px; }
+.slotzeile-mit { display: flex; gap: 6px; align-items: stretch; }
+.slotzeile-mit .slotzeile { flex: 1; min-width: 0; }
+.slotzeile-mit .nebenknopf.klein { flex: none; padding: 4px 10px; font-size: 12px; }
+.slotlage { display: flex; flex-direction: column; gap: 4px; }
+.slotkachel.belegt { opacity: .5; }
+.slotkachel.belegt span { color: var(--blass); }
+.planer-seite .planer-tag { width: 100%; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; }
+.planer-seite .frei-reihe { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.planer-seite .frei-chip { padding: 2px 8px; border-radius: 99px; background: rgba(74,222,128,.16); border: 1px solid #4ADE80; color: #4ADE80; font-weight: 700; }
+.planer-seite .wahl small { display: block; color: var(--blass); font-size: 11px; }
+.planer-seite .store-kopf .fz-bild { width: 64px; height: 40px; flex: none; }
 /* Flug bauen */
 .flug-reihe { display: flex; gap: 8px; width: 100%; flex: 1; min-height: 0; }
 .flug-spalte { flex: 1; min-width: 0; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; touch-action: pan-y; }
