@@ -43,7 +43,8 @@
     stufe3Wert: 100000000,   // Firmenwert für die Langstrecken-Jets
     stufe4Wert: 300000000,   // Firmenwert für den A380
     gelegenheitAb: 22,       // Woche 4: Messen und Gelegenheiten
-    dividende: 0.1,          // Anteil am Tagesgewinn, den Rivalen nicht wieder anlegen
+    dividende: 0,            // Anteil am Tagesgewinn, den Rivalen nicht wieder anlegen
+    mitteBonus: 0.45,        // Zuschlag an Gästen für eine ausgewogene, klassische Airline
   };
 
   // Drei Servicelinien. Jede hat eine eigene Stärke.
@@ -80,16 +81,20 @@
   };
   // Aus den Grundsätzen das Profil, mit dem gerechnet wird.
   const profilCache = new Map();
+  const profilSchnell = new WeakMap();      // Grundsätze werden nie verändert, nur ersetzt: das Objekt selbst ist der Schlüssel.
   function profil(a) {
     const g = a.grundsaetze || VORLAGEN[a.service] || VORLAGEN.standard;
+    const schnell = profilSchnell.get(g);
+    if (schnell) return schnell;
     const key = Object.keys(GRUNDSAETZE).map((k) => g[k]).join("|");
-    if (profilCache.has(key)) return profilCache.get(key);
+    if (profilCache.has(key)) { profilSchnell.set(g, profilCache.get(key)); return profilCache.get(key); }
     const o = {};
     for (const k of Object.keys(GRUNDSAETZE)) o[k] = GRUNDSAETZE[k].optionen[g[k]] || Object.values(GRUNDSAETZE[k].optionen)[0];
     let K = 0;
     for (const k of Object.keys(o)) K += o[k].komfort;
     if (o.essen.kosten === 0) K -= o.essenZahlen.komfort;      // ohne Essen ist der Aufpreis egal
     const essenKosten = o.essen.kosten * (o.essenZahlen.essenAnteil ?? 1);
+    const mitte = 1 + REGELN.mitteBonus * Math.exp(-K * K / 2);
     const pr = {
       komfort: K,
       sitze: o.sitz.sitze,
@@ -98,7 +103,8 @@
       extra: (o.platzwahl.extra || 0) + (o.koffer.extra || 0),
       wende: o.boarding.wende + (o.sitz.wende || 0),
       betrieb: K < 0 ? 1 + 0.043 * K : 1 + 0.017 * K,
-      gast: { urlaub: Math.exp(-(K < 0 ? 0.25 : 0.23) * K), geschaeft: Math.exp((K < 0 ? 0.23 : 0.135) * K) },
+      // Die Mitte zieht beide Gästegruppen etwas an ("gut für alle").
+      gast: { urlaub: Math.exp(-(K < 0 ? 0.25 : 0.23) * K) * mitte, geschaeft: Math.exp((K < 0 ? 0.23 : 0.135) * K) * mitte },
       umsteiger: Math.max(0.8, 1.5 - 0.2 * Math.abs(K)),
       treu: K >= 2.5,
       klassen: o.sitz.sitze > 1 ? "billig" : o.sitz.sitze < 1 ? "premium" : "standard",
@@ -317,14 +323,18 @@
   const cache = new WeakMap();
   function geaendert(st) { st.stand = (st.stand || 0) + 1; }
 
-  const entfernungen = {};
+  const entfernungen = new Map();   // Stadt -> Map(Stadt -> km), ohne Zeichenketten zu bauen
   function entfernung(a, b) {
-    const k = a < b ? a + "|" + b : b + "|" + a;
-    if (entfernungen[k] != null) return entfernungen[k];
+    let zeile = entfernungen.get(a);
+    if (!zeile) entfernungen.set(a, (zeile = new Map()));
+    const da = zeile.get(b);
+    if (da !== undefined) return da;
     const A = STADT[a], B = STADT[b];
     const r = Math.PI / 180;
     const h = Math.sin(((B.lat - A.lat) * r) / 2) ** 2 + Math.cos(A.lat * r) * Math.cos(B.lat * r) * Math.sin(((B.lon - A.lon) * r) / 2) ** 2;
-    return (entfernungen[k] = Math.round(2 * 6371 * Math.asin(Math.sqrt(h))));
+    const km = Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
+    zeile.set(b, km);
+    return km;
   }
   const paar = (a, b) => (a < b ? a + "|" + b : b + "|" + a);
   const tagVon = (st) => Math.floor(st.zeit / 24) + 1;
@@ -1183,7 +1193,7 @@
   }
   function rangliste(st) {
     return st.reihenfolge.map((id) => ({ id, name: st.airlines[id].name, farbe: st.airlines[id].farbe, wert: firmenwert(st, id), routen: st.airlines[id].routen.length, flugzeuge: st.airlines[id].flotte.length }))
-      .sort((x, y) => y.wert - x.wert);
+      .sort((x, y) => y.wert - x.wert || (x.id === SPIELER) - (y.id === SPIELER));   // bei Gleichstand liegt der Rivale vorn
   }
   function platz(st) { return rangliste(st).findIndex((x) => x.id === SPIELER) + 1; }
   function staerksterRivale(st) { return rangliste(st).find((x) => x.id !== SPIELER).id; }
@@ -1208,7 +1218,7 @@
         }
       }
     }
-    if (pl === 1 && !st.platz1) {
+    if (pl === 1 && !st.platz1 && tagVon(st) >= 10) {   // nicht schon am Anfang, wenn alle bei Null stehen
       st.platz1 = true;
       melden(st, { art: "aufstieg", text: "Platz 1! Du bist die größte Airline der Welt." });
     }
@@ -1257,9 +1267,9 @@
 
   // ---------- Rivalen (und Bot für Probepartien) ----------
   const STIL = {
-    platzhirsch: { reserve: 300000, amortisation: 36, klasse: { 1: 0.7, 2: 1, 3: 1.3 }, proTag: 3, typen: ["falke", "a320", "kranich", "albatros", "b777"] },
-    billig: { reserve: 200000, amortisation: 34, klasse: { 1: 1.4, 2: 1, 3: 0.6 }, proTag: 3, typen: ["falke", "b737", "kranich", "libelle", "crj900"] },
-    premium: { reserve: 300000, amortisation: 34, klasse: { 1: 0.6, 2: 1.1, 3: 1.2 }, proTag: 3, typen: ["falke", "a220", "kranich", "albatros", "a350"] },
+    platzhirsch: { reserve: 300000, amortisation: 44, klasse: { 1: 0.7, 2: 1, 3: 1.3 }, proTag: 3, typen: ["crj900", "falke", "a320", "kranich", "albatros", "b777"] },
+    billig: { reserve: 200000, amortisation: 42, klasse: { 1: 1.4, 2: 1, 3: 0.6 }, proTag: 3, typen: ["libelle", "crj900", "falke", "b737", "kranich"] },
+    premium: { reserve: 300000, amortisation: 42, klasse: { 1: 0.6, 2: 1.1, 3: 1.2 }, proTag: 3, typen: ["dash8", "falke", "a220", "kranich", "albatros", "a350"] },
     ruhig: { reserve: 0, amortisation: 0, klasse: { 1: 1, 2: 1, 3: 1 }, proTag: 0, typen: [] },   // für Tests: tut nichts
     bot: { reserve: 300000, amortisation: 40, klasse: { 1: 1, 2: 1, 3: 1 }, proTag: 3, typen: ["libelle", "dash8", "falke", "a320", "kranich", "albatros", "b777"] },
   };
@@ -1292,14 +1302,30 @@
     for (const r of a.routen) { orte.add(r.a); orte.add(r.b); }
     const kandidaten = [];
     const typen = stil.typen.filter((t) => typFrei(st, a, t));
+    // Kosten je Stadt und Typ nur einmal ausrechnen (sonst wird das späte Spiel zäh).
+    const slotKost = new Map();
+    const slotVon = (s) => {
+      if (!slotKost.has(s)) slotKost.set(s, slotsUebrig(a, s) > 0 ? { preis: 0, fehlt: false } : { preis: slotPreis(st, s), fehlt: slotsFrei(st, s) <= 0 });
+      return slotKost.get(s);
+    };
+    const flugzeugPreis = {};
+    for (const typ of typen) flugzeugPreis[typ] = freieFlugzeuge(a).some((f) => f.typ === typ) ? 0 : TYPEN[typ].preis;
+    const budget = a.geld - reserve;
+    const maxWeite = Math.max(0, ...typen.map((t) => TYPEN[t].reichweite));
     for (const x of orte) {
+      const sx = slotVon(x);
+      if (sx.fehlt) continue;
       for (const s of staedte(st)) {
         const y = s.id;
         if (y === x) continue;
+        const km = entfernung(x, y);
+        if (km > maxWeite) continue;
+        const sy = slotVon(y);
+        if (sy.fehlt) continue;
         for (const typ of typen) {
-          if (entfernung(x, y) > TYPEN[typ].reichweite) continue;
-          const k = kostenFuer(st, aid, x, y, typ);
-          if (k.slotFehlt || k.gesamt > a.geld - reserve) continue;
+          if (km > TYPEN[typ].reichweite) continue;
+          const k = { gesamt: flugzeugPreis[typ] + sx.preis + sy.preis };
+          if (k.gesamt > budget) continue;
           const sch = schaetzen(st, aid, x, y, typ);
           if (sch.gewinn <= 0 || sch.auslastung < 0.45) continue;
           const vorliebe = stil.klasse[STADT[y].k] * (a.stil === "premium" ? 0.6 + (STADT[x].w + STADT[y].w) : 1) * (x === a.basis ? 1.15 : 1);
