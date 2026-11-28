@@ -372,6 +372,14 @@
       const zahlen = new Set(sortiert.length <= 6 ? sortiert.map((x) => x.r.id) : sortiert.slice(0, 3).concat(sortiert.slice(-3)).map((x) => x.r.id));
       const aktiv = ui.route || (ui.editor && ui.editor.linie);
       if (aktiv) zahlen.add(aktiv);
+      // Kurzer Zustand für Linien, um die man sich kümmern sollte: immer beschriftet.
+      const zustand = {};
+      for (const { r, e } of mit) {
+        if (!e.flugzeuge || tag - (r.seit || 0) < 2) continue;
+        if (e.gewinn + e.zubringer < 0) zustand[r.id] = "Verlust";
+        else if (e.auslastung < 0.45) zustand[r.id] = "fast leer";
+        if (zustand[r.id]) zahlen.add(r.id);
+      }
       const verlust = new Set(st.letzterTag ? st.letzterTag.routen.filter((x) => x.gewinn + x.zubringer < 0).map((x) => x.id) : []);
       for (const { r, e } of mit) {
         const farbe = farbeGewinn(e.gewinn + e.zubringer);
@@ -385,12 +393,13 @@
         if (!zahlen.has(r.id)) continue;
         const [mx, my] = mitteVon(r.a, r.b);
         const farbe = farbeGewinn(e.gewinn + e.zubringer);
-        const text = kurz(e.gewinn);
-        const w = (text.length * 6.2 + 8) * s, h = 13 * s;
+        const text = kurz(e.gewinn) + (zustand[r.id] ? " · " + zustand[r.id] : "");
+        const w = (text.length * 5.6 + 8) * s, h = 13 * s;
         if (!frei(mx, my, w, h)) continue;
         const schild = sv("g", { class: "preis-schild", "data-route": r.id });
-        schild.append(sv("rect", { x: mx - w / 2, y: my - h / 2, width: w, height: h, rx: h / 2, stroke: farbe, "stroke-width": 0.8 * s }));
-        schild.append(sv("text", { x: mx, y: my + 0.5 * s, fill: farbe, "font-size": 9.5 * s, text }));
+        const farbeZ = zustand[r.id] === "Verlust" ? "#F87171" : zustand[r.id] ? "#FB923C" : farbe;
+        schild.append(sv("rect", { x: mx - w / 2, y: my - h / 2, width: w, height: h, rx: h / 2, stroke: farbeZ, "stroke-width": (zustand[r.id] ? 1.4 : 0.8) * s }));
+        schild.append(sv("text", { x: mx, y: my + 0.5 * s, fill: farbeZ, "font-size": 9.5 * s, text }));
         karte.schilder.append(schild);
       }
     }
@@ -420,6 +429,10 @@
         }
       }
     }
+    // Vorschläge für die erste Linie (solange die Tafel offen ist).
+    if (p && ui.tafel === "angebote" && ui.angebote) {
+      for (const o of ui.angebote) linieSv(karte.routen, p.basis, o.ziel, { stroke: "#F2C14E", "stroke-width": 2.4 * s, "stroke-dasharray": `${5 * s} ${4 * s}`, "stroke-linecap": "round", opacity: 0.85 });
+    }
     // Geplante Linie im Editor.
     if (ui.editor && ui.editor.start && ui.editor.ziel) {
       linieSv(karte.routen, ui.editor.start, ui.editor.ziel, { stroke: "#F2C14E", "stroke-width": 3 * s, "stroke-dasharray": `${6 * s} ${4 * s}`, "stroke-linecap": "round" });
@@ -432,7 +445,7 @@
       const g = sv("g", { "data-stadt": c.id });
       const r = (c.k === 3 ? 6 : c.k === 2 ? 4.6 : 3.4) * s;
       g.append(sv("circle", { cx: x, cy: y, r: Math.max(r, 11 * s), fill: "transparent" }));
-      if (ui.heimat && L.HEIMAT.includes(c.id)) g.append(sv("circle", { cx: x, cy: y, r: r * 2.2, fill: "#F2C14E", class: "puls", opacity: 0.6 }));
+      if (ui.heimat && L.HEIMAT.includes(c.id)) g.append(sv("circle", { cx: x, cy: y, r: r * 2.2, fill: SCHWER_FARBE[L.SCHWIERIGKEIT[c.id]] || "#F2C14E", class: "puls", opacity: 0.6 }));
       if (heat && heat[c.id]) {
         const f = HEAT[heat[c.id]];
         g.append(sv("circle", { cx: x, cy: y, r: r + 5 * s, fill: f, opacity: heat[c.id] === "grau" ? 0.15 : 0.35 }));
@@ -446,10 +459,14 @@
       if (fokus === c.id || (ui.editor && ui.editor.ziel === c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 7 * s, fill: "none", stroke: "#fff", "stroke-width": 1.6 * s, class: "puls" }));
       const fuell = eigen ? p.farbe : c.k === 3 ? "#EAF2F8" : c.k === 2 ? "#C5D6E2" : "#93A9B8";
       g.append(sv("circle", { cx: x, cy: y, r, fill: fuell, class: "stadt-punkt", "stroke-width": 1.2 * s }));
-      const zeigeName = ui.heimat ? L.HEIMAT.includes(c.id) : (c.k === 3 && z > 0.6) || (c.k === 2 && z > 1.4) || z > 2.4 || fokus === c.id || (ui.editor && ui.editor.ziel === c.id) || eigen || (heat && heat[c.id] === "gruen");
+      const zeigeName = ui.heimat ? L.HEIMAT.includes(c.id) : (ui.tafel === "angebote" && ui.angebote && ui.angebote.some((o) => o.ziel === c.id)) || (c.k === 3 && z > 0.6) || (c.k === 2 && z > 1.4) || z > 2.4 || fokus === c.id || (ui.editor && ui.editor.ziel === c.id) || eigen || (heat && heat[c.id] === "gruen");
       const nameB = c.name.length * (c.k === 3 ? 5.6 : 4.9) * s;
-      const muss = fokus === c.id || (ui.editor && ui.editor.ziel === c.id);
-      if (zeigeName && (muss || frei(x + r + 2.5 * s + nameB / 2, y, nameB, 9 * s))) karte.namen.append(sv("text", { x: x + r + 2.5 * s, y: y + 3.2 * s, class: "stadt-name", "font-size": (c.k === 3 ? 10.5 : 9) * s, "stroke-width": 2.6 * s, text: c.name }));
+      const muss = fokus === c.id || (ui.editor && ui.editor.ziel === c.id) || (ui.tafel === "angebote" && ui.angebote && ui.angebote.some((o) => o.ziel === c.id));
+      if (zeigeName && (muss || frei(x + r + 2.5 * s + nameB / 2, y, nameB, 9 * s))) {
+        karte.namen.append(sv("text", { x: x + r + 2.5 * s, y: y + 3.2 * s, class: "stadt-name", "font-size": (c.k === 3 ? 10.5 : 9) * s, "stroke-width": 2.6 * s, text: c.name }));
+        const sw = ui.heimat && L.SCHWIERIGKEIT[c.id];
+        if (sw && z > 0.9) karte.namen.append(sv("text", { x: x + r + 2.5 * s, y: y + 12 * s, class: "stadt-name", "font-size": 7.5 * s, "stroke-width": 2.2 * s, fill: SCHWER_FARBE[sw], text: sw }));
+      }
       let zeichen = null;
       if (messen.has(c.id)) zeichen = "🎪";
       else if ((c.t === "sonne" && sai.sonne > 1.2) || (c.t === "sued" && sai.sued > 1.2) || (c.t === "tropen" && sai.tropen > 1.2)) zeichen = "☀️";
@@ -605,7 +622,7 @@
     hud.tempo.classList.toggle("pause", ui.tempo === 0);
     const pl = L.platz(st);
     hud.platz.replaceChildren(el("span", { class: "stufen-bild" }, [3, 1, 2].map((i) => el("i", { class: i === pl ? "an" : "", style: { height: (i === 1 ? 14 : i === 2 ? 10 : 7) + "px" } }))), el("b", { text: pl + "." }),
-      st.rennen ? el("span", { class: "abzeichen rennen-abzeichen", text: "🏁" }) : null);
+      ...(st.rennen ? [el("span", { class: "abzeichen rennen-abzeichen", text: "🏁" })] : []));
     const frei = L.freieFlugzeuge(p).length;
     hud.frei.textContent = frei; hud.frei.style.display = frei ? "" : "none";
     const au = Object.values(p.auftraege || {}).filter(Boolean);
@@ -633,7 +650,7 @@
   }
   function zielAntippen() {
     const z = L.zielStand(st);
-    if (z.id === "kaufen") storeZeigen();
+    if (z.id === "kaufen" || (z.id === "route" && !ich().routen.length)) angeboteZeigen();
     else if (["route", "drehkreuz", "kontinent", "kontinente4"].includes(z.id)) editorOeffnen();
     else if (z.id === "flotte5") storeZeigen();
     else if (z.id.startsWith("platz")) zeigeRang();
@@ -889,16 +906,22 @@
           el("b", { class: "spaltentitel", text: "Name" }),
           el("input", { class: "namensfeld", value: p.name, maxlength: 18, onchange: (e) => { L.umbenennen(st, L.SPIELER, e.target.value); nachAktion(); neu(); } }),
           el("div", { class: "farben" }, FARBEN.map((f) => el("button", { class: "farbpunkt" + (p.farbe === f ? " an" : ""), style: { background: f }, "aria-label": "Farbe", onclick: () => { L.umbenennen(st, L.SPIELER, null, f); karte.fliegerEls.forEach((x) => x.remove()); karte.fliegerEls.clear(); nachAktion(); neu(); } }))),
-          el("div", { class: "art-schild" }, el("div", { class: "art-bild" }, bildEl("air-service-" + pr.art, art.icon)), el("b", { text: art.name }), el("small", { text: art.staerke })),
           el("div", { class: "zeile" }, el("span", { text: "⭐ Ruf" }), el("b", { class: "rechts", text: Math.round(p.ruf) + " / 100" })),
           el("div", { class: "auslastung" }, el("i", { style: { width: p.ruf + "%", background: "#F2C14E" } })),
           el("div", { class: "blass mini", text: rufWirkung(p) }),
           werbeKnopf(neu)),
         el("div", { class: "meine-spalte breit" },
-          el("b", { class: "spaltentitel", text: "Grundsätze" }),
-          Object.entries(L.GRUNDSAETZE).map(([k, g]) => el("div", { class: "grundsatz" + (k === "essenZahlen" && ohneEssen ? " aus" : "") },
-            el("span", { class: "gs-icon", text: g.icon }), el("span", { class: "gs-name", text: g.name }),
-            el("div", { class: "segment klein" }, Object.entries(g.optionen).map(([id, o]) => el("button", { class: p.grundsaetze[k] === id ? "an" : "", onclick: () => { L.grundsatzSetzen(st, L.SPIELER, k, id); nachAktion(); neu(); } }, o.name))))),
+          el("b", { class: "spaltentitel", text: "Deine Art von Airline" }),
+          el("div", { class: "profilwahl" }, [["billig", "Günstig"], ["standard", "Ausgewogen"], ["premium", "Premium"]].map(([id, name]) => {
+            const passt = Object.entries(L.VORLAGEN[id]).every(([k, w]) => p.grundsaetze[k] === w);
+            return el("button", { class: "profil-knopf" + (passt ? " an" : ""), onclick: () => { L.vorlageSetzen(st, L.SPIELER, id); nachAktion(); neu(); } },
+              el("div", { class: "art-bild" }, bildEl("air-service-" + id, L.SERVICE[id].icon)), el("b", { text: name }), el("small", { text: L.SERVICE[id].staerke }));
+          })),
+          el("div", { class: "blass mini mitte-text", text: "Ein Tipp stellt alles passend ein. Schlechter für die Gäste kostet etwas Ruf." }),
+          detailsBox("grundsaetze", "Details: einzelne Grundsätze",
+            Object.entries(L.GRUNDSAETZE).map(([k, g]) => el("div", { class: "grundsatz" + (k === "essenZahlen" && ohneEssen ? " aus" : "") },
+              el("span", { class: "gs-icon", text: g.icon }), el("span", { class: "gs-name", text: g.name }),
+              el("div", { class: "segment klein" }, Object.entries(g.optionen).map(([id, o]) => el("button", { class: p.grundsaetze[k] === id ? "an" : "", onclick: () => { L.grundsatzSetzen(st, L.SPIELER, k, id); nachAktion(); neu(); } }, o.name)))))),
           el("div", { class: "wirkung" },
             el("div", {}, el("small", { text: "🏖️ Urlauber" }), el("b", { text: punkte(pr.gast.urlaub) })),
             el("div", {}, el("small", { text: "👔 Geschäftsleute" }), el("b", { text: punkte(pr.gast.geschaeft) })),
@@ -906,8 +929,7 @@
             el("div", {}, el("small", { text: "➕ Gebühren" }), el("b", { text: pr.extra ? "+" + pr.extra + " € / Gast" : "keine" })),
             el("div", {}, el("small", { text: "⭐ Qualität" }), el("b", { class: "sterne", text: "★".repeat(pr.sterne) + "☆".repeat(5 - pr.sterne) })),
             el("div", {}, el("small", { text: "🍽️ Kostet dich" }), el("b", { class: pr.essenKosten > 0 ? "minus" : "", text: pr.essenKosten > 0 ? Math.round(pr.essenKosten) + " € / Gast" : "nichts" }))),
-          el("div", { class: "blass mini mitte-text", text: "Schlechter für die Gäste kostet etwas Ruf. Schnellwahl:" }),
-          el("div", { class: "knopfreihe" }, Object.entries(L.SERVICE).map(([id, x]) => el("button", { class: "nebenknopf", text: x.icon + " " + x.name.split("-")[0].replace("Klassische Airline", "Klassisch").replace("Billigflieger", "Billig"), onclick: () => { L.vorlageSetzen(st, L.SPIELER, id); nachAktion(); neu(); } })))),
+          ),
         el("div", { class: "meine-spalte" },
           el("b", { class: "spaltentitel", text: "Assistenten" }),
           assistKarte("controller", neu), assistKarte("analyst", neu), assistKarte("preis", neu))));
@@ -1121,6 +1143,26 @@
       extra);
   }
 
+  // ---------- Drei Vorschläge für die erste Linie ----------
+  const ANGEBOT = {
+    guenstig: { icon: "💰", titel: "Günstiger Einstieg" },
+    drehkreuz: { icon: "🔁", titel: "Gut für ein Drehkreuz" },
+    chance: { icon: "🎲", titel: "Große Chance, mehr Risiko" },
+  };
+  function angeboteZeigen() {
+    const p = ich();
+    ui.angebote = L.angebote(st, L.SPIELER);
+    if (!ui.angebote.length) { editorOeffnen(); return; }
+    tafel("angebote", "Deine erste Linie", "Drei Vorschläge ab " + L.STADT[p.basis].name,
+      ui.angebote.map((o) => el("button", { class: "wahl angebot " + o.art, onclick: () => { ui.angebote = null; editorOeffnen({ start: p.basis, ziel: o.ziel, typ: o.typ }); } },
+        el("div", { class: "mitte" },
+          el("small", { class: "angebot-art", text: ANGEBOT[o.art].icon + " " + ANGEBOT[o.art].titel }),
+          el("div", { class: "angebot-zeile" }, el("b", { text: "→ " + L.STADT[o.ziel].name }), el("span", { class: "plus", text: kurz(o.von) + " bis " + kurz(o.bis) + " / Woche" })),
+          el("div", { class: "angebot-zeile" }, el("span", { text: L.TYPEN[o.typ].name }), el("span", { class: "kostet", text: "kostet " + geld(o.gesamt) })),
+          el("span", { class: "grund", text: o.grund })))),
+      el("button", { class: "nebenknopf", text: "✏️ Lieber selbst planen", onclick: () => { ui.angebote = null; editorOeffnen(); } }));
+  }
+
   // ---------- Linien-Editor ----------
   // Der einzige Weg zu neuen Linien. Links deine Linien, rechts der aktuelle Schritt.
   let editorEl = null;
@@ -1228,6 +1270,23 @@
       }
       return { typ, test, delta };
     });
+    // Kein passendes freies Flugzeug? Dann direkt hier kaufen: der vorgeschlagene Typ oder die drei besten.
+    const kaufTypen = [];
+    if (e.typ && !freieTypen.includes(e.typ)) kaufTypen.push(e.typ);
+    if (!optionen.some((o) => o.test.ok)) {
+      const geschaetzt = Object.keys(L.TYPEN).filter((typ) => !freieTypen.includes(typ) && !kaufTypen.includes(typ) && L.kannFliegen(st, L.SPIELER, a, b, typ).ok)
+        .map((typ) => ({ typ, g: L.schaetzen(st, L.SPIELER, a, b, typ).gewinn })).sort((x, y) => y.g - x.g).slice(0, Math.max(0, 3 - kaufTypen.length));
+      kaufTypen.push(...geschaetzt.map((x) => x.typ));
+    }
+    for (const typ of kaufTypen) {
+      const test = L.kannFliegen(st, L.SPIELER, a, b, typ);
+      let delta = null;
+      if (test.ok || test.grund === "geld") {
+        const pr = L.probe(st, L.SPIELER, (k) => { k.airlines[L.SPIELER].geld = 1e12; const r = L.fliegen(k, L.SPIELER, a, b, typ, { stufe: e.stufe }); if (r.ok) L.preisStufe(k, L.SPIELER, r.route.id, e.stufe); return r; });
+        delta = pr ? pr.delta : null;
+      }
+      optionen.push({ typ, test, delta, kaufen: true });
+    }
     if (!e.typ || !optionen.some((o) => o.typ === e.typ)) {
       const beste = optionen.filter((o) => o.test.ok).sort((x, y) => (y.delta || -1e9) - (x.delta || -1e9))[0];
       e.typ = beste ? beste.typ : null;
@@ -1241,23 +1300,24 @@
         symbol("⚔️", "Konkurrenz", konkurrenz.length ? konkurrenz.length + "×" : "keine")),
       konkurrenz.length ? el("div", { class: "chips" }, konkurrenz.map(chipAirline)) : null,
       el("div", { class: "chips" }, slotKosten.map((x) => el("span", { class: "chip" + (x.voll && !x.da ? " rot" : "") }, x.da ? "✓ " : "🎟️ ", L.STADT[x.s].name, x.da ? "" : x.voll ? " ausverkauft" : " " + geld(x.preis)))),
-      optionen.length ? el("div", { class: "blass mini", text: "Welches freie Flugzeug?" }) : el("div", { class: "hinweis", text: "Du hast kein freies Flugzeug. Kauf eins im Store, dann geht es hier weiter." }),
+      optionen.length ? el("div", { class: "blass mini", text: optionen.some((o) => !o.kaufen) ? "Welches Flugzeug?" : "Welches Flugzeug kaufen?" }) : el("div", { class: "hinweis", text: "Kein Flugzeug schafft diese Strecke mit deinem Geld." }),
       optionen.map((o) => el("button", {
         class: "wahl" + (e.typ === o.typ ? " an" : "") + (o.test.ok && o.delta > 0 ? " gut" : ""), disabled: !o.test.ok && o.test.grund !== "geld",
         onclick: () => { e.typ = o.typ; editorZeichnen(); },
       },
       el("div", { class: "ic" }, bildEl("air-flugzeug-" + o.typ, TYP_ICON[o.typ])),
-      el("div", { class: "mitte" }, el("b", { text: L.TYPEN[o.typ].name }), el("span", { text: o.test.ok ? L.TYPEN[o.typ].sitze + " Sitze" : GRUND[o.test.grund] })),
+      el("div", { class: "mitte" }, el("b", { text: L.TYPEN[o.typ].name }), el("span", { text: (o.kaufen ? "🛒 " + geld(L.TYPEN[o.typ].preis) + " · " : "frei · ") + (o.test.ok ? L.TYPEN[o.typ].sitze + " Sitze" : GRUND[o.test.grund]) })),
       el("div", { class: "wert", style: { color: o.delta == null ? "#9FB4C4" : farbeGewinn(o.delta) } }, o.delta == null ? "–" : kurz(o.delta), el("small", { text: "pro Tag" })))),
-      optionen.length ? null : el("button", { class: "hauptknopf", text: "🛒 Zum Flugzeug-Store", onclick: storeZeigen }),
       wahl ? el("div", { class: "blass mini", text: "Ticketpreis:" }) : null,
       wahl ? preisSegment(e.stufe, km, (s) => { e.stufe = s; editorZeichnen(); }) : null,
       wahl ? el("button", {
         class: "hauptknopf gross-knopf", disabled: !wahl.test.ok,
-        text: wahl.test.ok ? `Linie eröffnen · ${kurz(wahl.delta || 0)} am Tag` : GRUND[wahl.test.grund],
-        onclick: () => eroeffnen(a, b, wahl.typ, e.stufe),
+        text: !wahl.test.ok ? GRUND[wahl.test.grund] : wahl.kaufen ? `🛒 Kaufen & Linie eröffnen · ${geld(wahl.test.kosten.gesamt)}` : `Linie eröffnen · ${kurz(wahl.delta || 0)} am Tag`,
+        onclick: () => eroeffnen(a, b, wahl.typ, e.stufe, wahl.kaufen),
       }) : null,
-      wahl && wahl.test.kosten && wahl.test.kosten.slots ? el("div", { class: "blass mini mitte-text", text: "Landerechte kosten einmalig " + geld(wahl.test.kosten.slots) }) : null);
+      wahl && wahl.kaufen && wahl.test.ok ? el("div", { class: "blass mini mitte-text", text: "Bringt etwa " + kurz(wahl.delta || 0) + " am Tag" + (wahl.test.kosten.slots ? " · Landerechte im Preis: " + geld(wahl.test.kosten.slots) : "") }) : null,
+      wahl && !wahl.kaufen && wahl.test.kosten && wahl.test.kosten.slots ? el("div", { class: "blass mini mitte-text", text: "Landerechte kosten einmalig " + geld(wahl.test.kosten.slots) }) : null,
+      el("button", { class: "nebenknopf", text: "🛒 Anderes Flugzeug im Store", onclick: storeZeigen }));
   }
 
   function preisSegment(stufe, km, wenn) {
@@ -1267,8 +1327,8 @@
       el("small", { text: Math.round(L.ticket(km) * L.profil(p).preis * s.preis) + " €" }))));
   }
 
-  function eroeffnen(a, b, typ, stufe) {
-    const r = L.fliegen(st, L.SPIELER, a, b, typ, { nurFrei: true, stufe });
+  function eroeffnen(a, b, typ, stufe, kaufen) {
+    const r = L.fliegen(st, L.SPIELER, a, b, typ, kaufen ? { stufe } : { nurFrei: true, stufe });
     if (!r.ok) return;
     L.preisStufe(st, L.SPIELER, r.route.id, stufe);
     if (ui.tempo === 0 && ich().routen.length === 1) tempo(1);
@@ -1297,13 +1357,22 @@
         el("button", { class: "flugzeug-chip minus-knopf", text: "−", onclick: () => { L.abziehen(st, L.SPIELER, rid); nachAktion(); editorZeichnen(); }, "aria-label": "Flugzeug abziehen" }),
         passend.map((typ) => el("button", { class: "flugzeug-chip plus-knopf", onclick: () => { L.fliegen(st, L.SPIELER, r.a, r.b, typ, { nurFrei: true }); L.zielPruefen(st); nachAktion(); editorZeichnen(); } }, "＋", el("small", { text: L.TYPEN[typ].kurz })))),
       passend.length ? null : el("div", { class: "blass mini", text: e.auslastung > 0.9 ? "Fast voll! Ein weiteres Flugzeug würde sich lohnen: 🛒 Store." : "Kein freies Flugzeug zum Dazunehmen." }),
-      umruestenZeile(r, e),
       el("div", { class: "blass mini", text: "Ticketpreis:" }),
       preisSegment(r.stufe, e.km, (s) => { L.preisStufe(st, L.SPIELER, rid, s); nachAktion(); editorZeichnen(); }),
-      klassenEditor(r, e),
+      detailsBox("linie", "Details: Umrüsten, Sitzklassen", umruestenZeile(r, e), klassenEditor(r, e)),
       el("button", { class: "nebenknopf", text: "Linie schließen", onclick: () => { L.routeSchliessen(st, L.SPIELER, rid); nachAktion(); ui.editor = { start: p.basis, ziel: null, linie: null, typ: null, stufe: "normal" }; editorZeichnen(); } }),
       el("div", { class: "blass mini", text: "Abgezogene Flugzeuge stehen danach frei." }));
     if (einf.gesehen["erste-linie"] && !tippEl) erklaeren("linie");
+  }
+
+  // Eingeklappter Bereich für alles, was man selten braucht. Bleibt offen, wenn man ihn geöffnet hat.
+  function detailsBox(id, titel, ...inhalt) {
+    ui.details = ui.details || {};
+    const offen = !!ui.details[id];
+    return el("div", { class: "details" + (offen ? " offen" : "") },
+      el("button", { class: "details-kopf", onclick: (ev) => { ui.details[id] = !offen; const box = ev.currentTarget.parentNode; box.classList.toggle("offen"); ui.details[id] = box.classList.contains("offen"); } },
+        el("span", { class: "pfeilchen", text: "▸" }), titel),
+      el("div", { class: "details-rumpf" }, inhalt));
   }
 
   // Umrüsten: das kleinste Flugzeug der Linie gegen ein größeres tauschen (das alte wird verkauft).
@@ -1735,12 +1804,14 @@
     feld.append(seite);
   }
 
+  const SCHWER_FARBE = { leicht: "#4ADE80", mittel: "#F2C14E", schwer: "#F87171" };
   function heimatWaehlen() {
     feld.replaceChildren();
     ui.heimat = true;
     kameraPassend();
     karteBauen();
-    feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Tippe auf eine leuchtende Stadt. Wischen und mit zwei Fingern zoomen geht auch." })),
+    feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Tippe auf eine leuchtende Stadt. Wischen und mit zwei Fingern zoomen geht auch." }),
+      el("div", { class: "legende" }, Object.entries(SCHWER_FARBE).map(([k, f]) => el("span", {}, el("i", { style: { background: f } }), { leicht: "leichter Start", mittel: "mittel", schwer: "schwerer Start" }[k])))),
       el("button", { class: "kachel rundknopf", onclick: () => { ui.heimat = false; startSeite(); }, style: { position: "absolute", left: "6px", top: "6px", height: "38px", zIndex: 9 }, "aria-label": "Zurück", text: "◀" }));
   }
 
@@ -1750,7 +1821,8 @@
     einf = { gesehen: {} };
     schreiben(EINFUEHRUNG, einf);
     spielStarten();
-    tippZeigen("Willkommen! Alle Airlines starten bei Null. Unten steht immer dein nächstes Ziel. Als Erstes brauchst du ein Flugzeug: Tippe auf 🛒.", hud.store, "unten", "Los geht's");
+    angeboteZeigen();
+    tippZeigen("Willkommen! Alle Airlines starten bei Null. Hier sind drei Vorschläge für deine erste Linie: Tippe einen an. Flugzeug kaufen und Linie eröffnen geht dann in einem Schritt.", tafelEl, "links", "Los geht's");
   }
 
   function spielStarten() {

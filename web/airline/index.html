@@ -379,6 +379,27 @@ button:disabled { opacity: .4; cursor: default; }
 .art-schild small { font-size: 10px; color: var(--blass); line-height: 1.2; }
 .art-bild { height: 64px; display: grid; place-items: center; font-size: 30px; background: rgba(255,255,255,.05); overflow: hidden; }
 .art-bild img { width: 100%; height: 100%; object-fit: cover; }
+.profilwahl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.profil-knopf { display: flex; flex-direction: column; gap: 2px; background: rgba(255,255,255,.05); border: 1.5px solid transparent; border-radius: 10px; overflow: hidden; padding-bottom: 6px; text-align: left; }
+.profil-knopf.an { border-color: var(--gold); background: rgba(242,193,78,.12); }
+.profil-knopf .art-bild { height: 52px; font-size: 26px; }
+.profil-knopf b, .profil-knopf small { padding: 0 6px; }
+.profil-knopf b { font-size: 12px; }
+.profil-knopf small { font-size: 9.5px; color: var(--blass); line-height: 1.2; }
+.details { border-radius: 10px; background: rgba(255,255,255,.035); }
+.details-kopf { width: 100%; text-align: left; padding: 7px 9px; font-size: 11.5px; font-weight: 700; color: var(--blass); display: flex; gap: 6px; align-items: center; }
+.details .pfeilchen { display: inline-block; transition: transform .15s; }
+.details.offen .pfeilchen { transform: rotate(90deg); }
+.details-rumpf { display: none; padding: 0 8px 8px; flex-direction: column; gap: 6px; }
+.details.offen .details-rumpf { display: flex; }
+.angebot { align-items: flex-start; border-color: rgba(242,193,78,.35); }
+.angebot .angebot-art { display: block; font-size: 10px; font-weight: 800; color: var(--gold); }
+.angebot .angebot-zeile { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.angebot .angebot-zeile b { font-size: 13px; }
+.angebot .plus { color: #4ADE80; font-weight: 800; font-size: 11.5px; white-space: nowrap; }
+.angebot .kostet { color: #EAF2F8; white-space: nowrap; }
+.angebot .grund { display: block; line-height: 1.25; margin-top: 1px; font-style: italic; }
+.heimatwahl .legende { justify-content: center; margin-top: 3px; font-weight: 400; }
 .grundsatz { display: grid; grid-template-columns: 20px 92px 1fr; align-items: center; gap: 4px; }
 .grundsatz.aus { opacity: .35; pointer-events: none; }
 .gs-icon { font-size: 15px; text-align: center; }
