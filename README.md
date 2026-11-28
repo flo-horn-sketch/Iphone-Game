@@ -1,6 +1,6 @@
 # Luftlinie
 
-Ein Airline-Manager fürs iPhone im Querformat. Alle Airlines starten bei Null: Du legst im Linien-Editor Flüge zwischen echten Städten der ganzen Welt an und kaufst das Flugzeug gleich mit. Jeder Flug braucht einen Slot mit Uhrzeit: zu Hause von deiner eigenen Tafel, an fremden Flughäfen ersteigert oder von Rivalen gekauft. Ein Flugzeug kann mehrmals am Tag fliegen. Du bestimmst Ticketpreis und Kabine (Economy, Business, First) und kämpfst gegen drei Rivalen um Platz 1. Die Rivalen spielen nach denselben Regeln, machen Fehler und merken sich, was du ihnen antust; wie gut sie spielen, wählst du beim Start (Anfänger, Erfahrene, Profis).
+Ein Airline-Manager fürs iPhone im Querformat. Alle Airlines starten bei Null und in Europa: Du legst im Linien-Editor Flüge zwischen echten Städten der ganzen Welt an und kaufst das Flugzeug gleich mit. Jeder Flug braucht einen Slot mit Uhrzeit: zu Hause von deiner eigenen Tafel, an fremden Flughäfen ersteigert oder von Rivalen gekauft. Ein Flugzeug kann mehrmals am Tag fliegen. Du bestimmst Ticketpreis und Kabine (Economy, Business, First) und kämpfst gegen drei Rivalen um Platz 1. Die Rivalen spielen nach denselben Regeln, machen Fehler und merken sich, was du ihnen antust; wie gut sie spielen, wählst du beim Start (Anfänger, Erfahrene, Profis).
 
 ## Spielen
 

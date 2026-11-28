@@ -391,11 +391,9 @@
     { name: "Silberfalke", farbe: "#6EC6FF" },
     { name: "Morgenrot", farbe: "#FF7FA8" },
   ];
+  // Gestartet wird nur in Europa (Florian, 2026-11-28). Der Rest der Welt ist Ziel, nicht Heimat.
   const HEIMAT = ["london", "paris", "frankfurt", "amsterdam", "madrid", "istanbul", "muenchen", "berlin", "rom", "wien",
-    "newyork", "losangeles", "chicago", "atlanta", "mexiko", "saopaulo", "dubai", "delhi", "mumbai", "bangkok", "singapur", "hongkong", "peking", "shanghai", "tokio", "seoul", "sydney",
-    "dublin", "lissabon", "kopenhagen", "athen", "helsinki", "warschau", "hamburg", "toronto", "miami", "denver", "seattle", "houston",
-    "buenosaires", "bogota", "lima", "kairo", "johannesburg", "lagos", "nairobi", "addisabeba", "doha", "riad",
-    "osaka", "manila", "kualalumpur", "jakarta", "melbourne", "perth", "auckland", "brisbane"];
+    "dublin", "lissabon", "kopenhagen", "athen", "helsinki", "warschau", "hamburg"];
 
   // Wie leicht der Start ist: gemessen in Probepartien (Firmenwert nach 30 Tagen, 5 Partien je Stadt).
   // Entscheidend sind Ziele in der Nähe und wie dicht die Rivalen sitzen. Neu messen, wenn sich Städte ändern.
@@ -538,9 +536,9 @@
     // Alle starten bei Null: kein Flugzeug, keine Linie, nur Startgeld und zwei geschenkte Slots auf der eigenen Tafel.
     const p = neueAirline(SPIELER, { name: name.name, farbe: name.farbe, service: opt.service || "standard", basis, geld: REGELN.startGeld });
     st.airlines[SPIELER] = p;
-    // Die Rivalen sitzen in der Nähe: der Platzhirsch im nächsten Weltdrehkreuz, die anderen in Großstädten.
+    // Auch die Rivalen starten in Europa und sitzen in der Nähe: der Platzhirsch im nächsten Weltdrehkreuz, die anderen in Großstädten.
     const vergeben = new Set([basis]);
-    const nah = (filter) => ALLE.filter((c) => !vergeben.has(c.id) && filter(c)).sort((x, y) => entfernung(basis, x.id) - entfernung(basis, y.id))[0].id;
+    const nah = (filter) => ALLE.filter((c) => !vergeben.has(c.id) && c.r === "europa" && filter(c)).sort((x, y) => entfernung(basis, x.id) - entfernung(basis, y.id))[0].id;
     const WAHL = { k: (c) => c.k === 3, s: (c) => c.k === 2, a: (c) => c.k >= 2 && c.w >= 0.45 };
     for (const [id, r] of Object.entries(RIVALEN)) {
       const b = nah(WAHL[id]);

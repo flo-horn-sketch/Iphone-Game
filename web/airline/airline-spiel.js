@@ -2402,10 +2402,13 @@
   function heimatWaehlen() {
     feld.replaceChildren();
     ui.heimat = true;
-    kameraPassend();
+    { // Gestartet wird in Europa: Die Karte zeigt gleich den passenden Ausschnitt.
+      const xs = L.HEIMAT.map((id) => stadtXY[id][0]), ys = L.HEIMAT.map((id) => stadtXY[id][1]);
+      kameraPassend({ x0: Math.min(...xs) - 40, x1: Math.max(...xs) + 40, y0: Math.min(...ys) - 95, y1: Math.max(...ys) + 24 });
+    }
     karteBauen();
-    feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Tippe auf eine leuchtende Stadt. Wischen und mit zwei Fingern zoomen geht auch." }),
-      el("div", { class: "legende" }, Object.entries(SCHWER_FARBE).map(([k, f]) => el("span", {}, el("i", { style: { background: f } }), { leicht: "leichter Start", mittel: "mittel", schwer: "schwerer Start" }[k])))),
+    feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Alle Airlines starten in Europa. Tippe auf eine leuchtende Stadt. Die Welt fliegst du von dort aus an." }),
+      el("div", { class: "legende" }, Object.entries(SCHWER_FARBE).filter(([k]) => L.HEIMAT.some((id) => L.SCHWIERIGKEIT[id] === k)).map(([k, f]) => el("span", {}, el("i", { style: { background: f } }), { leicht: "leichter Start", mittel: "mittel", schwer: "schwerer Start" }[k])))),
       el("button", { class: "kachel rundknopf", onclick: () => { ui.heimat = false; startSeite(); }, style: { position: "absolute", left: "6px", top: "6px", height: "38px", zIndex: 9 }, "aria-label": "Zurück", text: "◀" }));
   }
 

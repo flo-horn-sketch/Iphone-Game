@@ -49,7 +49,7 @@ test("An jedem Flughafen liegt am Anfang genau ein freier Slot", () => {
 });
 
 test("Rivalen sitzen in der Nähe der Heimat, jeder woanders", () => {
-  for (const basis of ["paris", "tokio", "newyork"]) {
+  for (const basis of ["paris", "athen", "helsinki"]) {
     const st = L.neuesSpiel({ seed: 3, basis });
     const orte = st.reihenfolge.map((id) => st.airlines[id].basis);
     assert.equal(new Set(orte).size, 4);
@@ -681,4 +681,15 @@ test("Rivalen: Wer überboten wird, ärgert sich und verlangt beim Handel mehr",
   // Der Ärger verraucht mit der Zeit.
   for (let d = 0; d < 12; d++) L.kiTag(st, "k");
   assert.notEqual(L.laune(st, "k").art, "groll");
+});
+
+test("Start nur in Europa: Heimat des Spielers und der Rivalen", () => {
+  assert.ok(L.HEIMAT.length >= 10);
+  for (const id of L.HEIMAT) assert.equal(L.STADT[id].r, "europa", id);
+  for (const basis of L.HEIMAT) {
+    const st = L.neuesSpiel({ seed: 11, basis });
+    for (const id of ["k", "s", "a"]) assert.equal(L.STADT[st.airlines[id].basis].r, "europa", basis + " " + id);
+  }
+  // Die Welt bleibt als Ziel im Spiel.
+  assert.ok(L.ALLE.some((c) => c.r !== "europa"));
 });
