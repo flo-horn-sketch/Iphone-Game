@@ -393,6 +393,8 @@
       belegt.push({ x: sx, y: sy, w: sw, h: sh });
       return true;
     };
+    const belegen = (x, y, w, h) => belegt.push({ x: x * z + ui.kamera.x, y: y * z + ui.kamera.y, w: w * z, h: h * z });
+    const schildPos = {};
     if (p) {
       const mit = p.routen.map((r) => ({ r, e: rg.routen[r.id] })).filter((x) => x.e);
       const sortiert = mit.slice().sort((x, y) => y.e.gewinn - x.e.gewinn);
@@ -423,6 +425,7 @@
         const text = kurz(e.gewinn) + (zustand[r.id] ? " · " + zustand[r.id] : "");
         const w = (text.length * 5.6 + 8) * s, h = 13 * s;
         if (!frei(mx, my, w, h)) continue;
+        schildPos[r.id] = { mx, my, w };
         const schild = sv("g", { class: "preis-schild", "data-route": r.id });
         const farbeZ = zustand[r.id] === "Verlust" ? "#F87171" : zustand[r.id] ? "#FB923C" : farbe;
         schild.append(sv("rect", { x: mx - w / 2, y: my - h / 2, width: w, height: h, rx: h / 2, stroke: farbeZ, "stroke-width": (zustand[r.id] ? 1.4 : 0.8) * s }));
@@ -433,9 +436,14 @@
     // Preiskampf ⚔️ und Trend-Pfeile auf deinen Linien.
     if (p && !ui.editor) {
       const punktAuf = (a, b, t) => { const [x1, y1, x2, y2] = strecke(a, b); return [umlauf(x1 + (x2 - x1) * t), y1 + (y2 - y1) * t]; };
+      // Freien Platz auf der Linie suchen, damit Zeichen nichts verdecken.
+      const freierPunkt = (a, b, ts) => { for (const t of ts) { const q = punktAuf(a, b, t); if (frei(q[0], q[1], 18 * s, 18 * s)) return q; } const q = punktAuf(a, b, ts[0]); belegen(q[0], q[1], 18 * s, 18 * s); return q; };
       for (const r of p.routen) {
         if (r.duell) {
-          const [dx, dy] = punktAuf(r.a, r.b, 0.68);
+          // Neben das Zahlenschild, nie darauf.
+          const sp = schildPos[r.id];
+          const [dx, dy] = sp ? [sp.mx - sp.w / 2 - 10 * s, sp.my] : freierPunkt(r.a, r.b, [0.68, 0.55, 0.8, 0.42]);
+          if (sp) belegen(dx, dy, 18 * s, 18 * s);
           const grp = sv("g", { "data-duell": r.id, class: "huepfen" });
           grp.append(sv("circle", { cx: dx, cy: dy, r: 8.5 * s, fill: "rgba(9,18,28,.92)", stroke: st.airlines[r.duell.gegen].farbe, "stroke-width": 1.4 * s }));
           grp.append(svIcon("⚔️", dx, dy, 10 * s));
@@ -443,7 +451,9 @@
         }
         const hw = !r.duell && (p.hinweise || []).find((h) => h.id === r.id);
         if (hw) {
-          const [hx, hy] = punktAuf(r.a, r.b, 0.5);
+          const sp = schildPos[r.id];
+          const [hx, hy] = sp ? [sp.mx + sp.w / 2 + 10 * s, sp.my] : freierPunkt(r.a, r.b, [0.5, 0.38, 0.62, 0.28, 0.72]);
+          if (sp) belegen(hx, hy, 18 * s, 18 * s);
           const grp = sv("g", { "data-route": r.id, class: "huepfen" });
           grp.append(sv("circle", { cx: hx, cy: hy, r: 8 * s, fill: "rgba(9,18,28,.92)", stroke: "#FB923C", "stroke-width": 1.4 * s }));
           grp.append(svIcon("❗", hx, hy, 9 * s));
