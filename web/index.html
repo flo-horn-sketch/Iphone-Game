@@ -2,148 +2,17 @@
 <html lang="de">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Spielauswahl</title>
+<title>Luftlinie</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Fahrenden">
-<meta name="theme-color" content="#0D1718">
+<meta name="apple-mobile-web-app-title" content="Luftlinie">
+<meta name="theme-color" content="#0B1622">
 <link rel="apple-touch-icon" href="app-icon-180.png">
 <link rel="manifest" href="manifest.json">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya:wght@400;500&display=swap">
-<style>
-/* Startbildschirm: Welches Spiel soll es sein? Gleiches festes Feld wie im Spiel (844 × 390). */
-:root {
-  --nacht: #0D1718;
-  --tinte: #1B2A2B;
-  --pergament: #E8EDE6;
-  --gold: #C9963A;
-  --hellgold: #F3D27A;
-  --titel: "Cinzel", "Trajan Pro", Georgia, serif;
-  --text: "Alegreya", Georgia, "Times New Roman", serif;
-  color-scheme: dark;
-}
-html, body { height: 100%; margin: 0; }
-body {
-  background: var(--nacht); color: var(--pergament); font-family: var(--text);
-  overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-}
-#rahmen {
-  position: fixed; inset: 0;
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  background: radial-gradient(ellipse at 50% 10%, #284a44 0%, var(--nacht) 72%);
-}
-#feld {
-  position: absolute; width: 844px; height: 390px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-}
-h1 { margin: 0; font-family: var(--titel); font-size: 22px; letter-spacing: 3px; color: var(--hellgold); text-transform: uppercase; text-shadow: 0 2px 6px #000; }
-.spiele { display: flex; gap: 18px; }
-.spiel {
-  position: relative; width: 252px; height: 250px; border-radius: 18px; overflow: hidden;
-  display: block; text-decoration: none; color: inherit;
-  border: 2px solid rgba(201,150,58,.7); background: var(--tinte);
-  box-shadow: 0 8px 22px rgba(0,0,0,.55);
-  transition: transform .15s ease;
-}
-.spiel:active { transform: scale(.97); }
-.spiel .bild { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.spiel .unten {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 14px 14px;
-  background: linear-gradient(transparent, rgba(6,12,13,.94) 55%);
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
-.spiel .name { font-family: var(--titel); font-size: 21px; font-weight: 700; color: var(--hellgold); }
-.spiel .name small { display: block; font-family: var(--text); font-size: 13px; font-weight: 400; color: var(--pergament); opacity: .8; }
-.spiel .los {
-  width: 46px; height: 46px; border-radius: 50%; flex: none;
-  display: grid; place-items: center; font-size: 20px; color: var(--nacht);
-  background: linear-gradient(90deg, var(--gold), var(--hellgold));
-}
-.spiel.bald { border-style: dashed; cursor: default; }
-.spiel.bald .bild { filter: grayscale(.6) brightness(.55); }
-.spiel.bald .los { background: rgba(232,237,230,.15); color: var(--pergament); }
-.spiel .bild + .platzhalter { display: none; }
-.platzhalter {
-  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
-  background: repeating-linear-gradient(135deg, #1f3433 0 18px, #1a2c2b 18px 36px);
-  font-family: var(--titel); font-size: 80px; color: rgba(243,210,122,.35);
-}
-.wackeln { animation: wackeln .35s; }
-@keyframes wackeln { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-#drehen {
-  position: fixed; inset: 0; z-index: 100; display: none;
-  place-content: center; justify-items: center; gap: 14px; text-align: center;
-  background: var(--nacht); padding: 24px; font-family: var(--titel); font-size: 18px;
-}
-#drehen .telefon { width: 46px; height: 80px; border: 3px solid var(--hellgold); border-radius: 10px; animation: drehen 2s ease-in-out infinite; }
-@keyframes drehen { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-@media (orientation: portrait) and (max-width: 700px) { #drehen { display: grid; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-</style>
-
-<div id="rahmen">
-  <div id="feld">
-    <h1>Was wollt ihr spielen?</h1>
-    <div class="spiele">
-      <!-- Bildname auswahl-clanviertel.png (siehe BILDER-AUFTRAG.md); bis dahin ein Platzhalter. -->
-      <a class="spiel" href="clanviertel/" data-spiel="clanviertel">
-        <img class="bild" data-bild="auswahl-clanviertel" alt="">
-        <div class="platzhalter">🏮</div>
-        <div class="unten"><span class="name">Clan-Viertel</span><span class="los">▶</span></div>
-      </a>
-      <!-- Bildname auswahl-airline.png (siehe BILDER-AUFTRAG.md); bis dahin ein Platzhalter. -->
-      <a class="spiel" href="airline/" data-spiel="airline">
-        <img class="bild" data-bild="auswahl-airline" alt="">
-        <div class="platzhalter">✈️</div>
-        <div class="unten"><span class="name">Luftlinie<small>Airline-Manager</small></span><span class="los">▶</span></div>
-      </a>
-      <!-- Die Fahrenden ist pausiert. Wieder einschalten: dieses div durch einen Link auf fahrenden.html ersetzen. -->
-      <div class="spiel bald" data-spiel="fahrenden" role="button" aria-disabled="true" aria-label="Die Fahrenden, pausiert">
-        <img class="bild" data-bild="auswahl-fahrenden" data-ersatz="karte-welt" alt="">
-        <div class="unten"><span class="name">Die Fahrenden<small>pausiert</small></span><span class="los">🔒</span></div>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="drehen" role="status"><div class="telefon"></div><div>Dreh dein iPhone quer</div></div>
-
-<script>
-(function () {
-  "use strict";
-  const rahmen = document.getElementById("rahmen");
-  const feld = document.getElementById("feld");
-  function skalieren() {
-    const cs = getComputedStyle(rahmen);
-    const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
-    const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
-    const w = rahmen.clientWidth - pl - pr, h = rahmen.clientHeight - pt - pb;
-    const skala = Math.max(0.2, Math.min(w / 844, h / 390));
-    feld.style.left = pl + w / 2 + "px";
-    feld.style.top = pt + h / 2 + "px";
-    feld.style.transform = `translate(-50%, -50%) scale(${skala})`;
-  }
-  window.addEventListener("resize", skalieren);
-  window.addEventListener("orientationchange", () => setTimeout(skalieren, 200));
-  skalieren();
-
-  // Bilder: eigenes Auswahlbild, sonst Ersatzbild, sonst unsichtbar.
-  fetch("grafiken/vorhanden.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
-    const da = new Set(liste);
-    for (const img of document.querySelectorAll("img[data-bild]")) {
-      const name = [img.dataset.bild, img.dataset.ersatz].find((n) => n && da.has(n + ".png"));
-      if (name) img.src = "grafiken/" + name + ".png";
-      else img.remove();
-    }
-  });
-
-  const bald = document.querySelector(".spiel.bald");
-  bald.addEventListener("click", () => {
-    bald.classList.remove("wackeln");
-    void bald.offsetWidth;
-    bald.classList.add("wackeln");
-  });
-})();
-</script>
+<meta http-equiv="refresh" content="0; url=airline/">
+<style>html, body { margin: 0; height: 100%; background: #0B1622; }</style>
+<!-- Es gibt nur noch ein Spiel: Luftlinie. Diese Seite leitet direkt dorthin weiter. -->
+<script>location.replace("airline/" + location.search + location.hash);</script>
+<a href="airline/" style="color:#F2C14E;font-family:system-ui;display:block;padding:24px">Luftlinie öffnen</a>
 </html>
