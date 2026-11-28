@@ -684,7 +684,8 @@
     hud.slotZahl = el("span", { class: "abzeichen" });
     hud.store = el("button", { class: "kachel rundknopf knopf-mit", onclick: slotListe, "aria-label": "Freie Slots" }, "🎟️", hud.slotZahl);
     hud.frei = el("span", { class: "abzeichen" });
-    hud.linien = el("button", { class: "kachel linienknopf knopf-mit", onclick: () => editorOeffnen() }, "✏️ Linien", hud.frei);
+    // Geplant wird vom Flugzeug aus: Der Hauptknopf heißt "Flotte" (Florian). Ohne Flugzeug geht es direkt zum ersten Flug.
+    hud.linien = el("button", { class: "kachel linienknopf knopf-mit", onclick: () => (ich().flotte.length ? zeigeFlotte() : editorOeffnen()) }, "🛩️ Flotte", hud.frei);
     hud.menue = el("button", { class: "kachel rundknopf", onclick: menueZeigen, "aria-label": "Menü" }, "☰");
     // Ton an/aus, immer sichtbar (Töne stehen in airline-ton.js).
     hud.ton = el("button", { class: "kachel rundknopf tonknopf", onclick: tonFenster, "aria-label": "Ton" });
@@ -988,7 +989,7 @@
     const seite = el("div", { class: "seite store slottafel" },
       el("div", { class: "store-kopf" },
         el("h1", {}, L.STADT[id].name, el("small", { text: id === p.basis ? "Deine Heimat" : "Dein Drehkreuz" })),
-        el("span", { class: "store-geld", text: p.geschenk > 0 ? p.geschenk === 1 ? "🎁 Noch 1 Slot geschenkt: Such ihn dir aus." : "🎁 Noch " + p.geschenk + " Slots geschenkt: Such sie dir aus." : "Hier kaufst nur du Slots. Du verlierst sie nie." }),
+        el("span", { class: "store-geld", text: p.geschenk > 0 ? (p.geschenk === 1 ? "🎁 Noch 1 Slot geschenkt" : "🎁 Noch " + p.geschenk + " Slots geschenkt") + ": Du nimmst ihn, wenn du einen Flug planst." : "Slots kaufst du, wenn du einen Flug planst. Diese verlierst du nie." }),
         el("button", { class: "zu", text: "✕", "aria-label": "Schließen", onclick: zu })),
       el("div", { class: "slotgitter" }, zeilen.map((z) => {
         const ziel = z.flug ? L.STADT[z.flug.von === id ? z.flug.nach : z.flug.von].name : null;
@@ -1005,9 +1006,10 @@
       el("div", { class: "tafel-fuss" + (gew ? " an" : "") },
         el("div", { class: "mitte" },
           el("b", { text: gew ? uhr(gew.h) + " Uhr ausgewählt" : "Tippe eine Uhrzeit an" }),
-          el("span", { text: gew ? ZEIT_LANG[gew.art] + ". Ein Abflug pro Tag um diese Zeit." : "Jeder Abflug braucht einen Slot. Für den Rückflug brauchst du einen am Ziel." })),
-        gew ? el("button", { class: "hauptknopf", disabled: p.geld < gew.preis, text: gew.preis ? "Kaufen · " + geld(gew.preis) : "🎁 Nehmen (geschenkt)",
-          onclick: () => { L.heimSlotKaufen(st, L.SPIELER, id, gew.h); ton("kauf"); ui.tafelWahl = null; nachAktion(); tafelSeite(id); } }) : null));
+          el("span", { text: gew ? ZEIT_LANG[gew.art] + ". " + (gew.preis ? "Kostet " + geld(gew.preis) + ", gezahlt wird beim Eröffnen des Flugs." : "Geschenkt.") : "Slots kauft man nur zusammen mit einem Flug: Tippe eine Uhrzeit an und plane den Flug." })),
+        // Slots gibt es nur zusammen mit einem Flug: Der Knopf öffnet die Planung mit dieser Abflugzeit.
+        gew ? el("button", { class: "hauptknopf", text: "✏️ Flug um " + uhr(gew.h) + " planen",
+          onclick: () => { const h = gew.h; seite.remove(); ui.modal = false; ui.tafelWahl = null; editorOeffnen({ start: id, vor: { e1: { art: "tafel", h, preis: p.geschenk > 0 ? 0 : L.heimPreis(id, h) } } }); } }) : null));
     feld.append(seite);
     erklaeren("tafel");
   }
@@ -1036,27 +1038,33 @@
     return w;
   }
 
-  // Ein Slot wird vergeben: verdeckt bieten, einen Tag lang.
-  function zeigeSlot(sid) {
+  // Slots gibt es nur beim Planen eines Flugs (Florian). Die Karte zeigt, was los ist, und führt in die Planung.
+  // Bieten und Handel laufen als Fenster über der Flugseite; danach geht es dort weiter.
+  function slotFenster(titel, unter, ...inhalt) {
+    const alt = feld.querySelector(".slot-fenster");
+    if (alt) alt.remove();
+    const seite = el("div", { class: "seite ergebnis-seite slot-fenster" },
+      el("div", { class: "ergebnis-karte" },
+        el("div", { class: "ergebnis-kopf" }, el("span", { class: "ergebnis-icon", text: "🎟️" }), el("div", {}, el("small", { text: unter }), el("b", { text: titel })),
+          el("button", { class: "zu", text: "✕", "aria-label": "Schließen", onclick: () => seite.remove() })),
+        inhalt));
+    feld.append(seite);
+    return seite;
+  }
+  // Verdeckt bieten, einen Tag lang. "weiter" läuft nach dem Gebot (zurück zur Flugseite).
+  function bietFenster(sid, weiter) {
     const s = st.pool.find((x) => x.id === sid);
-    if (!s) { if (ui.tafel === "slot") tafelZu(); return; }
+    if (!s || s.bis == null) { if (weiter) weiter(); return; }
     const p = ich();
     const c = L.STADT[s.stadt];
-    ui.stadt = s.stadt; ui.route = null; ui.slot = sid;
     const gp = L.slotGrundpreis(s.stadt, s.h);
-    const titel = "🎟️ " + c.name + " " + uhr(s.h) + " Uhr";
-    if (s.bis == null) {
-      tafel("slot", titel, ZEIT_LANG[L.zeitArt(s.h)],
-        el("div", { class: "hinweis gruen", text: "Dieser Slot liegt frei. Wer zuerst einen Flug darauf legt, bekommt ihn für " + geld(gp) + "." }),
-        el("button", { class: "hauptknopf", text: "✏️ Flug nach " + c.name + " planen", onclick: () => editorOeffnen({ start: p.basis, ziel: s.stadt }) }),
-        el("button", { class: "nebenknopf", text: "Flughafen ansehen", onclick: () => zeigeStadt(s.stadt) }));
-      return;
-    }
     const mein = s.gebote[L.SPIELER] || 0;
     const max = Math.max(gp, mein, Math.min(Math.floor(p.geld / 10000) * 10000, gp * 8));
     let betrag = mein || gp;
     const rat = ratCache("slot" + sid, () => L.ratSlot(st, sid));
-    const knopf = el("button", { class: "hauptknopf", disabled: p.geld < gp, onclick: () => { L.bieten(st, sid, betrag); nachAktion(); meldung("🎟️", "Dein Gebot für " + c.name + " steht: " + geld(betrag) + "."); zeigeSlot(sid); } });
+    let fenster = null;
+    const fertig = () => { if (fenster) fenster.remove(); nachAktion(); if (weiter) weiter(); };
+    const knopf = el("button", { class: "hauptknopf", disabled: p.geld < gp, onclick: () => { L.bieten(st, sid, betrag); meldung("🎟️", "Dein Gebot für " + c.name + " " + uhr(s.h) + " steht: " + geld(betrag) + ". Gewinnst du, ist er morgen früh dein Slot."); fertig(); } });
     const setzen = (v) => { betrag = v; textSetzen(knopf, (mein ? "Gebot ändern · " : "Verdeckt bieten · ") + geld(v)); };
     setzen(betrag);
     let ratText = null;
@@ -1065,31 +1073,26 @@
       ratText = (rat.wert ? "Der Slot ist für dich etwa " + geld(rat.wert[0]) + " bis " + geld(rat.wert[1]) + " wert" + (rat.von ? " (Flug ab " + L.STADT[rat.von].name + ")." : ".") : "Von deinen Flughäfen aus bringt dir der Slot kaum etwas.")
         + " " + (namen.length ? "Ich rechne damit, dass " + namen.join(" und ") + " mitbietet." : "Ich glaube, du bietest allein.");
     }
-    tafel("slot", titel, ZEIT_LANG[L.zeitArt(s.h)] + " · noch " + stundenBis(s.bis) + " Std",
-      el("div", { class: "blass mini", text: "Alle Airlines bieten verdeckt. Das höchste Gebot gewinnt. Bietest nur du, zahlst du nur den Grundpreis von " + geld(gp) + "." }),
+    fenster = slotFenster(c.name + " " + uhr(s.h) + " Uhr wird vergeben", ZEIT_LANG[L.zeitArt(s.h)] + " · noch " + stundenBis(s.bis) + " Std",
+      el("div", { class: "blass mini", text: "Alle Airlines bieten verdeckt. Das höchste Gebot gewinnt. Bietest nur du, zahlst du nur den Grundpreis von " + geld(gp) + ". Das Ergebnis kommt morgen früh." }),
       ratBox(rat && rat.wer, ratText),
       el("div", { class: "blass mini", text: "Dein Gebot: am Rad drehen" }),
       rad(radWerte(gp, max), betrag, (v) => geld(v), setzen),
       knopf,
-      mein ? el("button", { class: "nebenknopf", text: "Gebot zurückziehen", onclick: () => { L.bieten(st, sid, 0); nachAktion(); zeigeSlot(sid); } }) : null,
-      el("button", { class: "nebenknopf", text: "Flughafen ansehen", onclick: () => zeigeStadt(s.stadt) }));
+      mein ? el("button", { class: "nebenknopf", text: "Gebot zurückziehen", onclick: () => { L.bieten(st, sid, 0); fertig(); } }) : null);
     erklaeren("bieten");
   }
-
-  // Einem Rivalen einen Slot abkaufen oder tauschen. Die Antwort kommt sofort.
-  function zeigeHandel(sid) {
+  // Einem Rivalen einen Slot abkaufen oder tauschen. Die Antwort kommt sofort. "weiter(ok)" läuft danach.
+  function handelFenster(sid, weiter) {
     const aid = L.slotBesitzer(st, sid);
-    if (!aid || aid === L.SPIELER) { tafelZu(); return; }
+    if (!aid || aid === L.SPIELER) { if (weiter) weiter(false); return; }
     const p = ich(), a = st.airlines[aid];
     const s = L.slotVon(a, sid);
     const c = L.STADT[s.stadt];
-    ui.stadt = s.stadt; ui.route = null;
     const h = L.handelPruefen(st, sid);
-    const titel = "🤝 " + c.name + " " + uhr(s.h) + " Uhr";
-    const zurueck = el("button", { class: "nebenknopf", text: "◀ Zum Flughafen", onclick: () => zeigeStadt(s.stadt) });
+    const titel = c.name + " " + uhr(s.h) + " Uhr";
     if (!h.ok) {
-      tafel("handel", titel, "Slot von " + a.name,
-        el("div", { class: "hinweis", text: h.grund === "heim" ? "Slots an der eigenen Heimat gibt niemand her." : a.name + " will bis Tag " + h.bis + " nicht mehr über diesen Slot reden." }), zurueck);
+      slotFenster(titel, "Slot von " + a.name, el("div", { class: "hinweis", text: h.grund === "heim" ? "Slots an der eigenen Heimat gibt niemand her." : a.name + " will bis Tag " + h.bis + " nicht mehr über diesen Slot reden." }));
       return;
     }
     const F = L.slotFlug(a, sid);
@@ -1097,15 +1100,16 @@
     const eigene = p.slots.filter((x) => !x.heim && !L.slotFlug(p, x.id));
     let betrag = Math.min(h.grundpreis, Math.floor(p.geld / 10000) * 10000), tausch = null;
     const max = Math.max(betrag, Math.min(Math.floor(p.geld / 10000) * 10000, h.grundpreis * 12));
+    let fenster = null;
     const knopf = el("button", { class: "hauptknopf", onclick: () => {
       const r = L.handelAnbieten(st, sid, betrag, tausch);
       nachAktion();
-      if (r.ok) { ton("sieg"); meldung("🤝", a.name + ": „Abgemacht.“ Der Slot gehört dir."); zeigeStadt(s.stadt); }
-      else if (r.grund === "nein") { meldung("✋", a.name + ": „Das reicht nicht. In zwei Tagen können wir wieder reden.“"); zeigeHandel(sid); }
+      if (r.ok) { ton("sieg"); meldung("🤝", a.name + ": „Abgemacht.“ Der Slot gehört dir."); fenster.remove(); if (weiter) weiter(true); }
+      else if (r.grund === "nein") { meldung("✋", a.name + ": „Das reicht nicht. In zwei Tagen können wir wieder reden.“"); fenster.remove(); if (weiter) weiter(false); }
     } });
     const setzen = (v) => { betrag = v; textSetzen(knopf, "Angebot machen · " + geld(v) + (tausch ? " + Slot" : "")); };
     setzen(betrag);
-    tafel("handel", titel, "Slot von " + a.name,
+    fenster = slotFenster(titel, "🤝 Slot von " + a.name,
       el("div", { class: "blass mini", text: (F ? a.name + " fliegt darauf nach " + L.STADT[F.von === s.stadt ? F.nach : F.von].name + ". " : a.name + " nutzt den Slot gerade nicht. ") + "Die Antwort kommt sofort. Nach einem Nein ist zwei Tage Pause." }),
       h.groll >= 0.5 ? el("div", { class: "laune groll", text: a.name + " ärgert sich gerade über dich und verlangt deshalb mehr." }) : null,
       ratBox(rat && rat.wer, rat ? a.name + " gibt ihn wohl für " + geld(rat.noetig[0]) + " bis " + geld(rat.noetig[1]) + " her." + (rat.wert ? " Dir ist er etwa " + geld(rat.wert[0]) + " bis " + geld(rat.wert[1]) + " wert." : " Du kannst ihn von hier kaum nutzen.") : null),
@@ -1118,8 +1122,41 @@
         if (tausch) ev.currentTarget.classList.add("an");
         setzen(betrag);
       } }, L.STADT[x.stadt].name + " " + uhr(x.h)))) : null,
-      knopf, zurueck);
+      knopf);
     erklaeren("handel");
+  }
+  // Auf der Karte: ein Slot, der vergeben wird oder frei liegt. Gekauft und geboten wird in der Planung.
+  function zeigeSlot(sid) {
+    const s = st.pool.find((x) => x.id === sid);
+    if (!s) { if (ui.tafel === "slot") tafelZu(); return; }
+    const p = ich();
+    const c = L.STADT[s.stadt];
+    ui.stadt = s.stadt; ui.route = null; ui.slot = sid;
+    const gp = L.slotGrundpreis(s.stadt, s.h);
+    const titel = "🎟️ " + c.name + " " + uhr(s.h) + " Uhr";
+    const mein = s.bis != null ? s.gebote[L.SPIELER] || 0 : 0;
+    tafel("slot", titel, ZEIT_LANG[L.zeitArt(s.h)] + (s.bis != null ? " · noch " + stundenBis(s.bis) + " Std" : ""),
+      s.bis == null ? el("div", { class: "hinweis gruen", text: "Dieser Slot liegt frei. Wer zuerst einen Flug darauf legt, bekommt ihn für " + geld(gp) + "." })
+        : el("div", { class: "hinweis", text: mein ? "Dein Gebot steht: " + geld(mein) + ". Das Ergebnis kommt, wenn die Zeit abläuft." : "Dieser Slot wird vergeben. Geboten wird beim Planen eines Flugs dorthin." }),
+      el("button", { class: "hauptknopf", text: s.bis == null ? "✏️ Flug nach " + c.name + " planen" : mein ? "✏️ Flug planen, Gebot ändern" : "✏️ Flug planen und bieten",
+        onclick: () => editorOeffnen({ start: p.basis, ziel: s.stadt, vor: s.bis == null ? null : { oeffne: { art: "bieten", sid } } }) }),
+      el("button", { class: "nebenknopf", text: "Flughafen ansehen", onclick: () => zeigeStadt(s.stadt) }));
+    if (s.bis != null) erklaeren("bieten");
+  }
+  // Auf der Karte: der Slot eines Rivalen. Gekauft wird in der Planung.
+  function zeigeHandel(sid) {
+    const aid = L.slotBesitzer(st, sid);
+    if (!aid || aid === L.SPIELER) { tafelZu(); return; }
+    const p = ich(), a = st.airlines[aid];
+    const s = L.slotVon(a, sid);
+    const c = L.STADT[s.stadt];
+    ui.stadt = s.stadt; ui.route = null;
+    const F = L.slotFlug(a, sid);
+    tafel("handel", "🤝 " + c.name + " " + uhr(s.h) + " Uhr", "Slot von " + a.name,
+      el("div", { class: "blass mini", text: (F ? a.name + " fliegt darauf nach " + L.STADT[F.von === s.stadt ? F.nach : F.von].name + ". " : a.name + " nutzt den Slot gerade nicht. ") + "Kaufen oder tauschen kannst du ihn, wenn du einen Flug hierher planst." }),
+      s.heim ? el("div", { class: "hinweis", text: "Slots an der eigenen Heimat gibt niemand her." })
+        : el("button", { class: "hauptknopf", text: "✏️ Flug planen und Slot kaufen", onclick: () => editorOeffnen({ start: p.basis, ziel: s.stadt, vor: { oeffne: { art: "handel", sid } } }) }),
+      el("button", { class: "nebenknopf", text: "◀ Zum Flughafen", onclick: () => zeigeStadt(s.stadt) }));
   }
 
   // Übersicht: Wo wird geboten, und was ist mit meinen Slots?
@@ -1248,7 +1285,8 @@
             ohne ? sicherKnopf("Verkaufen · " + geld(t.preis * L.REGELN.verkaufAnteil), () => { L.verkaufen(st, L.SPIELER, f.id); nachAktion(); zeigeFlotte(); }) : null));
       }),
       el("div", { class: "blass mini", text: "Der Balken zeigt den Tag jedes Flugzeugs. Je voller, desto besser verdient es sein Geld." }),
-      el("button", { class: "nebenknopf", text: "✏️ Flug anlegen", onclick: () => editorOeffnen() }));
+      el("button", { class: "nebenknopf", text: "＋ Neues Flugzeug mit Flug", onclick: () => editorOeffnen() }),
+      p.routen.length ? el("button", { class: "nebenknopf", text: "✏️ Linien bearbeiten", onclick: () => editorOeffnen({ linie: p.routen[0].id }) }) : null);
     erklaeren("tagesplan");
   }
 
@@ -2206,8 +2244,8 @@
     farben: { bild: "air-regel-farben", icon: "📈", titel: "Grün, Gelb, Rot", text: "Deine Linien leuchten nach Gewinn pro Tag: grün lohnt sich, gelb gerade so, rot kostet Geld. Tippe eine Linie an, dann siehst du warum." },
     tempo: { bild: "air-regel-tempo", icon: "⏳", titel: "Die Zeit läuft", text: "Ein Tag dauert eine Minute. Oben neben der Uhr machst du schneller oder hältst an. Abends wird abgerechnet." },
     flugzeuge: { bild: "air-regel-flugzeuge", icon: "🛩️", titel: "Flugzeuge kaufst du mit dem Flug", text: "Ein Flugzeug kaufst du immer zusammen mit einem Flug. Hat eins deiner Flugzeuge zu der Zeit frei, fliegt es den neuen Flug einfach mit, und du sparst den Kauf. 🔒 Größere Typen gibt es, wenn deine Airline mehr wert ist." },
-    tafel: { bild: "air-regel-tafel", icon: "🏠", titel: "Deine Slot-Tafel", text: "Zu Hause gehört die Tafel dir allein: von 5 bis 23 Uhr jede Stunde ein Slot. Zwei bekommst du geschenkt, weitere kaufst du zum festen Preis. Diese Slots verlierst du nie." },
-    tagesplan: { bild: "air-regel-tagesplan", icon: "🗓️", titel: "Ein Flugzeug, viele Flüge", text: "Ein Flugzeug kann mehrmals am Tag fliegen, auch zu verschiedenen Zielen. Der Balken zeigt seinen Tag. Je voller der Balken, desto besser verdient das Flugzeug sein Geld. Unter „Deine Flotte“ öffnet 🗓️ Planen den Planer jedes Flugzeugs." },
+    tafel: { bild: "air-regel-tafel", icon: "🏠", titel: "Deine Slot-Tafel", text: "Zu Hause gehört die Tafel dir allein: von 5 bis 23 Uhr jede Stunde ein Slot. Zwei bekommst du geschenkt, weitere kosten einen festen Preis. Slots nimmst du immer beim Planen eines Flugs: Tippe eine Uhrzeit an und plane los. Diese Slots verlierst du nie." },
+    tagesplan: { bild: "air-regel-tagesplan", icon: "🗓️", titel: "Ein Flugzeug, viele Flüge", text: "Ein Flugzeug kann mehrmals am Tag fliegen, auch zu verschiedenen Zielen. Der Balken zeigt seinen Tag. Je voller der Balken, desto besser verdient das Flugzeug sein Geld. Oben unter 🛩️ Flotte öffnet 🗓️ Planen den Planer jedes Flugzeugs." },
     planer: { bild: "air-regel-planer", icon: "🗓️", titel: "Der Planer", text: "Hier siehst du den Tag eines Flugzeugs: Wo es fliegt und wann es frei ist. Rechts stehen Ziele, die noch in seine Lücken passen. Tipp eins an, dann ist der Flug schon ausgefüllt: Zeiten, Slots und dieses Flugzeug." },
     sofort: { bild: "air-regel-sofort", icon: "🎟️", titel: "Slot sofort kaufen", text: "Ist am Ziel kein Slot frei, kannst du beim Flughafen einen sofort kaufen, zur Uhrzeit deiner Wahl. Das kostet das " + L.REGELN.sofortFaktor.toLocaleString("de-DE") + "-fache vom Grundpreis. Dafür gibt der Flughafen seinen nächsten Slot später heraus, und eine Weile geht dort kein weiterer Sofortkauf. Wird gerade ein Slot vergeben, musst du bieten." },
     linie: { bild: "air-regel-linie", icon: "✏️", titel: "Deine Linie einstellen", text: "Hier siehst du alle Flüge der Linie mit Uhrzeit und wie voll sie sind. ＋ legt einen weiteren Flug an, ✕ streicht einen. Der Preis 🔻 billiger oder 🔺 teurer gilt für die ganze Linie." },
