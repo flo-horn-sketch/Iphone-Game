@@ -764,7 +764,7 @@
     const ringe = slotRinge().length;
     hud.slotZahl.textContent = ringe; hud.slotZahl.style.display = ringe ? "" : "none";
     const au = Object.values(p.auftraege || {}).filter(Boolean);
-    const ctrl = L.assistent(p, "controller");
+    const ctrl = L.assistent(p);
     const fertig = au.some((x) => x.bericht && !x.gelesen) || !!(p.wochenbericht && !p.wochenbericht.gelesen) || !!(p.hinweise && p.hinweise.some((h) => !h.gelesen)), laeuft = au.some((x) => !x.bericht);
     hud.bericht.style.display = au.length || ctrl ? "" : "none";
     textSetzen(hud.bericht, laeuft && !fertig ? "⏳" : "📋");
@@ -890,7 +890,7 @@
     return ratMerker.get(k);
   }
   function ratBox(wer, text) {
-    if (!wer) return el("div", { class: "rat leer" }, el("span", { text: "Ohne Analyst kein Rat." }),
+    if (!wer) return el("div", { class: "rat leer" }, el("span", { text: "Ohne Assistent kein Rat." }),
       el("button", { class: "nebenknopf", text: "Einstellen", onclick: () => { const fs = feld.querySelector(".flugseite"); if (fs) { fs.remove(); ui.modal = false; } tafelZu(); if (ui.editor) editorZu(); meineAirline(); } }));
     return el("div", { class: "rat" }, el("div", { class: "gesicht klein-gesicht" }, bildEl(wer.bild, wer.name[0])),
       el("div", { class: "rat-text" }, el("b", { text: wer.name + " " + sterne(wer.sterne) }), el("span", { text })));
@@ -1320,7 +1320,8 @@
   // ---------- Meine Airline ----------
   // Name, Grundsätze und Assistenten. Jederzeit über das Menü erreichbar, alles änderbar.
   const FARBEN = ["#4FD1A5", "#6EC6FF", "#FF7FA8", "#F2C14E", "#B794F6", "#F6AD55"];
-  const ROLLE = { analyst: { icon: "🔎", titel: "Analyst", text: "berät dich bei Slots, Flugzeugen, Preisen und sucht neue Linien" }, preis: { icon: "💶", titel: "Preis-Check", text: "prüft die Preise deiner Linien" }, controller: { icon: "📋", titel: "Controlling", text: "meldet Probleme bei Linien und schreibt den Wochenbericht" } };
+  // Was der Assistent alles macht, als Bildzeile (gleich für alle drei, nur unterschiedlich gut).
+  const ASSIST_KANN = [["✨", "Rat"], ["💬", "Tipps"], ["❗", "Probleme"], ["📋", "Wochenbericht"]];
   const sterne = (n) => "★".repeat(n) + "☆".repeat(3 - n);
   const punkte = (v) => { const n = Math.max(1, Math.min(5, Math.round(1 + v / 2.4 * 4))); return "●".repeat(n) + "○".repeat(5 - n); };
   function meineAirline() {
@@ -1352,11 +1353,11 @@
             el("div", {}, el("small", { text: "🍽️ Kostet dich" }), el("b", { class: pr.essenKosten > 0 ? "minus" : "", text: pr.essenKosten > 0 ? Math.round(pr.essenKosten) + " € / Gast" : "nichts" })),
             el("div", {}, el("small", { text: "➕ Gebühren" }), el("b", { text: pr.extra ? "+" + pr.extra + " € / Gast" : "keine" }))),
           (st.wirkungenGestern || []).length ? el("div", { class: "hinweis", text: "🔎 Deine letzte Änderung: " + st.wirkungenGestern.map((w) => w.text + " brachte " + geld(w.gewinn, true) + " am Tag").join(" · ") }) : null,
-          el("div", { class: "blass mini", text: analyst ? "Unter jeder Einstellung steht, was sie sofort bewirkt. ✨ ist der Rat von " + analyst.name + ". Am nächsten Morgen siehst du, was eine Änderung wirklich gebracht hat." : "Unter jeder Einstellung steht, was sie sofort bewirkt. Was sie an Gästen bringt, schätzt nur ein Analyst. Am nächsten Morgen siehst du die echte Wirkung." }),
+          el("div", { class: "blass mini", text: analyst ? "Unter jeder Einstellung steht, was sie sofort bewirkt. ✨ ist der Rat von " + analyst.name + ". Am nächsten Morgen siehst du, was eine Änderung wirklich gebracht hat." : "Unter jeder Einstellung steht, was sie sofort bewirkt. Was sie an Gästen bringt, schätzt nur dein Assistent. Am nächsten Morgen siehst du die echte Wirkung." }),
           bloecke),
         el("div", { class: "meine-spalte" },
-          el("b", { class: "spaltentitel", text: "Assistenten" }),
-          assistKarte("controller", neu), assistKarte("analyst", neu), assistKarte("preis", neu))));
+          el("b", { class: "spaltentitel", text: "Dein Assistent" }),
+          assistKarte(neu))));
     feld.append(seite);
     seite.querySelector(".meine-spalte.breit").scrollTop = scroll;
     // Der Rat kommt Stück für Stück nach, damit das Fenster sofort da ist.
@@ -1388,35 +1389,30 @@
     return block;
   }
 
-  function assistKarte(rolle, neu) {
+  // Ein Assistent für alles: drei zur Wahl, mehr Sterne = genauer und teurer. Das Gehalt steht auch als Anteil am Tagesgewinn da.
+  function assistKarte(neu) {
     const p = ich();
-    const x = L.assistent(p, rolle);
-    const R = ROLLE[rolle];
-    const liste = rolle === "analyst" ? L.ANALYSTEN : rolle === "preis" ? L.PREISPROFIS : L.CONTROLLER;
-    const kopf = el("div", { class: "assist-kopf" }, el("span", { text: R.icon }), el("b", { text: R.titel }));
-    if (!x) {
-      return el("div", { class: "assist" }, kopf, el("div", { class: "blass mini", text: "Noch niemand. Wer " + R.text + "?" }),
-        Object.entries(liste).map(([id, k]) => el("div", { class: "kandidat" },
-          el("div", { class: "gesicht klein-gesicht" }, bildEl(k.bild, k.name[0])),
-          el("div", { class: "mitte" }, el("b", { text: k.name }), el("span", { class: "sterne", text: sterne(k.sterne) }), el("small", { text: geld(k.gehalt) + "/Tag · " + k.mackeText })),
-          el("button", { class: "nebenknopf", text: "Einstellen", onclick: () => { L.einstellen(st, L.SPIELER, rolle, id); nachAktion(); neu(); } }))));
-    }
-    const au = p.auftraege && p.auftraege[rolle];
-    let aktion;
-    if (rolle === "controller") aktion = el("div", {}, el("div", { class: "blass mini", text: "Meldet sich von selbst bei Problemen (❗ an der Linie). Jeden Sonntag: Wochenbericht." }),
-      p.wochenbericht || (p.hinweise && p.hinweise.length) ? el("button", { class: "nebenknopf", text: "📋 Bericht ansehen", onclick: () => { meineZu(); zeigeBericht(); } }) : null);
-    else if (au && !au.bericht) aktion = el("div", { class: "hinweis", text: "⏳ arbeitet … noch " + Math.max(1, Math.ceil(au.fertig - st.zeit)) + " Std" });
-    else aktion = el("div", { class: "knopfreihe" },
-      el("button", { class: "nebenknopf", text: "⚡ Schnell", onclick: () => { auftrag(rolle, false); meineZu(); } }),
-      el("button", { class: "nebenknopf", text: "🔬 Gründlich", onclick: () => { auftrag(rolle, true); meineZu(); } }));
-    return el("div", { class: "assist" }, kopf,
-      el("div", { class: "kandidat" },
-        el("div", { class: "gesicht klein-gesicht" }, bildEl(x.bild, x.name[0])),
-        el("div", { class: "mitte" }, el("b", { text: x.name }), el("span", { class: "sterne", text: sterne(x.sterne) }), el("small", { text: geld(x.gehalt) + "/Tag · " + x.mackeText })),
-        el("button", { class: "zu", text: "✕", title: "Entlassen", "aria-label": "Entlassen", onclick: () => { L.einstellen(st, L.SPIELER, rolle, null); nachAktion(); neu(); } })),
-      au && au.bericht ? el("button", { class: "hauptknopf", text: "📋 Bericht ansehen", onclick: () => { meineZu(); zeigeBericht(); } }) : null,
-      rolle === "controller" ? null : el("div", { class: "blass mini", text: rolle === "analyst" ? "Prüft Ziele ab " + L.STADT[p.basis].name + ":" : "Prüft alle deine Linien:" }),
-      aktion);
+    const x = L.assistent(p);
+    const gewinn = p.verlauf.length ? p.verlauf[p.verlauf.length - 1] + (x ? x.gehalt : 0) : 0;   // Gewinn vor Gehalt
+    const anteil = (g) => (gewinn > 0 ? Math.max(1, Math.round(g / gewinn * 100)) + " % vom Gewinn" : null);
+    const kann = el("div", { class: "chips" }, ASSIST_KANN.map(([i, t]) => el("span", { class: "chip", text: i + " " + t })));
+    // Gesicht nur beim Eingestellten, damit die anderen in die schmale Spalte passen.
+    const zeile = (id, k, an) => el("div", { class: "kandidat" + (an ? " an" : "") },
+      an ? el("div", { class: "gesicht klein-gesicht" }, bildEl(k.bild, k.name[0])) : null,
+      el("div", { class: "mitte" }, el("b", { text: k.name + " " }, el("span", { class: "sterne", text: sterne(k.sterne) })),
+        el("small", { text: geld(k.gehalt) + "/Tag · " + k.mackeText }), anteil(k.gehalt) ? el("small", { class: "blass", text: "≈ " + anteil(k.gehalt) }) : null),
+      an ? el("button", { class: "zu", text: "✕", title: "Entlassen", "aria-label": "Entlassen", onclick: () => { L.einstellen(st, L.SPIELER, null); nachAktion(); neu(); } })
+        : el("button", { class: "nebenknopf", text: x ? "Wechseln" : "Einstellen", onclick: () => { L.einstellen(st, L.SPIELER, id); nachAktion(); neu(); } }));
+    if (!x) return el("div", { class: "assist" },
+      el("div", { class: "blass mini", text: "Noch niemand. Dein Assistent macht alles:" }), kann,
+      Object.entries(L.ASSISTENTEN).map(([id, k]) => zeile(id, k, false)),
+      el("div", { class: "blass mini", text: "Mehr ★ = genauer und übersieht weniger." }));
+    const andere = Object.entries(L.ASSISTENTEN).filter(([id]) => id !== x.id);
+    return el("div", { class: "assist" },
+      zeile(x.id, x, true), kann,
+      p.wochenbericht || (p.hinweise && p.hinweise.length) ? el("button", { class: "nebenknopf", text: "📋 Bericht ansehen", onclick: () => { meineZu(); zeigeBericht(); } }) : null,
+      el("div", { class: "blass mini", text: "Oder jemand anderes:" }),
+      andere.map(([id, k]) => zeile(id, k, false)));
   }
   // Ruf: was er bringt und wie man ihn hebt.
   function rufWirkung(p) {
@@ -1449,13 +1445,6 @@
       mitName ? el("button", { class: "nebenknopf", text: "Ansehen", onclick: () => zeigeRoute(h.id) }) : null);
   }
   function meineZu() { const m = feld.querySelector(".meine"); if (m) m.remove(); ui.modal = false; }
-  function auftrag(rolle, gruendlich, stadt) {
-    L.auftragGeben(st, L.SPIELER, rolle, stadt || ich().basis, gruendlich);
-    nachAktion();
-    const x = L.assistent(ich(), rolle);
-    meldung("⏳", x.name + ": Bin dran! " + (gruendlich ? "Gründlich dauert einen Tag." : "In ein paar Stunden weiß ich mehr."));
-    if (ui.tempo === 0) tempo(1);
-  }
   // ---------- Berater: Tipps der Assistenten als Sprechblase an der Linie ----------
   const STUFE_ORDNUNG = { angreifen: 0, normal: 1, abschoepfen: 2 };
   function tippInhalt(t) {
@@ -1506,7 +1495,7 @@
       beraterEl = el("div", { class: "berater" },
         el("div", { class: "berater-kopf" },
           el("span", { class: "berater-gesicht" }, bildEl(wer.bild, "🧑‍💼")),
-          el("div", { class: "berater-name" }, el("b", { text: wer.name }), el("small", { text: { analyst: "Analyse", preis: "Preise", controller: "Controlling" }[t.rolle] })),
+          el("div", { class: "berater-name" }, el("b", { text: wer.name }), el("small", { text: { analyst: "Neue Strecke", preis: "Preise", controller: "Deine Linien" }[t.rolle] })),
           el("button", { class: "berater-zu", text: "✕", "aria-label": "Später", onclick: () => { L.tippWeg(st); speichern(); karteZeichnen(); } })),
         el("div", { class: "berater-text", text: inhalt.text }),
         inhalt.sicher ? sicherKnopf(inhalt.knopf, () => tippAnnehmen(t)) : el("button", { class: "hauptknopf klein", text: inhalt.knopf, onclick: () => tippAnnehmen(t) }));
@@ -1551,10 +1540,10 @@
     const p = ich();
     for (const au of Object.values(p.auftraege || {})) if (au && au.bericht) au.gelesen = true;
     const teile = [];
-    const ctrl = L.assistent(p, "controller");
+    const ctrl = L.assistent(p);
     if (ctrl) {
       teile.push(el("div", { class: "bericht-kopf" }, el("div", { class: "gesicht klein-gesicht" }, bildEl(ctrl.bild, ctrl.name[0])),
-        el("div", {}, el("b", { text: ctrl.name + " " + sterne(ctrl.sterne) }), el("small", { class: "blass", text: "Controlling" }))));
+        el("div", {}, el("b", { text: ctrl.name + " " + sterne(ctrl.sterne) }), el("small", { class: "blass", text: "Dein Assistent" }))));
       const hs = (p.hinweise || []).filter((h) => p.routen.some((r) => r.id === h.id));
       teile.push(hs.length ? hs.map((h) => hinweisBox(h, true)) : el("div", { class: "hinweis gruen", text: "✅ Gerade läuft alles rund." }));
       const w = p.wochenbericht;
@@ -1573,45 +1562,15 @@
             return el("div", { class: "zeile mini" }, el("span", { class: "farbstrich", style: { background: farbeGewinn(x.gewinn) } }), el("span", { text: L.STADT[x.a].name + " – " + L.STADT[x.b].name + " " + kurz(x.gewinn) }),
               k && !x.erledigt ? el("button", { class: "nebenknopf rechts", text: txt + " · " + vonBis(x.plus, kurz), onclick: () => { L.wochenVorschlagUebernehmen(st, i); nachAktion(); zeigeBericht(); } })
                 : el("span", { class: "rechts", text: x.erledigt ? "✓ erledigt" : "passt so" }));
-          })));
+          }),
+          (w.neu || []).length ? el("div", { class: "blass mini", text: "Neue Strecken, die ich mir anschauen würde:" }) : null,
+          (w.neu || []).filter((v) => !L.routeVon(p, v.start, v.ziel)).map((v) => el("div", { class: "zeile mini" },
+            el("span", { text: "→ " + L.STADT[v.start].name + " – " + L.STADT[v.ziel].name + " " + TYP_ICON[v.typ] }),
+            el("button", { class: "nebenknopf rechts", text: "✏️ " + vonBis(v.gewinn, kurz), onclick: () => editorOeffnen({ start: v.start, ziel: v.ziel, vor: { stufe: v.preis, typ: v.typ } }) })))));
       }
+      teile.push(el("div", { class: "blass mini", text: "Nur Schätzungen (" + ctrl.mackeText + "). Jahreszeit und Konkurrenz ändern die Nachfrage." }));
     }
-    for (const rolle of ["analyst", "preis"]) {
-      const au = p.auftraege && p.auftraege[rolle];
-      const x = L.assistent(p, rolle);
-      if (!au || !x) continue;
-      if (!au.bericht) { teile.push(el("div", { class: "hinweis", text: `⏳ ${x.name} arbeitet noch (${Math.max(1, Math.ceil(au.fertig - st.zeit))} Std).` })); continue; }
-      teile.push(el("div", { class: "bericht-kopf" }, el("div", { class: "gesicht klein-gesicht" }, bildEl(x.bild, x.name[0])),
-        el("div", {}, el("b", { text: x.name + " " + sterne(x.sterne) }), el("small", { class: "blass", text: (rolle === "analyst" ? "Ziele ab " + L.STADT[au.stadt].name : "Deine Linien") + " · Stand Tag " + au.tag + (au.gruendlich ? " · gründlich" : "") }))));
-      if (rolle === "analyst") {
-        if (!au.bericht.length) teile.push(el("div", { class: "hinweis", text: "Ich habe von hier nichts gefunden, das sich lohnt." }));
-        for (const v of au.bericht) {
-          const n = L.TYPEN[v.typ].kurz;
-          teile.push(el("div", { class: "vorschlag" },
-            el("div", { class: "zeile" }, el("b", { text: "→ " + L.STADT[v.ziel].name }), el("span", { class: "rechts plus", text: vonBis(v.gewinn, kurz) })),
-            el("div", { class: "chips" },
-              el("span", { class: "chip", text: "👥 " + vonBis(v.gaeste, (z) => Math.max(0, z)) + " Gäste" }),
-              el("span", { class: "chip", text: "👔 " + v.geschaeft + " %" }),
-              el("span", { class: "chip", text: v.konkurrenz ? "⚔️ " + v.konkurrenz + "×" : "⚔️ keine" }),
-              el("span", { class: "chip", text: STUFE_TEXT[v.preis] }),
-              v.ab != null ? el("span", { class: "chip", text: "🛫 " + uhr(v.ab) }) : null,
-              el("span", { class: "chip", text: TYP_ICON[v.typ] + " " + n })),
-            el("button", { class: "nebenknopf", text: "✏️ Im Editor öffnen", onclick: () => editorOeffnen({ start: v.start, ziel: v.ziel, vor: { stufe: v.preis, typ: v.typ } }) })));
-        }
-      } else {
-        for (const v of au.bericht) {
-          const r = p.routen.find((x) => x.id === v.id);
-          if (!r) continue;
-          teile.push(el("div", { class: "vorschlag" },
-            el("div", { class: "zeile" }, el("b", { text: L.STADT[v.a].name + " – " + L.STADT[v.b].name })),
-            el("div", { class: "zeile mini" }, el("span", { class: "blass", text: v.lage }),
-              v.plus && !v.erledigt && r.stufe !== v.stufe ? el("button", { class: "nebenknopf rechts", text: STUFE_TEXT[v.stufe] + " · " + vonBis(v.plus, kurz), onclick: () => { L.preisVorschlagUebernehmen(st, v.id); nachAktion(); zeigeBericht(); } })
-                : el("span", { class: "rechts", text: r.stufe === v.stufe ? "✓ passt so" : "–" }))));
-        }
-      }
-      teile.push(el("div", { class: "blass mini", text: "Nur eine Schätzung (" + x.mackeText + "). Jahreszeit und Konkurrenz ändern die Nachfrage." }));
-    }
-    tafel("bericht", "📋 Berichte", null, teile.length ? teile : el("div", { class: "hinweis", text: "Noch kein Bericht. Stelle in ✈️ Meine Airline jemanden ein." }),
+    tafel("bericht", "📋 Bericht", null, teile.length ? teile : el("div", { class: "hinweis", text: "Noch kein Bericht. Stelle in ✈️ Meine Airline einen Assistenten ein." }),
       el("button", { class: "nebenknopf", text: "✈️ Meine Airline", onclick: () => { tafelZu(); meineAirline(); } }));
   }
 
@@ -1772,17 +1731,7 @@
         : el("div", { class: "hinweis gruen", text: gruen ? `${gruen} Ziele leuchten grün. Tippe eins auf der Karte an.` : "Von hier lohnt sich gerade kein Ziel mit freiem Slot." }),
       el("div", { class: "blass mini", text: "Farbig sind nur Ziele, an denen gerade ein Slot zu haben ist." }),
       L.hatTafel(p, id) ? el("button", { class: "nebenknopf", text: "🎟️ Deine Slot-Tafel in " + L.STADT[id].name, onclick: () => tafelSeite(id) }) : null,
-      analystKnopf(id),
       el("button", { class: "nebenknopf", text: "Andere Startstadt wählen", onclick: () => { ui.editor.wahlStart = true; ui.editor.ziel = null; editorZeichnen(); } }));
-  }
-
-  function analystKnopf(id) {
-    const p = ich();
-    const x = L.assistent(p, "analyst");
-    if (!x) return null;
-    const au = p.auftraege && p.auftraege.analyst;
-    if (au && !au.bericht) return el("div", { class: "blass mini", text: "⏳ " + x.name + " prüft gerade " + L.STADT[au.stadt].name + "." });
-    return el("button", { class: "nebenknopf", text: "🔎 " + x.name.split(" ").slice(-1)[0] + " soll Ziele ab " + L.STADT[id].name + " prüfen", onclick: () => { editorZu(); auftrag("analyst", false, id); } });
   }
 
   // ---------- Einen Flug bauen: Abflug wählen, Rückflug wählen, Flugzeug nimmt das Spiel ----------
@@ -1912,7 +1861,7 @@
         el("div", {}, el("span", { text: "Hinflug " + uhr(zRef.ab) }), el("b", { style: { color: hin[1] }, text: hin[0] })),
         el("div", {}, el("span", { text: "Rückflug " + uhr(zRef.rueck) }), el("b", { style: { color: zur[1] }, text: zur[0] }))) : null,
       analyst ? (ratF ? ratBox(analyst, "Bringt etwa " + kurz(ratF.gewinn[0]) + " bis " + kurz(ratF.gewinn[1]) + " am Tag." + (rat && rat.typ !== typ && !flieger ? " Ich würde den " + L.TYPEN[rat.typ].kurz + " nehmen." : "") + " ✨ zeigt, was ich empfehle.") : null)
-        : el("span", { class: "blass mini", text: "Ohne Analyst gibt es keine Vorhersage in Euro. Morgen siehst du, was der Flug wirklich bringt." }),
+        : el("span", { class: "blass mini", text: "Ohne Assistent gibt es keine Vorhersage in Euro. Morgen siehst du, was der Flug wirklich bringt." }),
       test.ok && test.kosten.gesamt ? el("span", { class: "blass mini mitte-text", text: [test.kosten.flugzeug ? "Flugzeug " + geld(test.kosten.flugzeug) : null, test.kosten.slots ? "Slots " + geld(test.kosten.slots) : null].filter(Boolean).join(" · ") }) : null,
       el("button", { class: "hauptknopf gross-knopf", disabled: !test.ok,
         text: !test.ok ? (GRUND[test.grund] || "geht nicht") + (test.grund === "geld" && test.kosten ? " (" + geld(test.kosten.gesamt) + ")" : "") : (neuLinie ? "Linie eröffnen" : "Flug hinzufügen") + (test.kosten.gesamt ? " · " + geld(test.kosten.gesamt) : ""),
@@ -2126,9 +2075,9 @@
     bieten: { bild: "air-regel-bieten", icon: "🎟️", titel: "Slots an fremden Flughäfen", text: "Dort gibt es nur wenige Slots für alle Airlines. Wird einer frei, leuchtet ein goldener Ring. Einen Tag lang bieten alle verdeckt: Dreh am Rad und gib dein Gebot ab. Das höchste gewinnt. Bietest nur du, zahlst du nur den Grundpreis." },
     meine: { bild: "air-regel-meine", icon: "✈️", titel: "Meine Airline", text: "Im Menü ☰ unter „Meine Airline“: Name, Farbe und deine Grundsätze wie Essen, Koffer und Sitzabstand. Unter jeder Einstellung steht, was sie sofort bewirkt. Am nächsten Morgen meldet das Spiel, was eine Änderung wirklich gebracht hat." },
     reisende: { bild: "air-regel-reisende", icon: "👥", titel: "Reisende sind begrenzt", text: "Jede Stadt hat nur eine feste Zahl Reisender am Tag. Alle Flüge und alle Airlines teilen sie sich. Der Balken am Flughafen zeigt, wie viele schon fliegen. Zwei Flüge kurz nacheinander nehmen sich die Gäste weg." },
-    assistenten: { bild: "air-regel-assistenten", icon: "🔎", titel: "Assistenten", text: "In „Meine Airline“ stellst du Leute ein: 🔎 der Analyst berät dich bei jeder Entscheidung und sucht neue Strecken, 💶 prüft deine Preise, 📋 Controlling meldet Probleme. Ihre Berichte liegen unter 📋." },
+    assistenten: { bild: "air-regel-assistenten", icon: "🔎", titel: "Dein Assistent", text: "In „Meine Airline“ stellst du einen Assistenten ein. Er macht alles: ✨ Rat bei jeder Entscheidung, 💬 Tipps auf der Karte, ❗ an Linien mit Problemen und sonntags 📋 den Wochenbericht. Mehr ★ heißt genauer, aber teurer." },
     berater: { bild: "air-regel-berater", icon: "💬", titel: "Tipps deiner Leute", text: "Deine Assistenten arbeiten von selbst. Finden sie etwas, das sich wirklich lohnt, erscheint eine Sprechblase auf der Karte: ein Tipp genügt. Nie mehr als ein Tipp auf einmal. ✕ heißt: später." },
-    rat: { bild: "air-regel-rat", icon: "✨", titel: "Der Analyst rät dir", text: "✨ zeigt bei Uhrzeit, Flugzeug, Kabine, Preis und Geboten, was dein Analyst empfiehlt, dazu eine Spanne in Euro. Gute Analysten ★★★ liegen näher an der Wahrheit. Ohne Analyst gibt es keinen Rat." },
+    rat: { bild: "air-regel-rat", icon: "✨", titel: "Dein Assistent rät dir", text: "✨ zeigt bei Uhrzeit, Flugzeug, Kabine, Preis und Geboten, was dein Assistent empfiehlt, dazu eine Spanne in Euro. Mit ★★★ liegt er näher an der Wahrheit. Ohne Assistent gibt es keinen Rat." },
     verlieren: { bild: "air-regel-verlieren", icon: "⚠️", titel: "Nutzen oder verlieren", text: "Am Ende jeder Jahreszeit gehen Slots an fremden Flughäfen zurück, wenn kein Flug darauf liegt. Zwei Tage vorher wirst du gewarnt. Slots zu Hause bleiben immer deine." },
     saison: { bild: "air-regel-saison", icon: "🗓️", titel: "Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. ☀️ und ⛷️ an einer Stadt zeigen, wo gerade Hochsaison ist." },
     drehkreuz: { bild: "air-regel-drehkreuz", icon: "🔁", titel: "Dein Drehkreuz!", text: "Ab drei Linien steigen Gäste in deiner Stadt um. Kleine Zubringer füllen so deine großen Flugzeuge." },
@@ -2146,7 +2095,7 @@
     rivalpleite: { bild: "air-regel-rivalpleite", icon: "💥", titel: "Ein Rivale ist pleite", text: "Geht ein Rivale pleite, werden alle seine Slots an fremden Flughäfen frei. Sie leuchten golden: Biete schnell mit. Der Rivale fängt mit neuem Geld von vorn an." },
     ruf: { bild: "air-regel-ruf", icon: "⭐", titel: "Dein Ruf", text: "Oben neben deinem Namen steht dein ⭐ Ruf. Je höher, desto mehr Gäste. Bis 70 wächst er von selbst, darüber nur mit 📺 Werbung in „Meine Airline“, und dann sinkt er langsam wieder." },
     statistik: { bild: "air-regel-statistik", icon: "📊", titel: "Statistik", text: "Im Menü ☰ unter „Statistik“: alle Linien mit Auslastung und Gewinn, sortierbar, dazu Städte und Verlauf. Antippen springt zur Linie." },
-    controlling: { bild: "air-regel-controlling", icon: "📋", titel: "Controlling", text: "Stelle in „Meine Airline“ jemanden fürs Controlling ein. Dann zeigt ❗ an einer Linie, wenn dort etwas nicht stimmt, mit einem Vorschlag zum Antippen. Jeden Sonntag kommt der Wochenbericht." },
+    controlling: { bild: "air-regel-controlling", icon: "📋", titel: "Wochenbericht", text: "❗ an einer Linie heißt: Dein Assistent sieht dort ein Problem, mit einem Vorschlag zum Antippen. Jeden Sonntag kommt unter 📋 der Wochenbericht, mit zwei Ideen für neue Strecken." },
     verwaltung: { bild: "air-regel-verwaltung", icon: "🏢", titel: "Größer heißt teurer", text: "Ab der 9. Linie kostet jede weitere Verwaltung, und zwar immer mehr. Wenige starke Linien schlagen viele schwache. Lass lieber ein Flugzeug öfter fliegen, statt immer neue Linien zu eröffnen." },
     spaet: { bild: "air-regel-spaet", icon: "🎯", titel: "Besser statt mehr", text: "Ab jetzt fragen die Ziele auch nach Qualität: alle Linien im Plus, volle Flieger, bester Ruf, starke Linien. Und Entscheidungen halten die Uhr an, bis du sie getroffen hast." },
     pleite: { bild: "air-regel-pleite", icon: "⚠️", titel: "Achtung, Minus!", text: "Ist dein Konto im Minus, mahnt die 🏦 Bank. Drei Stufen: Mahnung, Kredit, dann will dich ein Rivale kaufen. Streiche rote Flüge oder verkaufe ein Flugzeug." },

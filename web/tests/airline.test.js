@@ -496,25 +496,29 @@ test("Bei gleichem Preis gewinnt die bessere Qualität, gutes Essen kostet", () 
   assert.ok(L.profil(p).sterne >= 3);
 });
 
-test("Analystin liefert nach einiger Zeit drei Vorschläge mit Spannen und Abflugzeit", () => {
+test("Ein Assistent für alles: eine Person, drei zur Wahl, ein Gehalt", () => {
   const st = leer();
-  L.einstellen(st, "p", "analyst", "mia");
-  assert.ok(L.auftragGeben(st, "p", "analyst", "frankfurt", false));
-  L.vorruecken(st, L.REGELN.auftragStunden + 1);
-  const b = st.airlines.p.auftraege.analyst.bericht;
-  assert.equal(b.length, 3);
-  for (const v of b) { assert.ok(v.gewinn[0] <= v.gewinn[1]); assert.ok(v.ab >= 5 && v.ab <= 23); assert.ok(L.TYPEN[v.typ]); }
+  const p = st.airlines.p;
+  assert.equal(Object.keys(L.ASSISTENTEN).length, 3);
+  assert.equal(L.assistent(p), null);
+  assert.ok(L.einstellen(st, "p", "mia"));
+  for (const rolle of [undefined, "analyst", "preis", "controller"]) assert.equal(L.assistent(p, rolle).id, "mia");
+  assert.equal(L.gehaelter(p), L.ASSISTENTEN.mia.gehalt);
+  assert.ok(L.einstellen(st, "p", "kern"));                    // wechseln ersetzt, es gibt nie zwei
+  assert.equal(L.gehaelter(p), L.ASSISTENTEN.kern.gehalt);
+  assert.ok(!L.einstellen(st, "p", "paul"));                   // die alten Rollen gibt es nicht mehr
+  assert.ok(L.einstellen(st, "p", null));
+  assert.equal(L.gehaelter(p), 0);
+  const g = Object.values(L.ASSISTENTEN).map((x) => x.gehalt);
+  assert.ok(g[0] < g[1] && g[1] < g[2]);
 });
 
-test("Preisprofi schlägt Preise vor, Vorschlag lässt sich übernehmen", () => {
+test("Alter Spielstand mit drei Rollen: der Beste bleibt, nur ein Gehalt", () => {
   const st = leer();
-  const r = flug(st, "frankfurt", "rom", "falke", 8, 12).route;
-  L.einstellen(st, "p", "preis", "paul");
-  L.auftragGeben(st, "p", "preis");
-  L.vorruecken(st, L.REGELN.auftragStunden + 1);
-  const b = st.airlines.p.auftraege.preis.bericht;
-  assert.equal(b[0].id, r.id);
-  if (b[0].stufe !== b[0].jetzt) { assert.ok(L.preisVorschlagUebernehmen(st, r.id)); assert.equal(r.stufe, b[0].stufe); }
+  st.airlines.p.assistenten = { controller: "ines", preis: "paul", analyst: null };
+  const neu = L.laden(JSON.stringify(st));
+  assert.equal(L.assistent(neu.airlines.p).id, "kern");
+  assert.equal(L.gehaelter(neu.airlines.p), L.ASSISTENTEN.kern.gehalt);
 });
 
 test("Rivale auf deiner Strecke startet einen Preiskampf", () => {
@@ -609,9 +613,10 @@ test("Spätes Spiel: Verwaltung, Werbung, Umrüsten, Controlling, späte Ziele",
   p.stil = "bot";
   for (let d = 1; d <= 14; d++) { L.kiTag(st, "p"); L.vorruecken(st, 24); }
   assert.ok(!p.wochenbericht);
-  L.einstellen(st, "p", "controller", "ines");
+  L.einstellen(st, "p", "kern");
   for (let d = 1; d <= 7; d++) L.vorruecken(st, 24);
   assert.ok(p.wochenbericht && p.wochenbericht.schwach.length >= 1);
+  assert.ok(Array.isArray(p.wochenbericht.neu) && p.wochenbericht.neu.length <= 2);
   assert.ok(Array.isArray(p.hinweise) && p.hinweise.length <= 3);
   st.ziel = L.ZIELE.length;
   assert.match(L.zielStand(st).text, /rote Linie/);
