@@ -246,12 +246,16 @@
     kameraSetzen();
   }
 
-  function kameraSetzen() {
-    const c = ui.kamera;
+  function kameraBegrenzen(c) {
     const r = { x0: -40, x1: K.B + 40, y0: -40, y1: K.H + 40 };
     c.z = Math.max(ui.zMin, Math.min(6, c.z));
     c.x = Math.min(FELD_B - 60 - r.x0 * c.z, Math.max(60 - r.x1 * c.z, c.x));
     c.y = Math.min(FELD_H - 60 - r.y0 * c.z, Math.max(60 - r.y1 * c.z, c.y));
+    return c;
+  }
+  function kameraSetzen() {
+    const c = kameraBegrenzen(ui.kamera);
+    if (karte.svg.style.transform) karte.svg.style.transform = "";
     karte.g.setAttribute("transform", `translate(${c.x.toFixed(1)} ${c.y.toFixed(1)}) scale(${c.z.toFixed(4)})`);
     karteZeichnen();
   }
@@ -280,22 +284,38 @@
       const r = feld.getBoundingClientRect();
       return { x: (e.clientX - r.left) / ui.skala, y: (e.clientY - r.top) / ui.skala };
     };
+    // Während der Geste wird nur das fertige Bild verschoben und gezoomt (flüssig, die Grafikkarte macht das).
+    // Erst wenn die Finger weg sind, wird die Karte neu gezeichnet.
+    let vorschau = null;
+    const vorschauSetzen = (c) => {
+      kameraBegrenzen(c);
+      const b = ui.kamera, k = c.z / b.z;
+      vorschau = c;
+      svg.style.transform = `translate3d(${(c.x - k * b.x).toFixed(1)}px, ${(c.y - k * b.y).toFixed(1)}px, 0) scale(${k.toFixed(4)})`;
+    };
+    const vorschauFertig = () => {
+      if (!vorschau) return;
+      Object.assign(ui.kamera, vorschau);
+      vorschau = null;
+      kameraSetzen();
+    };
     svg.addEventListener("pointerdown", (e) => {
       try { svg.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
       zeiger.set(e.pointerId, punkt(e));
       bewegt = false;
-      start = { kamera: { ...ui.kamera }, punkte: [...zeiger.values()].map((p) => ({ ...p })), ziel: e.target };
+      start = { kamera: { ...(vorschau || ui.kamera) }, punkte: [...zeiger.values()].map((p) => ({ ...p })), ziel: e.target };
     });
     svg.addEventListener("pointermove", (e) => {
       if (!zeiger.has(e.pointerId) || !start) return;
       zeiger.set(e.pointerId, punkt(e));
       const pts = [...zeiger.values()];
-      if (pts.length !== start.punkte.length) start = { kamera: { ...ui.kamera }, punkte: pts.map((p) => ({ ...p })), ziel: null };
+      if (pts.length !== start.punkte.length) start = { kamera: { ...(vorschau || ui.kamera) }, punkte: pts.map((p) => ({ ...p })), ziel: null };
+      const c = { ...start.kamera };
       if (pts.length === 1) {
         const dx = pts[0].x - start.punkte[0].x, dy = pts[0].y - start.punkte[0].y;
         if (Math.abs(dx) + Math.abs(dy) > 6) bewegt = true;
         if (!bewegt) return;
-        ui.kamera.x = start.kamera.x + dx; ui.kamera.y = start.kamera.y + dy;
+        c.x = start.kamera.x + dx; c.y = start.kamera.y + dy;
       } else {
         bewegt = true;
         const [a, b] = pts, [a0, b0] = start.punkte;
@@ -303,16 +323,17 @@
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, mx0 = (a0.x + b0.x) / 2, my0 = (a0.y + b0.y) / 2;
         const z = Math.max(ui.zMin, Math.min(6, start.kamera.z * d / d0));
         const wx = (mx0 - start.kamera.x) / start.kamera.z, wy = (my0 - start.kamera.y) / start.kamera.z;
-        ui.kamera.z = z; ui.kamera.x = mx - wx * z; ui.kamera.y = my - wy * z;
+        c.z = z; c.x = mx - wx * z; c.y = my - wy * z;
       }
-      kameraSetzen();
+      vorschauSetzen(c);
     });
     svg.addEventListener("pointerup", (e) => {
       if (!zeiger.has(e.pointerId)) return;
       zeiger.delete(e.pointerId);
+      if (zeiger.size === 0) vorschauFertig();
       if (!bewegt && zeiger.size === 0 && start && start.ziel) tippen(start.ziel);
     });
-    svg.addEventListener("pointercancel", (e) => { zeiger.delete(e.pointerId); bewegt = true; });
+    svg.addEventListener("pointercancel", (e) => { zeiger.delete(e.pointerId); bewegt = true; if (zeiger.size === 0) vorschauFertig(); });
     svg.addEventListener("wheel", (e) => {
       e.preventDefault();
       const p = punkt(e);

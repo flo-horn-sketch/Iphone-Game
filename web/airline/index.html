@@ -49,7 +49,7 @@ button:disabled { opacity: .4; cursor: default; }
 .minus { color: var(--rot); }
 
 /* Karte */
-#karte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#karte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transform-origin: 0 0; will-change: transform; }
 #karte .land { fill: var(--land); stroke: var(--land-rand); stroke-width: .6; }
 #karte .grenze { fill: none; stroke: rgba(160, 210, 200, .18); stroke-width: .5; }
 #karte .netz { fill: none; stroke: rgba(255,255,255,.035); stroke-width: .5; }
