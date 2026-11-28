@@ -668,6 +668,19 @@ body.anleitung-an > :not(.anleitung) { display: none !important; }
 .tagbalken .block { position: absolute; top: 2px; height: 12px; border-radius: 4px; background: #4ADE80; overflow: hidden; box-sizing: border-box; border: 1px solid rgba(6,16,26,.6); }
 .tagbalken .block span { display: block; font-size: 8px; line-height: 10px; color: #06220f; font-weight: 800; padding: 0 2px; white-space: nowrap; }
 .tagbalken .block.neu { background: var(--gold); }
+.tagbalken.gross { height: 40px; }
+.tagbalken.gross .block { top: 4px; height: 22px; }
+.tagbalken.gross .block span { font-size: 11px; line-height: 20px; }
+.tagbalken.gross .strich small { font-size: 10px; }
+.slotkachel.sofort { border-style: dashed; background: rgba(242,193,78,.06); }
+.slotkachel.belegt { opacity: .5; }
+.slotkachel.belegt span { color: var(--blass); }
+.sofort-titel { font-size: 11px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+.planer-seite .planer-tag { width: 100%; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; }
+.planer-seite .frei-reihe { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.planer-seite .frei-chip { padding: 2px 8px; border-radius: 99px; background: rgba(74,222,128,.16); border: 1px solid #4ADE80; color: #4ADE80; font-weight: 700; }
+.planer-seite .wahl small { display: block; color: var(--blass); font-size: 11px; }
+.planer-seite .store-kopf .fz-bild { width: 64px; height: 40px; flex: none; }
 /* Flug bauen */
 .flug-reihe { display: flex; gap: 8px; width: 100%; flex: 1; min-height: 0; }
 .flug-spalte { flex: 1; min-width: 0; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; touch-action: pan-y; }

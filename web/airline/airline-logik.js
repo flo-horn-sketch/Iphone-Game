@@ -26,6 +26,7 @@
     heimGeschenk: 2,         // so viele Slots auf der Heimat-Tafel sind am Anfang geschenkt
     slotMax: { 1: 8, 2: 14, 3: 20 },              // so viele Slots gibt ein Flughafen höchstens an fremde Airlines
     slotTakt: { 1: 6, 2: 4, 3: 3 },               // alle so viele Tage gibt ein Flughafen einen neuen Slot frei
+    sofortFaktor: 2.5,       // Sofortkauf beim Flughafen: so viel mal der Grundpreis. Dafür ohne Bieten und ohne Warten.
     slotSchonTage: 3,        // ein frisch erworbener Slot ist so lange vor "nutzen oder verlieren" sicher
     reisende: 220,           // Reisende pro Tag an einem Flughafen = reisende × Größe²
     daheim: 0.5,             // wie leicht ein Gast lieber gar nicht fliegt, wenn keine Zeit passt
@@ -770,6 +771,44 @@
     geaendert(st);
     return { ok: true, slot: neu, preis };
   }
+  // Sofortkauf: Der Flughafen gibt seinen nächsten Slot schon jetzt heraus, zu einer Uhrzeit nach Wahl, aber teurer.
+  // Es kommen dadurch nicht mehr Slots ins Spiel: Der nächste reguläre Slot dieses Flughafens kommt entsprechend später.
+  // Geht nur, wenn dort gerade kein Slot vergeben wird, der Flughafen nicht voll ist und er nicht gerade erst einen herausgegeben hat.
+  function sofortStatus(st, aid, stadt) {
+    const a = st.airlines[aid], c = STADT[stadt];
+    if (!c || hatTafel(a, stadt)) return { ok: false, grund: "tafel" };
+    if (st.pool.some((s) => s.stadt === stadt && s.bis != null)) return { ok: false, grund: "bieten" };     // erst die Vergabe abwarten
+    if (slotZahl(st, stadt) >= REGELN.slotMax[c.k]) return { ok: false, grund: "voll" };
+    const tag = tagVon(st), uhr = (st.slotUhr || {})[stadt];
+    const warten = uhr == null ? 0 : Math.max(0, uhr - tag - REGELN.slotTakt[c.k] + 1);
+    if (warten > 0) return { ok: false, grund: "warten", tage: warten };
+    return { ok: true };
+  }
+  const sofortPreis = (stadt, h) => runde10k(slotGrundpreis(stadt, h) * REGELN.sofortFaktor);
+  // Welche vollen Stunden sind an diesem Flughafen noch nicht vergeben? (5 bis 23 Uhr)
+  function sofortStunden(st, stadt) {
+    const belegt = [];
+    for (const s of st.pool) if (s.stadt === stadt) belegt.push(s.h);
+    for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt) belegt.push(s.h);
+    return HEIM_STUNDEN.filter((h) => !belegt.some((b) => Math.abs(b - h) < 0.5));
+  }
+  function sofortKaufen(st, aid, stadt, h) {
+    const a = st.airlines[aid], c = STADT[stadt];
+    const s0 = sofortStatus(st, aid, stadt);
+    if (!s0.ok) return s0;
+    if (!sofortStunden(st, stadt).includes(h)) return { ok: false, grund: "belegt" };
+    const preis = sofortPreis(stadt, h);
+    if (a.geld < preis) return { ok: false, grund: "geld" };
+    a.geld -= preis;
+    const s = { id: "s" + st.naechsterSlot++, stadt, h, seit: tagVon(st), sofort: true };
+    a.slots.push(s);
+    // Der nächste reguläre Slot dieses Flughafens rückt um einen Takt nach hinten.
+    st.slotUhr = st.slotUhr || {};
+    const tag = tagVon(st);
+    st.slotUhr[stadt] = Math.max(st.slotUhr[stadt] == null ? tag : st.slotUhr[stadt], tag) + REGELN.slotTakt[c.k];
+    geaendert(st);
+    return { ok: true, slot: s, preis };
+  }
   function typFrei(st, a, typ) {
     const t = TYPEN[typ];
     if (a.id !== SPIELER) return t.stufe <= (a.stufe || 1);
@@ -829,13 +868,17 @@
     for (const s of st.pool) if (s.bis == null) (idx.pool[s.stadt] = idx.pool[s.stadt] || []).push(s);
     return idx;
   }
-  function enden(st, a, stadt, idx) {
+  // mitSofort: auch Slots, die man beim Flughafen sofort kaufen kann (nur für den Spieler im Editor).
+  function enden(st, a, stadt, idx, mitSofort) {
     idx = idx || slotIndex(st, a);
     const liste = [];
     for (const s of idx.eigene[stadt] || []) liste.push({ art: "slot", id: s.id, h: s.h, preis: 0 });
     if (hatTafel(a, stadt)) {
       for (const h of tafelStunden(a, stadt)) if (!a.slots.some((s) => s.heim && s.stadt === stadt && s.h === h)) liste.push({ art: "tafel", h, preis: idx.geschenk > 0 ? 0 : heimPreis(stadt, h) });
-    } else for (const s of idx.pool[stadt] || []) liste.push({ art: "pool", id: s.id, h: s.h, preis: slotGrundpreis(stadt, s.h) });
+    } else {
+      for (const s of idx.pool[stadt] || []) liste.push({ art: "pool", id: s.id, h: s.h, preis: slotGrundpreis(stadt, s.h) });
+      if (mitSofort && sofortStatus(st, a.id, stadt).ok) for (const h of sofortStunden(st, stadt)) liste.push({ art: "sofort", h, preis: sofortPreis(stadt, h) });
+    }
     return liste;
   }
 
@@ -850,7 +893,7 @@
     const km = entfernung(x, y);
     if (km > TYPEN[typ].reichweite) return { ok: false, grund: "reichweite" };
     const idx = opt.idx || slotIndex(st, a);
-    const e1 = opt.e1 ? [opt.e1] : enden(st, a, x, idx), e2 = opt.e2 ? [opt.e2] : enden(st, a, y, idx);
+    const e1 = opt.e1 ? [opt.e1] : enden(st, a, x, idx, opt.sofort), e2 = opt.e2 ? [opt.e2] : enden(st, a, y, idx, opt.sofort);
     if (!e1.length || !e2.length) return { ok: false, grund: "slots", fehlt: !e1.length ? x : y };
     const eigene = opt.neu ? [] : a.flotte.filter((f) => (opt.fid ? f.id === opt.fid : f.typ === typ));
     const w = (STADT[x].w + STADT[y].w) / 2;
@@ -880,6 +923,7 @@
   function endeNehmen(st, a, stadt, e) {
     if (e.art === "slot") return slotVon(a, e.id);
     if (e.art === "tafel") { const r = heimSlotKaufen(st, a.id, stadt, e.h); return r.ok ? r.slot : null; }
+    if (e.art === "sofort") { const r = sofortKaufen(st, a.id, stadt, e.h); return r.ok ? r.slot : null; }
     const r = slotNehmen(st, a.id, e.id);
     return r.ok ? r.slot : null;
   }
@@ -3122,7 +3166,7 @@
     KLASSEN, KLASSEN_MAX, klassenVon, kabineGrenzen, kabineStandard, kabineSetzen, umbauPreis, inWerkstatt, besteKabine,
     GESCHLECHTER, AUSSEHEN, aussehenFuer, managerPruefen, managerSetzen, anrede,
     neuesSpiel, laden, istAlterStand, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
-    HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen,
+    HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen, sofortStatus, sofortPreis, sofortStunden, sofortKaufen,
     slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,
     flugzeugeAuf, freieFlugzeuge, fluegeVon, fluegeAuf, typFrei, routeVon, flugFinden, flugAnlegen, flugStreichen,
     kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ASSISTENTEN, ANALYSTEN: ASSISTENTEN, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruestenGeht, umruesten,

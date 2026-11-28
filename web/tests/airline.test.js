@@ -795,3 +795,42 @@ test("Der Analyst schätzt Linien der Rivalen als Spanne", () => {
   const e = L.rivalenEinschaetzung(st, "k", k.routen[0].id, L.assistent(st.airlines.p, "analyst"));
   assert.ok(e.gewinn[0] <= e.gewinn[1]);
 });
+
+test("Sofortkauf: Slot zur Wunschzeit, teurer, und der Flughafen gibt seinen nächsten Slot später heraus", () => {
+  const st = leer();
+  const p = st.airlines.p;
+  const c = L.STADT.paris;
+  st.pool = st.pool.filter((s) => s.stadt !== "paris");
+  st.slotUhr = { paris: 2 };
+  assert.ok(L.sofortStatus(st, "p", "paris").ok);
+  const preis = L.sofortPreis("paris", 13);
+  assert.equal(preis, Math.round(L.slotGrundpreis("paris", 13) * L.REGELN.sofortFaktor / 10000) * 10000);
+  const vorher = p.geld;
+  const r = L.fliegen(st, "p", "frankfurt", "paris", "dash8", { e1: tafelEnde(7), e2: { art: "sofort", h: 13, preis } });
+  assert.ok(r.ok, r.grund);
+  assert.equal(vorher - p.geld, preis + L.TYPEN.dash8.preis);
+  assert.ok(p.slots.some((s) => s.stadt === "paris" && s.h === 13));
+  // Der reguläre Nachschub rückt einen Takt nach hinten, ein zweiter Sofortkauf geht erst später.
+  assert.equal(st.slotUhr.paris, 2 + L.REGELN.slotTakt[c.k]);
+  const zweit = L.sofortStatus(st, "p", "paris");
+  assert.equal(zweit.ok, false);
+  assert.equal(zweit.grund, "warten");
+  // Läuft eine Vergabe, wird geboten statt sofort gekauft; an der eigenen Heimat gibt es die Tafel.
+  const st2 = leer();
+  st2.pool = st2.pool.filter((s) => s.stadt !== "wien");
+  const s = { id: "x1", stadt: "wien", h: 10, bis: st2.zeit + 24, gebote: {} };
+  st2.pool.push(s);
+  assert.equal(L.sofortStatus(st2, "p", "wien").grund, "bieten");
+  assert.equal(L.sofortStatus(st2, "p", "frankfurt").grund, "tafel");
+  // Rivalen und die normale Suche sehen keinen Sofortkauf.
+  assert.ok(!L.enden(st2, st2.airlines.k, "paris").some((e) => e.art === "sofort"));
+});
+
+test("Sofortkauf: nie über die Obergrenze eines Flughafens", () => {
+  const st = leer();
+  const c = L.STADT.paris;
+  st.pool = st.pool.filter((s) => s.stadt !== "paris");
+  const k = st.airlines.k;
+  for (let i = 0; i < L.REGELN.slotMax[c.k]; i++) k.slots.push({ id: "v" + i, stadt: "paris", h: 5 + i * 0.9, seit: 0 });
+  assert.equal(L.sofortStatus(st, "p", "paris").grund, "voll");
+});
