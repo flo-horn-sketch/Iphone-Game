@@ -550,6 +550,12 @@
   }
 
   const FLIEGER_FORM = "M6 0 L1 -1.2 L-1 -5 L-2.4 -5 L-1.2 -1.2 L-4 -1 L-5 -2.4 L-6 -2.4 L-5.2 0 L-6 2.4 L-5 2.4 L-4 1 L-1.2 1.2 L-2.4 5 L-1 5 L1 1.2 Z";
+  // Symbolgröße nach Sitzen: ATR 72 klein, A380 gut doppelt so groß.
+  function groesseFlieger(typ) {
+    const t = L.TYPEN[typ];
+    if (!t) return 1;
+    return 0.7 + 0.9 * Math.sqrt(Math.max(0, Math.min(1, (t.sitze - 70) / 505)));
+  }
   function fliegerZeichnen() {
     if (!karte || !st) return;
     const s = 1 / ui.kamera.z;
@@ -571,7 +577,7 @@
           karte.flieger.append(e);
           karte.fliegerEls.set(f.id, e);
         }
-        e.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${winkel.toFixed(1)}) scale(${((eigen ? 1.25 : 0.75) * s).toFixed(3)})`);
+        e.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${winkel.toFixed(1)}) scale(${((eigen ? 1.25 : 0.75) * groesseFlieger(f.typ) * s).toFixed(3)})`);
         e.setAttribute("opacity", pos.amBoden ? 0 : eigen ? 1 : 0.55);
         da.add(f.id);
       }
