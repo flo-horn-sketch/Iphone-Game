@@ -344,6 +344,23 @@ button:disabled { opacity: .4; cursor: default; }
 
 /* Regelkarten */
 .regelkarte-seite { background: rgba(5, 10, 16, .78); }
+.ergebnis-seite { background: rgba(6,14,26,.72); }
+.ergebnis-karte { width: 440px; max-width: 100%; background: var(--tafel); border: 1px solid rgba(255,255,255,.15); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.6); animation: rein .3s ease-out; }
+.ergebnis-karte.sieg { border-color: var(--gold); }
+.ergebnis-kopf { display: flex; align-items: center; gap: 10px; }
+.ergebnis-kopf small { display: block; color: var(--blass); font-size: 11px; }
+.ergebnis-kopf b { font-size: 20px; }
+.ergebnis-icon { font-size: 32px; width: 40px; height: 40px; display: grid; place-items: center; }
+.gebote { display: flex; flex-direction: column; gap: 5px; }
+.gebot { display: grid; grid-template-columns: 10px 92px 1fr 74px 20px; align-items: center; gap: 7px; font-size: 12px; padding: 4px 6px; border-radius: 8px; }
+.gebot.vorn { background: rgba(242,193,78,.14); }
+.gebot.ich .gebot-name { font-weight: 800; }
+.gebot-punkt { width: 10px; height: 10px; border-radius: 50%; }
+.gebot-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gebot-balken { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+.gebot-balken i { display: block; height: 100%; border-radius: 4px; }
+.gebot-betrag { text-align: right; font-weight: 700; }
+.ergebnis-karte .hauptknopf { align-self: center; width: auto; padding: 9px 30px; }
 .regelkarte { width: 620px; height: 270px; display: flex; background: var(--tafel); border: 1px solid var(--gold); border-radius: 18px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.6); animation: rein .3s ease-out; }
 .regelbild { position: relative; width: 290px; flex: none; display: grid; place-items: center; font-size: 80px; background: linear-gradient(160deg, #24496a, #10202f); }
 .regelbild img { width: 100%; height: 100%; object-fit: cover; }
