@@ -46,6 +46,8 @@
     saisonTage: 7,           // eine Jahreszeit dauert eine Woche, ein Jahr 28 Tage
     rivalenAb: 1,            // Rivalen fliegen von Anfang an (vorgestellt werden sie in Woche 2)
     verkaufAnteil: 0.6,      // ein Flugzeug bringt beim Verkauf so viel vom Neupreis
+    abschreibTage: 60,       // so lange zählt ein Flugzeug im Firmenwert mehr als sein Verkaufspreis
+    rangAb: 8,               // die Rangliste zählt erst ab Woche 2: am Anfang sagt sie nichts
     kreditZins: 0.012,       // pro Tag
     mahnTage: 2,
     letzteChanceTage: 3,
@@ -59,6 +61,9 @@
     planAb: 10,              // ab hier kündigen Rivalen Züge an
     planTage: 3,
     duellAb: 12,             // ab hier gibt es Preiskämpfe
+    wagnis: 0.025, wagnisAb: 20, wagnisAnteil: 0.25,   // Rivalen kaufen manchmal auf Pump (bis 25 % ihres Werts): so kann einer pleitegehen
+    angriffMut: 9000,        // so viel Verlust am Tag nimmt ein Rivale in Kauf, um dir eine Strecke abzunehmen (mal Stufe und Ärger)
+    nachahmen: 0.3,         // so wahrscheinlich prüft ein Rivale an einem Tag eine gut laufende Strecke von dir (mal Stufe und Ärger)
     trendAb: 14,             // ab hier ändert sich die Nachfrage über die Zeit
     wahlAb: 24,              // ab hier Ereignisse mit zwei Wahlen
     rennenAb: 29,            // ab hier jede Jahreszeit ein Rennen
@@ -75,14 +80,14 @@
   // komfort: mehr = Geschäftsleute zahlen mehr, weniger = Urlauber kommen wegen des Preises.
   const GRUNDSAETZE = {
     sitz: { name: "Sitzabstand", icon: "💺", optionen: {
-      eng: { name: "Eng", text: "30 % mehr Sitze", fakt: "30 % mehr Sitze in jedem Flugzeug. Gäste finden es unbequem.", komfort: -1, sitze: 1.3 },
+      eng: { name: "Eng", text: "15 % mehr Sitze", fakt: "15 % mehr Sitze in jedem Flugzeug. Gäste finden es unbequem, gutes Essen hilft da nur halb.", komfort: -1, sitze: 1.15 },
       normal: { name: "Normal", text: "", fakt: "So viele Sitze, wie der Hersteller vorsieht.", komfort: 0, sitze: 1 },
-      bequem: { name: "Bequem", text: "20 % weniger Sitze", fakt: "20 % weniger Sitze in jedem Flugzeug. Gäste zahlen dafür mehr.", komfort: 1, sitze: 0.8 } } },
+      bequem: { name: "Bequem", text: "12 % weniger Sitze", fakt: "12 % weniger Sitze in jedem Flugzeug. Gäste zahlen dafür mehr.", komfort: 1, sitze: 0.88 } } },
     essen: { name: "Essen an Bord", icon: "🍽️", optionen: {
       keins: { name: "Keins", text: "spart Kosten", fakt: "Kostet dich nichts. Gäste sind weniger zufrieden.", komfort: -1, kosten: 0 },
-      snack: { name: "Snack", text: "", fakt: "Kostet dich 7 € pro Gast.", komfort: 0, kosten: 7 },
-      menue: { name: "Menü", text: "", fakt: "Kostet dich 10 € pro Gast. Gäste sind zufriedener.", komfort: 0.8, kosten: 10 },
-      gourmet: { name: "Gourmet", text: "teuer, beeindruckt", fakt: "Kostet dich 13 € pro Gast. Geschäftsleute lieben es.", komfort: 1.6, kosten: 13 } } },
+      snack: { name: "Snack", text: "", fakt: "Kostet dich 6 € pro Gast.", komfort: 0, kosten: 6 },
+      menue: { name: "Menü", text: "", fakt: "Kostet dich 16 € pro Gast. Gäste sind zufriedener.", komfort: 0.8, kosten: 16 },
+      gourmet: { name: "Gourmet", text: "teuer, beeindruckt", fakt: "Kostet dich 30 € pro Gast. Geschäftsleute lieben es, in enger Kabine aber nur halb.", komfort: 1.6, kosten: 30 } } },
     essenZahlen: { name: "Essen bezahlen", icon: "💶", optionen: {
       inklusive: { name: "Im Preis", text: "", fakt: "Du zahlst das Essen für alle Gäste.", komfort: 0 },
       aufpreis: { name: "Aufpreis", text: "Gäste zahlen selbst", fakt: "Nur wer will, kauft Essen: Du sparst 80 % der Essenskosten. Gäste mögen es weniger.", komfort: -0.5, essenAnteil: 0.2 } } },
@@ -115,6 +120,7 @@
     let K = 0;
     for (const k of Object.keys(o)) K += o[k].komfort;
     if (o.essen.kosten === 0) K -= o.essenZahlen.komfort;      // ohne Essen ist der Aufpreis egal
+    if (o.sitz.sitze > 1 && o.essen.komfort > 0) K -= o.essen.komfort / 2;   // in enger Kabine wirkt gutes Essen nur halb
     const essenKosten = o.essen.kosten * (o.essenZahlen.essenAnteil ?? 1);
     const mitte = 1 + REGELN.mitteBonus * Math.exp(-K * K / 2);
     const pr = {
@@ -438,13 +444,14 @@
   const HEIMAT = ["london", "paris", "frankfurt", "amsterdam", "madrid", "istanbul", "muenchen", "berlin", "rom", "wien",
     "dublin", "lissabon", "kopenhagen", "athen", "helsinki", "warschau", "hamburg"];
 
-  // Wie leicht der Start ist: gemessen in Probepartien (Firmenwert nach 30 Tagen, 5 Partien je Stadt).
-  // Entscheidend sind Ziele in der Nähe und wie dicht die Rivalen sitzen. Neu messen, wenn sich Städte ändern.
+  // Wie leicht der Start ist: gemessen in Probepartien (2026-11-28, nach dem Slot-Umbau: 12 Partien je Stadt über 80 Tage,
+  // alle drei Rivalen-Stufen, sortiert nach dem mittleren Platz am Ende). Neu messen, wenn sich Städte oder Regeln ändern.
   const SCHWIERIGKEIT = {
-    berlin: "leicht", lissabon: "leicht", helsinki: "leicht", houston: "leicht", muenchen: "leicht", tokio: "leicht", athen: "leicht", hamburg: "leicht", kopenhagen: "leicht", chicago: "leicht", kairo: "leicht", dublin: "leicht", dubai: "leicht", istanbul: "leicht", seattle: "leicht", denver: "leicht", miami: "leicht", rom: "leicht", warschau: "leicht", wien: "leicht", mexiko: "leicht",
-    losangeles: "mittel", london: "mittel", manila: "mittel", kualalumpur: "mittel", toronto: "mittel", osaka: "mittel", madrid: "mittel", delhi: "mittel", singapur: "mittel", newyork: "mittel", frankfurt: "mittel", doha: "mittel", bangkok: "mittel", mumbai: "mittel", paris: "mittel", amsterdam: "mittel", hongkong: "mittel", atlanta: "mittel", riad: "mittel", addisabeba: "mittel", seoul: "mittel", peking: "mittel", johannesburg: "mittel", shanghai: "mittel",
-    saopaulo: "schwer", jakarta: "schwer", bogota: "schwer", sydney: "schwer", buenosaires: "schwer", lagos: "schwer", lima: "schwer", nairobi: "schwer", brisbane: "schwer", melbourne: "schwer", perth: "schwer", auckland: "schwer",
+    wien: "leicht", berlin: "leicht", istanbul: "leicht", muenchen: "leicht", london: "leicht", amsterdam: "leicht",
+    rom: "mittel", kopenhagen: "mittel", madrid: "mittel", warschau: "mittel", paris: "mittel", frankfurt: "mittel",
+    dublin: "schwer", athen: "schwer", helsinki: "schwer", hamburg: "schwer", lissabon: "schwer",
   };
+
 
   // ---------- Zufall (mit Startwert, damit Partien nachspielbar sind) ----------
   function zufall(st) {
@@ -863,7 +870,7 @@
     if (!best) return { ok: false, grund: !zeitPasst ? "zeit" : opt.nurFrei && !opt.fid ? "keinFlugzeug" : belegt ? "belegt" : "zeit" };
     const kosten = { flugzeug: best.flugzeug, slots: best.slots, gesamt: best.flugzeug + best.slots, frei: !!best.f };
     const plan = { x, y, typ, fid: best.f ? best.f.id : null, e1: best.s1, e2: best.s2, stufe: opt.stufe || null, kabine: opt.kabine || null };
-    if (kosten.gesamt > a.geld) return { ok: false, grund: "geld", kosten, plan, zeiten: best.z };
+    if (kosten.gesamt > a.geld && !opt.schulden) return { ok: false, grund: "geld", kosten, plan, zeiten: best.z };
     return { ok: true, kosten, plan, zeiten: best.z };
   }
   const kostenFuer = (st, aid, x, y, typ) => { const t = flugFinden(st, aid, x, y, typ); return t.kosten ? Object.assign({ slotFehlt: false }, t.kosten) : { flugzeug: TYPEN[typ].preis, slots: 0, gesamt: TYPEN[typ].preis, slotFehlt: t.grund === "slots" || t.grund === "zeit", frei: false }; };
@@ -879,12 +886,12 @@
   // Legt einen Flug an: kauft fehlende Slots und (wenn nötig) das Flugzeug, eröffnet die Linie, wenn es sie noch nicht gibt.
   function flugAnlegen(st, aid, plan) {
     const a = st.airlines[aid];
-    const test = flugFinden(st, aid, plan.x, plan.y, plan.typ, { e1: plan.e1, e2: plan.e2, fid: plan.fid, neu: !plan.fid });
+    const test = flugFinden(st, aid, plan.x, plan.y, plan.typ, { e1: plan.e1, e2: plan.e2, fid: plan.fid, neu: !plan.fid, schulden: plan.schulden });
     if (!test.ok) return test;
     const s1 = endeNehmen(st, a, plan.x, plan.e1), s2 = endeNehmen(st, a, plan.y, plan.e2);
     if (!s1 || !s2) return { ok: false, grund: "slots" };
     let f = plan.fid ? a.flotte.find((z) => z.id === plan.fid) : null;
-    if (!f) { a.geld -= TYPEN[plan.typ].preis; f = flugzeugHinzu(a, plan.typ, plan.kabine); }
+    if (!f) { a.geld -= TYPEN[plan.typ].preis; f = flugzeugHinzu(a, plan.typ, plan.kabine); f.seit = tagVon(st); }
     f.ort = plan.x;
     let r = routeVon(a, plan.x, plan.y);
     if (!r) {
@@ -1348,16 +1355,14 @@
       const o = liste.find((v) => !raus.has(v.ziel));
       if (!o) return null;
       raus.add(o.ziel);
-      const w = o.gewinn * 7;
+      const w = o.gewinn;          // pro Tag, wie überall im Spiel
       const streu = art === "chance" ? 0.45 : 0.25;
-      return Object.assign({}, o, { art, grund: grund(o), von: Math.round(w * (1 - streu) / 1e4) * 1e4, bis: Math.round(w * (1 + streu) / 1e4) * 1e4 });
+      return Object.assign({}, o, { art, grund: grund(o), von: Math.round(w * (1 - streu) / 1e3) * 1e3, bis: Math.round(w * (1 + streu) / 1e3) * 1e3 });
     };
-    const erg = [];
-    erg.push(nimm([...kand].sort((p, q) => p.gesamt - q.gesamt || q.gewinn - p.gewinn), "guenstig",
-      (o) => "Wenig Geld nötig, viel Reserve."));
-    erg.push(nimm(kand.filter((o) => o.k >= 2).sort((p, q) => STADT[q.ziel].k - STADT[p.ziel].k || q.gewinn - p.gewinn), "drehkreuz",
-      (o) => "Große Stadt: später viele Umsteiger."));
-    // Chance: stärkster Typ zum lohnendsten Ziel, ruhig teurer
+    // Reihenfolge der Auswahl: erst der günstige Einstieg, dann die große Chance (das höchste Ergebnis, das drin ist),
+    // dann das Drehkreuz aus dem, was übrig bleibt. So zeigt die Chance immer am meisten Gewinn.
+    const guenstig = nimm([...kand].sort((p, q) => p.gesamt - q.gesamt || q.gewinn - p.gewinn), "guenstig",
+      (o) => "Wenig Geld nötig, viel Reserve.");
     const stark = [];
     for (const o of kand) {
       let b = o;
@@ -1367,8 +1372,11 @@
       }
       stark.push(b);
     }
-    erg.push(nimm(stark.sort((p, q) => q.gewinn - p.gewinn), "chance",
-      (o) => "Viel Gewinn, braucht aber " + Math.round(o.gesamt / Math.max(1, a.geld) * 100) + " % deines Geldes."));
+    const chance = nimm(stark.sort((p, q) => q.gewinn - p.gewinn), "chance",
+      (o) => "Am meisten Gewinn, braucht aber " + Math.round(o.gesamt / Math.max(1, a.geld) * 100) + " % deines Geldes.");
+    const dreh = nimm(kand.filter((o) => o.k >= 2).sort((p, q) => STADT[q.ziel].k - STADT[p.ziel].k || q.gewinn - p.gewinn), "drehkreuz",
+      (o) => "Große Stadt: später viele Umsteiger.");
+    const erg = [guenstig, dreh, chance];
     return erg.filter(Boolean);
   }
 
@@ -1837,7 +1845,15 @@
   }
 
   // ---------- Rangliste ----------
-  function flottenWert(a) { return a.flotte.reduce((s, f) => s + TYPEN[f.typ].preis * REGELN.verkaufAnteil, 0); }
+  // Ein neues Flugzeug zählt erst voll und verliert dann über zwei Monate an Wert, bis auf den Verkaufspreis.
+  // So steht nicht vorn, wer anfangs am wenigsten kauft.
+  function flottenWert(a, tag) {
+    return a.flotte.reduce((s, f) => {
+      const alter = f.seit == null || tag == null ? REGELN.abschreibTage : Math.max(0, tag - f.seit);
+      const anteil = Math.max(REGELN.verkaufAnteil, 1 - (1 - REGELN.verkaufAnteil) * alter / REGELN.abschreibTage);
+      return s + TYPEN[f.typ].preis * anteil;
+    }, 0);
+  }
   function slotWert(a) {
     let s = 0;
     for (const x of a.slots) s += (x.heim ? heimPreis(x.stadt, x.h) : slotGrundpreis(x.stadt, x.h)) * 0.5;
@@ -1890,6 +1906,7 @@
     if (!umruestenGeht(st, aid, k.alt, typ)) return { ok: false, grund: "zeit" };
     a.geld -= k.preis;
     k.alt.typ = typ;
+    k.alt.seit = tagVon(st);
     const g = kabineGrenzen(typ);
     k.alt.kabine = { business: Math.min(g.business, k.alt.kabine.business), first: Math.min(g.first, k.alt.kabine.first) };
     geaendert(st);
@@ -1899,7 +1916,7 @@
     const a = st.airlines[aid];
     const verlauf = a.verlauf.slice(-7);
     const schnitt = verlauf.length ? verlauf.reduce((s, v) => s + v, 0) / verlauf.length : 0;
-    return Math.round(a.geld - a.kredit + flottenWert(a) + slotWert(a) + Math.max(0, schnitt) * 10);
+    return Math.round(a.geld - a.kredit + flottenWert(a, tagVon(st)) + slotWert(a) + Math.max(0, schnitt) * 10);
   }
   function rangliste(st) {
     return st.reihenfolge.map((id) => ({ id, name: st.airlines[id].name, farbe: st.airlines[id].farbe, wert: firmenwert(st, id), routen: st.airlines[id].routen.length, flugzeuge: st.airlines[id].flotte.length }))
@@ -1911,10 +1928,11 @@
 
   function rangPruefen(st) {
     const pl = platz(st);
-    if (st.letzterPlatz && pl < st.letzterPlatz) melden(st, { art: "aufstieg", text: `Du bist auf Platz ${pl} aufgestiegen!`, platz: pl });
+    if (tagVon(st) < REGELN.rangAb) { st.letzterPlatz = null; }
+    else if (st.letzterPlatz && pl < st.letzterPlatz) melden(st, { art: "aufstieg", text: `Du bist auf Platz ${pl} aufgestiegen!`, platz: pl });
     if (st.letzterPlatz && pl > st.letzterPlatz) melden(st, { art: "abstieg", text: `${rangliste(st)[pl - 2].name} hat dich überholt. Jetzt Platz ${pl}.`, platz: pl });
     st.letzterPlatz = pl;
-    st.bestPlatz = Math.min(st.bestPlatz || 9, pl);
+    if (tagVon(st) >= REGELN.rangAb) st.bestPlatz = Math.min(st.bestPlatz || 9, pl);
     // Größere Flugzeuge je nach Firmenwert, für alle Airlines gleich.
     for (const aid of st.reihenfolge) {
       const a = st.airlines[aid];
@@ -1946,11 +1964,11 @@
     { id: "bieten", text: "Gewinne einen Slot beim Bieten", ist: (st, p) => (p.geboten ? 1 : 0), soll: 1, belohnung: 200000 },
     { id: "flotte5", text: "Baue eine Flotte aus 5 Flugzeugen", ist: (st, p) => p.flotte.length, soll: 5, belohnung: 400000 },
     { id: "wert5", text: "Firmenwert 5 Mio", ist: (st, p) => Math.round(firmenwert(st, p.id) / 1e5) / 10, soll: 5, belohnung: 400000, mio: true },
-    { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st, p) => (platzVon(st, p.id) <= 3 ? 1 : 0), soll: 1, belohnung: 400000 },
+    { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st, p) => (tagVon(st) >= REGELN.rangAb && platzVon(st, p.id) <= 3 ? 1 : 0), soll: 1, belohnung: 400000 },
     { id: "wert10", text: "Firmenwert 10 Mio: der A321neo schafft den Atlantik", ist: (st, p) => Math.round(firmenwert(st, p.id) / 1e5) / 10, soll: 10, belohnung: 800000, mio: true },
-    { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st, p) => (platzVon(st, p.id) <= 2 ? 1 : 0), soll: 1, belohnung: 800000 },
+    { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st, p) => (tagVon(st) >= REGELN.rangAb && platzVon(st, p.id) <= 2 ? 1 : 0), soll: 1, belohnung: 800000 },
     { id: "kontinent", text: "Fliege auf einen anderen Kontinent", ist: (st, p) => p.routen.filter((r) => STADT[r.a].r !== STADT[r.b].r).length, soll: 1, belohnung: 1200000 },
-    { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st, p) => (platzVon(st, p.id) === 1 ? 1 : 0), soll: 1, belohnung: 2000000 },
+    { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st, p) => (tagVon(st) >= REGELN.rangAb && platzVon(st, p.id) === 1 ? 1 : 0), soll: 1, belohnung: 2000000 },
     { id: "wert35", text: "Firmenwert 35 Mio: die Boeing 787", ist: (st, p) => Math.round(firmenwert(st, p.id) / 1e5) / 10, soll: 35, belohnung: 2000000, mio: true },
     { id: "kontinente4", text: "Fliege auf vier Kontinente", ist: (st, p) => new Set(p.routen.flatMap((r) => [STADT[r.a].r, STADT[r.b].r])).size, soll: 4, belohnung: 3000000 },
   ];
@@ -2099,6 +2117,8 @@
     }
     const stil = STIL[a.stil] || STIL.bot;
     const vorher = a.flotte.length;
+    // Wer sich gern verschätzt oder wütend ist, geht eher ein Wagnis ein.
+    if (aid !== SPIELER && tagVon(st) >= REGELN.wagnisAb && a.geld > 300000 && zufall(st) < REGELN.wagnis * (0.3 + 0.4 * K.irrtum + 0.3 * k.groll)) kiAusbauen(st, aid, { wagnis: true });
     for (let i = 0; i < Math.min(stil.proTag, K.proTag); i++) if (!kiAusbauen(st, aid)) break;
     if (a.flotte.length > vorher) k.ruhe = K.pause;
     if (stil.proTag && (K.sorgfalt >= 1 || zufall(st) < K.sorgfalt)) kiAufruesten(st, aid);
@@ -2149,16 +2169,19 @@
     const a = st.airlines[aid];
     const stil = STIL[a.stil] || STIL.bot;
     const K = koennen(st, aid);
-    const reserve = opt && opt.start ? 0 : stil.reserve * K.vorsicht;
+    // Wagnis: Manchmal kauft ein Rivale auf Pump mehr, als er hat. Geht die Rechnung nicht auf, droht die Pleite.
+    const wagnis = opt && opt.wagnis ? Math.round(firmenwert(st, aid) * REGELN.wagnisAnteil) : 0;
+    const reserve = opt && opt.start ? 0 : wagnis ? -wagnis : stil.reserve * K.vorsicht;
     if (a.geld < reserve + 100000) return false;
-    const kandidaten = kiKandidaten(st, aid, reserve);
+    const kandidaten = kiKandidaten(st, aid, reserve, !!wagnis).filter((c) => !wagnis || (c.kosten > a.geld * 0.8 && c.kosten <= a.geld + wagnis));
+    if (wagnis) for (const c of kandidaten) c.plan.schulden = true;
     // Nicht jeder greift zur besten Idee: Manche nehmen, was ihnen gerade gefällt.
     if (K.wahl > 1 && kandidaten.length > 1) { const i = Math.floor(zufall(st) * Math.min(K.wahl, kandidaten.length)); kandidaten.unshift(...kandidaten.splice(i, 1)); }
     // Die besten Ideen genau prüfen. Wer sich verschätzt, sieht in der Rechnung mehr oder weniger, als wirklich drin ist.
     for (const c of kandidaten.slice(0, K.pruefen)) {
       const pr = probe(st, aid, (kopie) => flugAnlegen(kopie, aid, c.plan));
       if (!pr) continue;
-      const geglaubt = pr.delta + (c.glaube - 1) * Math.max(Math.abs(pr.delta), c.sch.gewinn, 3000);
+      const geglaubt = pr.delta + (c.mut || 0) + (c.glaube - 1) * Math.max(Math.abs(pr.delta), c.sch.gewinn, 3000);
       if (geglaubt > 0 && (c.kosten / (geglaubt * c.umlaeufe)) <= stil.amortisation) {
         const res = kiFliegen(st, aid, c.plan, opt);
         // Wer sorgfältig ist, rechnet die Sitze des neuen Flugzeugs durch, bevor es abhebt.
@@ -2207,9 +2230,16 @@
     const K = koennen(st, aid);
     const kf = aid === SPIELER ? null : kopf(a);
     const spieler = st.airlines[SPIELER];
-    for (const x of new Set([a.basis, ...(a.ausgebaut || [])])) {
-      for (const y of ziele) {
-        if (y === x) continue;
+    // Welche Strecken prüft die Airline? Alle ab ihren Drehkreuzen, und (wie echte Airlines) die gut laufenden Strecken der anderen:
+    // Wo du Geld verdienst, wollen die Rivalen auch hin. Wer sich über dich ärgert, schaut noch genauer hin.
+    const paare = [];
+    for (const x of new Set([a.basis, ...(a.ausgebaut || [])])) for (const y of ziele) if (y !== x) paare.push([x, y]);
+    if (kf && tagVon(st) >= REGELN.duellAb && kf.scheu <= 0) {
+      const lust = REGELN.nachahmen * (K.reagiert + kf.groll * 0.5);
+      for (const r of spieler.routen) if ((r.auslastung || 0) >= 0.7 && !routeVon(a, r.a, r.b) && fest(st, aid + r.id) < lust) paare.push([r.a, r.b]);
+    }
+    for (const [x, y] of paare) {
+      {
         const km = entfernung(x, y);
         if (km > maxWeite) continue;
         for (const typ of typen) {
@@ -2221,6 +2251,9 @@
           if (verwZusatz && !routeVon(a, x, y)) sch.gewinn -= verwZusatz;
           const g = glaube(st, aid, [x, y].sort().join("-"));
           // Wer sich verschätzt, hält auch eine schwache Strecke für gut (oder eine gute für schwach).
+          // Auf deinen Strecken kämpfen sie auch mit wenig Gewinn: Sie wollen dir den Markt abnehmen.
+          const mut = kf && routeVon(spieler, x, y) && !routeVon(a, x, y) ? REGELN.angriffMut * (K.reagiert + kf.groll * 0.5) : 0;
+          sch.gewinn += mut;
           if (sch.gewinn + (g - 1) * 8000 <= 0 || sch.auslastung * g < 0.4) continue;
           const vorliebe = stil.klasse[STADT[y].k] * (a.stil === "premium" ? 0.6 + (STADT[x].w + STADT[y].w) : 1) * (x === a.basis ? 1.15 : 1);
           // Ein neues Flugzeug schafft später mehrere Flüge am Tag: Das rechnet die Airline beim Kauf mit ein.
@@ -2231,7 +2264,7 @@
           // Wer sich über dich ärgert, fliegt dir nach. Wer gerade gegen dich verloren hat, meidet deine Strecken.
           let gegen = 1;
           if (kf && !routeVon(a, x, y) && routeVon(spieler, x, y)) gegen = kf.scheu > 0 ? 0.25 : 1 + 0.4 * kf.groll * K.reagiert;
-          kandidaten.push({ x, y, typ, plan: t.plan, kosten: t.kosten.gesamt, umlaeufe, glaube: g, wert: (sch.gewinn * umlaeufe * vorliebe * g * gegen) / Math.max(t.kosten.gesamt, 150000), tage, sch });
+          kandidaten.push({ x, y, typ, plan: t.plan, kosten: t.kosten.gesamt, umlaeufe, glaube: g, mut, wert: (sch.gewinn * umlaeufe * vorliebe * g * gegen) / Math.max(t.kosten.gesamt, 150000), tage, sch });
         }
       }
     }
@@ -2908,6 +2941,53 @@
       const pr = neueLinieProbe(st, p, k.start, k.ziel, k.typ);
       if (pr && lohnt(pr.delta, 0)) ideen.push({ art: "neu", start: k.start, ziel: k.ziel, typ: k.typ, delta: pr.delta, echt: pr.echt, kosten: pr.kosten, basis: 0 });
     }
+    ideen.push(...rivalenIdeen(st, p, wer, typen));
+    return ideen;
+  }
+  // Der Analyst schaut auch auf die Rivalen: Welche ihrer Linien laufen gut, und könnten wir dort mitfliegen?
+  // Wie gut die fremde Linie läuft, nennt er als Spanne (je nach Sternen genauer). Mitfliegen heißt Preiskampf.
+  function rivalenEinschaetzung(st, aid, rid, wer) {
+    const e = rechnung(st).routen[rid];
+    if (!e || !wer) return null;
+    const w = e.gewinn * wer.macke * rauschen(st, wer.streuung);
+    return { auslastung: e.auslastung, gewinn: spanne(w, wer.streuung).map((x) => Math.round(x / 1000) * 1000) };
+  }
+  // Für die Rangliste: die beste Linie eines Rivalen, so wie dein Analyst sie sieht (ohne Analyst: nichts).
+  function besteRivalenLinie(st, aid) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    const a = st.airlines[aid];
+    if (!wer || !a) return null;
+    const rg = rechnung(st);
+    const r = a.routen.filter((x) => rg.routen[x.id]).sort((x, y) => rg.routen[y.id].gewinn - rg.routen[x.id].gewinn)[0];
+    if (!r) return null;
+    return Object.assign({ a: r.a, b: r.b, wer, duFliegst: !!routeVon(st.airlines[SPIELER], r.a, r.b) }, rivalenEinschaetzung(st, aid, r.id, wer));
+  }
+  function rivalenIdeen(st, p, wer, typen) {
+    if (tagVon(st) < REGELN.duellAb) return [];
+    const rg = rechnung(st);
+    const liste = [];
+    for (const aid of ["k", "s", "a"]) {
+      const a = st.airlines[aid];
+      if (!a || a.konkurs) continue;
+      for (const r of a.routen) {
+        const e = rg.routen[r.id];
+        if (!e || e.gewinn < 8000 || routeVon(p, r.a, r.b)) continue;
+        liste.push({ aid, r, e });
+      }
+    }
+    liste.sort((x, y) => y.e.gewinn - x.e.gewinn);
+    const ideen = [];
+    for (const { aid, r, e } of liste.slice(0, 4)) {
+      const km = entfernung(r.a, r.b);
+      for (const typ of typen.filter((t) => TYPEN[t].reichweite >= km).slice(0, 2)) {
+        const pr = neueLinieProbe(st, p, r.a, r.b, typ);
+        if (!pr || !lohnt(pr.delta, 0)) continue;
+        const sch = rivalenEinschaetzung(st, aid, r.id, wer);
+        ideen.push({ art: "mitfliegen", start: r.a, ziel: r.b, typ, wer2: aid, rivale: sch.gewinn, delta: pr.delta, echt: pr.echt, kosten: pr.kosten, basis: 0 });
+        break;
+      }
+      if (ideen.length) break;
+    }
     return ideen;
   }
   // Ereignisse: Ein Rivale kündigt eine Strecke an, oder eine Versteigerung beginnt.
@@ -2980,7 +3060,7 @@
     const p = st.airlines[SPIELER];
     if (t.route && !p.routen.some((r) => r.id === t.route)) return false;
     if (t.gel && !st.gelegenheiten.some((g) => g.id === t.gel)) return false;
-    if ((t.art === "neu" || t.art === "plan") && routeVon(p, t.start, t.ziel)) return false;
+    if ((t.art === "neu" || t.art === "plan" || t.art === "mitfliegen") && routeVon(p, t.start, t.ziel)) return false;
     if (t.art === "dazu") { const r = p.routen.find((x) => x.id === t.route); if (!flugFinden(st, SPIELER, r.a, r.b, t.typ).ok) return false; }
     if (t.art === "kabine") { const f = p.flotte.find((x) => x.id === t.fid); if (!f || (f.kabine.business === t.business && f.kabine.first === t.first)) return false; }
     if (t.art === "abziehen" && flugzeugeAuf(p, t.route).length < 2) return false;
@@ -3048,7 +3128,7 @@
     gelegenheitAnnehmen, gelegenheitAblehnen, uebernahmeAnnehmen, uebernahmeAblehnen, tilgen,
     GEGNER, laune, firmenwert, rangliste, platz, kiTag, kiAusbauen, kiFliegen, kiKandidaten, tagesAbschluss, zielStand, zielPruefen, ZIELE,
     bieten, poolAuswerten, slotInGefahr, tageBisSaisonende, slotNutzen, slotWertFuer, slotBesitzer, handelPruefen, handelAnbieten,
-    ratSlot, ratHandel, ratGrundsatz, ratPreis, ratKauf, ratKabine, ratFlug, flugVorschau,
+    rivalenEinschaetzung, besteRivalenLinie, ratSlot, ratHandel, ratGrundsatz, ratPreis, ratKauf, ratKabine, ratFlug, flugVorschau,
     trendVon, stadtTrend, vergleich, duellAntwort, drehkreuzPreis, kannAusbauen, drehkreuzAusbauen, rennenStand, wahlTreffen, wirkung, ausgebaut, KONTINENTE_PAARE: PAARE,
   };
 });
