@@ -31,6 +31,9 @@ jobs:
           rsync -a --exclude tests web/ _site/
           # Bildliste automatisch aus dem Ordner erzeugen: neue Bilder brauchen keinen Eintrag von Hand.
           python3 -c "import json,os; print(json.dumps(sorted(f for f in os.listdir('_site/grafiken') if f.lower().endswith('.png')), indent=2))" > _site/grafiken/vorhanden.json
+          # Flugzeuge in Airline-Lackierung liegen in grafiken/lack/ und bekommen eine eigene Liste.
+          mkdir -p _site/grafiken/lack
+          python3 -c "import json,os; print(json.dumps(sorted(f for f in os.listdir('_site/grafiken/lack') if f.lower().endswith('.png')), indent=2))" > _site/grafiken/lack.json
           touch _site/.nojekyll
           # Version stempeln: die App vergleicht sie mit version.json und bietet ein Update an.
           VERSION="${GITHUB_SHA::12}"

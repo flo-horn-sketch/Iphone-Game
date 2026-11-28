@@ -53,6 +53,58 @@ Die Bilder erscheinen groß im Flugzeug-Store und klein im Linien-Editor. Flugze
 | `air-flugzeug-b777.png` | 1024 × 1024 | Eine Boeing 777-300ER: sehr langer Großraumjet mit zwei riesigen Triebwerken und sechs Rädern pro Hauptfahrwerk. |
 | `air-flugzeug-a380.png` | 1024 × 1024 | Ein Airbus A380: riesiges Doppelstock-Flugzeug mit vier Triebwerken und zwei durchgehenden Fensterreihen. |
 
+### 3b. Flugzeuge in der Lackierung der Airline (neu)
+
+Im Spiel führt man jetzt eine echte Airline, je nach Startflughafen. Die eigenen Flugzeuge sollen in den Farben dieser Airline erscheinen. Fehlt ein Bild, zeigt das Spiel das neutrale Flugzeug aus Abschnitt 3, es geht also nichts kaputt.
+
+**Abweichungen von den Regeln oben, nur für diesen Abschnitt:**
+
+- **Ordner:** `web/grafiken/lack/` (nicht `web/grafiken/`). Die Liste `lack.json` entsteht beim Veröffentlichen von selbst.
+- **Dateiname:** `air-flugzeug-<typ>-<kürzel>.png`, alles klein. Beispiel: der A320neo von Lufthansa heißt `air-flugzeug-a320-lh.png`.
+- **Größe:** 768 × 768, PNG.
+- **Bild:** dasselbe Flugzeug wie in Abschnitt 3 (gleicher Typ, gleiche Seitenansicht, gleicher schlichter heller Himmel), nur die Lackierung ist anders.
+- **Lackierung:** Farben und Aufteilung wie in der Tabelle der Airlines beschrieben. **Kein Logo, kein Schriftzug, kein Wappen, keine Buchstaben, keine Zahlen**, auch nicht am Leitwerk: nur Farbflächen und Streifen.
+- **Reihenfolge:** eine Airline nach der anderen, in der Reihenfolge der Tabelle, je Airline alle zwölf Typen. Jede fertige Airline ist sofort im Spiel sichtbar.
+
+**Die zwölf Typen** (Beschreibung des Flugzeugs wie in Abschnitt 3):
+
+| `<typ>` | Flugzeug |
+|---|---|
+| `libelle` | ATR 72-600 |
+| `dash8` | De Havilland Dash 8-400 |
+| `crj900` | Bombardier CRJ900 |
+| `falke` | Embraer E195-E2 |
+| `a220` | Airbus A220-300 |
+| `b737` | Boeing 737 MAX 8 |
+| `a320` | Airbus A320neo |
+| `kranich` | Airbus A321neo |
+| `albatros` | Boeing 787-9 |
+| `a350` | Airbus A350-900 |
+| `b777` | Boeing 777-300ER |
+| `a380` | Airbus A380 |
+
+**Die Airlines** (17 Stück, also 204 Bilder):
+
+| `<kürzel>` | Airline (Heimat) | Lackierung |
+|---|---|---|
+| `lh` | Lufthansa (Frankfurt) | Rumpf ganz weiß, Leitwerk und Rumpfende tief dunkelblau, Triebwerke weiß. Sehr schlicht. |
+| `ba` | British Airways (London) | Rumpf oben weiß, Bauch dunkelblau, Triebwerke dunkelblau, Leitwerk mit geschwungenen Bändern in Rot, Weiß und Dunkelblau. |
+| `af` | Air France (Paris) | Rumpf weiß, Leitwerk mit schrägen Streifen in Dunkelblau, Weiß und Rot, Triebwerke weiß. |
+| `kl` | KLM (Amsterdam) | Rumpf oben kräftig hellblau, schmaler dunkelblauer Streifen in der Mitte, Bauch weiß, Leitwerk weiß, Triebwerke hellblau. |
+| `ib` | Iberia (Madrid) | Rumpf weiß, Leitwerk mit geschwungenen Flächen in Rot und Gelb, Triebwerke weiß. |
+| `tk` | Turkish Airlines (Istanbul) | Rumpf weiß, Bauch hellgrau, Leitwerk kräftig rot, Triebwerke weiß. |
+| `en` | Air Dolomiti (München) | Rumpf weiß, Leitwerk und Triebwerke türkisgrün. |
+| `az` | ITA Airways (Rom) | Rumpf ganz in leuchtendem Azurblau, Leitwerk mit Streifen in Grün, Weiß und Rot, Triebwerke azurblau. |
+| `os` | Austrian (Wien) | Rumpf weiß, Leitwerk rot mit einem weißen Querband, Triebwerke rot. |
+| `sk` | SAS (Kopenhagen) | Rumpf hellgrau-beige, Leitwerk und Rumpfende dunkelblau, Triebwerke orange. |
+| `ei` | Aer Lingus (Dublin) | Rumpf weiß, Leitwerk und Triebwerke in kräftigem Blaugrün. |
+| `tp` | TAP Air Portugal (Lissabon) | Rumpf weiß, Leitwerk mit Flächen in Grün und Rot, Triebwerke weiß. |
+| `a3` | Aegean (Athen) | Rumpf weiß, Leitwerk dunkelblau mit hellblauen geschwungenen Linien, Triebwerke dunkelblau. |
+| `u2` | easyJet (Berlin) | Rumpf weiß, Leitwerk und Triebwerke kräftig orange. |
+| `lo` | LOT (Warschau) | Rumpf weiß, Leitwerk dunkelblau, schmaler dunkelblauer Streifen entlang der Fenster, Triebwerke weiß. |
+| `ew` | Eurowings (Hamburg) | Rumpf weiß, Leitwerk bordeauxrot mit einem türkisen Streifen, Triebwerke bordeauxrot. |
+| `ay` | Finnair (Helsinki) | Rumpf ganz weiß, Leitwerk weiß mit dunkelblauer Spitze, Triebwerke weiß. Sehr schlicht und kühl. |
+
 ### 4. Die Chefs der drei Rivalen (Porträts, quadratisch)
 
 Werden klein und rund gezeigt. Gesicht groß und mittig, schlichter dunkler Hintergrund in der Farbe der Airline. Erfundene Personen.
