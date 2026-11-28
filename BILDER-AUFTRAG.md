@@ -82,6 +82,12 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-ereignis-gebraucht.png` | 1536 × 1024 | Ein gebrauchtes Passagierflugzeug ohne Lackierung steht in einem großen Hangar, Mechaniker davor, ein Schild ohne Schrift hängt am Bugrad. |
 | `air-ereignis-messe.png` | 1536 × 1024 | Eine riesige moderne Messehalle mit vielen Ständen und Geschäftsleuten mit Koffern, durch die Glasfassade sieht man ein landendes Flugzeug. |
 | `air-ereignis-uebernahme.png` | 1536 × 1024 | Ein dunkler Besprechungsraum ganz oben in einem Hochhaus, ein Vertrag und ein Füller auf einem langen Tisch, draußen ein Flughafen bei Nacht. Bedrohliche, ernste Stimmung. |
+| `air-ereignis-plan.png` | 1536 × 1024 | Ein Megafon auf einem Konferenztisch vor einer großen Weltkarte mit einer neu eingezeichneten, leuchtenden Fluglinie, im Hintergrund unscharf ein Flughafen. Spannung wie vor einem Wettkampf. |
+| `air-ereignis-versteigerung.png` | 1536 × 1024 | Ein edler Auktionssaal, ein Auktionshammer liegt auf dem Pult, Bieter halten verdeckte Umschläge, durch hohe Fenster sieht man eine Start- und Landebahn. |
+| `air-ereignis-aufkauf.png` | 1536 × 1024 | Viele abgestellte Flugzeuge ohne Lackierung in Reihen auf einem großen Vorfeld, ein Mann und eine Frau geben sich davor die Hand, Abendlicht. |
+| `air-ereignis-streik.png` | 1536 × 1024 | Bodenpersonal in Warnwesten steht mit erhobenen Fäusten und Schildern ohne Schrift auf einem Vorfeld, dahinter wartende Flugzeuge. |
+| `air-ereignis-sturm.png` | 1536 × 1024 | Ein Passagierflugzeug steht auf dem Vorfeld, darüber dunkle Gewitterwolken und Blitze, Regen peitscht über die Landebahn. |
+| `air-ereignis-kerosin.png` | 1536 × 1024 | Ein Tankwagen betankt ein Flugzeug auf dem Vorfeld im Morgenlicht, Schläuche, Hitzeflimmern, im Vordergrund eine große Anzeige mit auf- und absteigender Kurve ohne Zahlen. |
 | `air-ende.png` | 1536 × 1024 | Ein leeres, stilles Vorfeld bei Regen, ein einzelnes geparktes Flugzeug mit abgedeckten Triebwerken, melancholisch. |
 
 ### 6. Regelkarten (quadratisch, erscheinen, wenn eine neue Regel dazukommt)
@@ -91,6 +97,14 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-regel-drehkreuz.png` | 1024 × 1024 | Ein großer Flughafen von oben wie ein Stern: von der Mitte gehen viele leuchtende goldene Fluglinien in alle Richtungen zu kleineren Städten, kleine Flugzeuge bringen Reisende herein, ein großes fliegt hinaus. |
 | `air-regel-rivalen.png` | 1024 × 1024 | Drei Flugzeuge in Rot, Orange und Violett fliegen nebeneinander durch Wolken um die Wette, sportliche, spannende Stimmung. |
 | `air-regel-saison.png` | 1024 × 1024 | Ein Bild, das in vier Teile geteilt ist: Frühlingsblüten, Sommerstrand, Herbstlaub, verschneite Berge, durch alle vier fliegt dasselbe kleine Flugzeug. |
+| `air-regel-plaene.png` | 1024 × 1024 | Ein Rivalen-Chef in einem dunklen Büro zeigt mit einem Stift auf eine Weltkarte, eine gestrichelte neue Linie leuchtet auf, geheimnisvolle Stimmung. |
+| `air-regel-duell.png` | 1024 × 1024 | Zwei Passagierflugzeuge in Grün und Orange fliegen Nase an Nase auf derselben Strecke, zwischen ihnen zwei gekreuzte Säbel aus Licht. |
+| `air-regel-trends.png` | 1024 × 1024 | Eine Stadt bei Nacht, über ihr steigt ein großer grüner Pfeil nach oben, eine andere Stadt am Horizont mit einem roten Pfeil nach unten, Flugzeuge dazwischen. |
+| `air-regel-versteigerung.png` | 1024 × 1024 | Ein goldener Auktionshammer schwebt über einem Flughafen-Terminal, drei Umschläge in Rot, Orange und Violett liegen auf einem Pult. |
+| `air-regel-wahl.png` | 1024 × 1024 | Eine Weggabelung aus zwei Landebahnen: links ruhiges Wetter und ein Schild mit Schutzschild-Symbol, rechts Gewitter und ein großer Würfel. |
+| `air-regel-rennen.png` | 1024 × 1024 | Vier Flugzeuge in Grün, Rot, Orange und Violett fliegen auf eine Zielflagge zu, darüber schwebt ein goldener Pokal. |
+| `air-regel-ausbau.png` | 1024 × 1024 | Ein Flughafen-Terminal wird mit Kränen und Gerüsten erweitert, neue Gates, Flugzeuge rollen schon heran, goldenes Abendlicht. |
+| `air-regel-aufkauf.png` | 1024 × 1024 | Ein Schild „Sale“ ohne Schrift, nur mit Prozentzeichen, hängt an einem Flugzeug, im Hintergrund weitere abgestellte Flugzeuge, leicht melancholische Stimmung. |
 
 ### 7. App-Symbol (für den Home-Bildschirm)
 

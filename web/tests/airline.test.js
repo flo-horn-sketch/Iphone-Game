@@ -363,3 +363,106 @@ test("Kein Platz 1 am Anfang, wenn alle bei Null stehen", () => {
   for (let d = 0; d < 3; d++) L.vorruecken(st, 24);
   assert.equal(st.platz1, false);
 });
+
+// ---------- Spannung ----------
+test("Bei gleichem Preis gewinnt die bessere Qualität, gutes Essen kostet", () => {
+  const st = leer();
+  const gut = st.airlines.s;
+  L.vorlageSetzen(st, "s", "standard");
+  L.grundsatzSetzen(st, "s", "essen", "gourmet");
+  const p = st.airlines.p;
+  p.ruf = gut.ruf;
+  // Qualität wirkt zusätzlich zum Preis: ohne den Qualitätsfaktor wäre die Gourmet-Airline weniger attraktiv.
+  const mit = L.anziehung(gut, "normal", "urlaub");
+  const q = L.REGELN.qualitaet; L.REGELN.qualitaet = 0;
+  const ohne = L.anziehung(gut, "normal", "urlaub");
+  L.REGELN.qualitaet = q;
+  assert.ok(mit > ohne);
+  assert.ok(L.profil(gut).sterne > L.profil(p).sterne);
+  assert.ok(L.profil(gut).essenKosten > L.profil(p).essenKosten, "gutes Essen kostet");
+  // Der Vergleich zeigt beide Linien nebeneinander.
+  gut.geld = 1e8;
+  L.fliegen(st, "p", "frankfurt", "rom", "falke");
+  L.kaufen(st, "s", "falke");
+  L.fliegen(st, "s", "frankfurt", "rom", "falke");
+  const v = L.vergleich(st, p.routen[0].id);
+  assert.equal(v.length, 2);
+  assert.ok(v[1].sterne > v[0].sterne);
+});
+
+test("Rivale auf deiner Strecke startet einen Preiskampf", () => {
+  const st = leer();
+  st.zeit = 24 * (L.REGELN.duellAb + 1);
+  L.fliegen(st, "p", "frankfurt", "rom", "falke");
+  const s = st.airlines.s;
+  s.geld = 1e8; s.stil = "billig";
+  s.slots.frankfurt = 2; s.slots.rom = 2;
+  L.kaufen(st, "s", "falke");
+  L.kiTag; // nur zur Sicherheit vorhanden
+  const r = st.airlines.p.routen[0];
+  // Spatzflug fliegt dieselbe Strecke über den normalen Weg der Rivalen.
+  const res = L.fliegen(st, "s", "frankfurt", "rom", "falke");
+  assert.ok(res.ok);
+  L.duellAntwort(st, r.id, "unterbieten");
+  assert.equal(r.stufe, "angreifen");
+  L.duellAntwort(st, r.id, "aufgeben");
+  assert.equal(st.airlines.p.routen.length, 0);
+});
+
+test("Drehkreuz ausbauen bringt mehr Umsteiger", () => {
+  const st = leer();
+  st.airlines.p.geld = 1e8;
+  for (const z of ["rom", "madrid", "wien"]) L.fliegen(st, "p", "muenchen", z, "falke");
+  L.fliegen(st, "p", "frankfurt", "muenchen", "falke");
+  assert.ok(L.kannAusbauen(st, "p", "muenchen"));
+  const bedarf = () => Object.values(L.rechnung(st).routen).filter((e) => e.airline === "p").reduce((s, e) => s + e.bedarf, 0);
+  const vorher = bedarf();
+  const res = L.drehkreuzAusbauen(st, "p", "muenchen");
+  assert.ok(res.ok);
+  assert.ok(bedarf() > vorher);
+  assert.ok(!L.kannAusbauen(st, "p", "muenchen"), "nur einmal");
+});
+
+test("Sicher oder Risiko: sicher kostet sofort", () => {
+  const st = leer();
+  L.fliegen(st, "p", "frankfurt", "rom", "falke");
+  st.gelegenheiten.push({ id: "gx", art: "wahl", typ: "streik", stadt: "frankfurt", preis: 200000, bis: st.zeit + 10, dauer: 10 });
+  const geld = st.airlines.p.geld;
+  assert.ok(L.wahlTreffen(st, "gx", true));
+  assert.equal(st.airlines.p.geld, geld - 200000);
+  assert.equal(st.gelegenheiten.length, 0);
+});
+
+test("Versteigerung: das höchste Gebot bekommt die Landerechte", () => {
+  const st = leer();
+  st.airlines.p.geld = 1e8;
+  for (const id of ["k", "s", "a"]) st.airlines[id].geld = 0;
+  st.gelegenheiten.push({ id: "gv", art: "versteigerung", stadt: "muenchen", stufe: 300000, gebot: 0, bis: st.zeit + 1, dauer: 1 });
+  L.bieten(st, "gv", 2);
+  L.vorruecken(st, 2);
+  assert.equal(st.airlines.p.slots.muenchen, L.REGELN.versteigerungStueck);
+});
+
+test("Nachfrage ändert sich über die Zeit und zeigt Pfeile", () => {
+  const st = leer();
+  const tag = L.tagVon(st);
+  const vorher = L.grundNachfrage(st, "frankfurt", "rom", tag).urlaub;
+  st.trend = { rom: { f: 1.3, d: 0.03, bis: tag + 5 } };
+  assert.ok(L.grundNachfrage(st, "frankfurt", "rom", tag).urlaub > vorher * 1.25);
+  assert.equal(L.trendVon(st, "frankfurt", "rom"), 1);
+  assert.equal(L.stadtTrend(st, "rom"), 1);
+});
+
+test("Lange Partie mit allen neuen Ereignissen läuft ohne Fehler", () => {
+  const st = L.neuesSpiel({ seed: 9, basis: "frankfurt" });
+  st.airlines.p.stil = "bot";
+  const arten = new Set();
+  for (let d = 0; d < 45; d++) {
+    L.kiTag(st, "p");
+    for (const g of st.gelegenheiten.slice()) if (g.art === "versteigerung") L.bieten(st, g.id, 1);
+    L.vorruecken(st, 24);
+    for (const m of st.meldungen.splice(0)) arten.add(m.art);
+  }
+  for (const a of ["versteigerung", "rennen", "plan"]) assert.ok(arten.has(a), a);
+  assert.ok(!st.ende);
+});
