@@ -115,6 +115,7 @@
     "👩": "crew", "🔁": "umsteiger", "🔄": "neu", "⭐": "stern", "★": "stern", "☆": "stern-leer", "🏳": "aufgeben", "🏗": "ausbau",
     "🔎": "lupe", "🔬": "gruendlich", "⚡": "schnell", "➕": "extra", "🛡": "sicher", "🎲": "risiko", "✅": "ok", "✨": "beste",
     "🔒": "schloss", "⚠": "warnung", "🌍": "welt", "🗓": "kalender", "📰": "zeitung", "💥": "pleite", "📖": "regeln", "🏠": "heimat", "❗": "hinweis", "📊": "statistik", "🏢": "verwaltung", "📺": "werbung", "📤": "teilen", "📲": "homescreen",
+    "🔊": "ton-an", "🔇": "ton-aus", "🎵": "musik",
   };
   const ICON_RE = new RegExp("(" + Object.keys(ICONS).join("|") + ")[\\uFE0F\\u200D\\u2708]*", "gu");
   function icon(zeichen) {
@@ -292,12 +293,14 @@
       kameraBegrenzen(c);
       const b = ui.kamera, k = c.z / b.z;
       vorschau = c;
+      feld.classList.add("geste");
       svg.style.transform = `translate3d(${(c.x - k * b.x).toFixed(1)}px, ${(c.y - k * b.y).toFixed(1)}px, 0) scale(${k.toFixed(4)})`;
     };
     const vorschauFertig = () => {
       if (!vorschau) return;
       Object.assign(ui.kamera, vorschau);
       vorschau = null;
+      feld.classList.remove("geste");
       kameraSetzen();
     };
     svg.addEventListener("pointerdown", (e) => {
@@ -496,6 +499,13 @@
         }
       }
     }
+    // Der Tipp eines Assistenten: betroffene Linie leuchtet, neue Strecke gestrichelt.
+    const tp = p && !ui.editor ? L.tipp(st) : null;
+    if (tp && tp.art !== "bieten") {
+      const r = tp.route && p.routen.find((x) => x.id === tp.route);
+      if (r) linieSv(karte.routen, r.a, r.b, { stroke: "#F2C14E", "stroke-width": 6 * s, opacity: 0.45, "stroke-linecap": "round", class: "puls" });
+      else if (tp.start && tp.ziel) linieSv(karte.routen, tp.start, tp.ziel, { stroke: "#F2C14E", "stroke-width": 2.4 * s, "stroke-dasharray": `${5 * s} ${4 * s}`, "stroke-linecap": "round", opacity: 0.9 });
+    }
     // Vorschläge für die erste Linie (solange die Tafel offen ist).
     if (p && ui.tafel === "angebote" && ui.angebote) {
       for (const o of ui.angebote) linieSv(karte.routen, p.basis, o.ziel, { stroke: "#F2C14E", "stroke-width": 2.4 * s, "stroke-dasharray": `${5 * s} ${4 * s}`, "stroke-linecap": "round", opacity: 0.85 });
@@ -558,6 +568,7 @@
       }
     }
     symboleZeichnen();
+    beraterZeigen();
   }
 
   // Gelegenheiten als Symbol an der Stadt, mit ablaufendem Ring.
@@ -655,8 +666,11 @@
     hud.frei = el("span", { class: "abzeichen" });
     hud.linien = el("button", { class: "kachel linienknopf knopf-mit", onclick: () => editorOeffnen() }, "✏️ Linien", hud.frei);
     hud.menue = el("button", { class: "kachel rundknopf", onclick: menueZeigen, "aria-label": "Menü" }, "☰");
+    // Ton an/aus, immer sichtbar (Töne stehen in airline-ton.js).
+    hud.ton = el("button", { class: "kachel rundknopf tonknopf", onclick: tonFenster, "aria-label": "Ton" });
+    tonKnopf();
     hud.bericht = el("button", { class: "kachel rundknopf berichtknopf", onclick: zeigeBericht, "aria-label": "Berichte" });
-    oben.append(hud.geldK, hud.uhr, hud.tempo, el("div", { class: "luecke" }), hud.bericht, hud.platz, hud.store, hud.linien, hud.menue);
+    oben.append(hud.geldK, hud.uhr, hud.tempo, el("div", { class: "luecke" }), hud.bericht, hud.platz, hud.store, hud.linien, hud.ton, hud.menue);
     hud.ziel = el("button", { class: "zielleiste", onclick: zielAntippen });
     hud.warn = el("div");
     // Schalter unten links: Rivalen-Linien auf der Karte zeigen oder ausblenden.
@@ -665,6 +679,32 @@
     rivalenKnopf();
     hudAktualisieren();
   }
+
+  function tonKnopf() {
+    const an = !window.Ton || window.Ton.an;
+    hud.ton.classList.toggle("aus", !an);
+    hud.ton.replaceChildren(icon(an ? "🔊" : "🔇"));
+  }
+  // Kleines Fenster unter dem Lautsprecher: zwei Schalter, Töne und Hintergrundklang.
+  function tonFenster() {
+    const alt = feld.querySelector(".tonfenster");
+    if (alt) { alt.remove(); return; }
+    if (!window.Ton) return;
+    const T = window.Ton;
+    const zeile = (zeichen, text, an, f) => el("button", { class: "ton-zeile" + (an ? " an" : ""), onclick: () => { f(); tonKnopf(); fenster.remove(); tonFenster(); } },
+      el("span", { class: "gross-icon" }, icon(zeichen)), el("span", { text }), el("span", { class: "schieber" }, el("i")));
+    const fenster = el("div", { class: "tonfenster" },
+      zeile(T.an ? "🔊" : "🔇", "Töne", T.an, () => T.anSetzen(!T.an)),
+      zeile("🎵", "Hintergrundklang", T.an && T.musik, () => { if (T.an && T.musik) T.musikSetzen(false); else { T.anSetzen(true); T.musikSetzen(true); } }));
+    feld.append(fenster);
+    // Tippen daneben schließt das Fenster.
+    const weg = (e) => {
+      if (fenster.isConnected && !fenster.contains(e.target) && !hud.ton.contains(e.target)) fenster.remove();
+      if (!fenster.isConnected) document.removeEventListener("pointerdown", weg, true);
+    };
+    document.addEventListener("pointerdown", weg, true);
+  }
+  const ton = (name) => { if (window.Ton) window.Ton.spielen(name); };
 
   function rivalenKnopf() {
     if (!hud.rivalen || !st) return;
@@ -787,6 +827,7 @@
     if (!g) return;
     g.gezeigt = true;
     ui.entscheidung = { id: g.id, tempo: ui.tempo };
+    ton("entscheidung");
     tempo(0);
     zeigeGelegenheit(g.id);
   }
@@ -944,7 +985,7 @@
           el("b", { text: gew ? uhr(gew.h) + " Uhr ausgewählt" : "Tippe eine Uhrzeit an" }),
           el("span", { text: gew ? ZEIT_LANG[gew.art] + ". Ein Abflug pro Tag um diese Zeit." : "Jeder Abflug braucht einen Slot. Für den Rückflug brauchst du einen am Ziel." })),
         gew ? el("button", { class: "hauptknopf", disabled: p.geld < gew.preis, text: gew.preis ? "Kaufen · " + geld(gew.preis) : "🎁 Nehmen (geschenkt)",
-          onclick: () => { L.heimSlotKaufen(st, L.SPIELER, id, gew.h); ui.tafelWahl = null; nachAktion(); tafelSeite(id); } }) : null));
+          onclick: () => { L.heimSlotKaufen(st, L.SPIELER, id, gew.h); ton("kauf"); ui.tafelWahl = null; nachAktion(); tafelSeite(id); } }) : null));
     feld.append(seite);
     erklaeren("tafel");
   }
@@ -1037,7 +1078,7 @@
     const knopf = el("button", { class: "hauptknopf", onclick: () => {
       const r = L.handelAnbieten(st, sid, betrag, tausch);
       nachAktion();
-      if (r.ok) { meldung("🤝", a.name + ": „Abgemacht.“ Der Slot gehört dir."); zeigeStadt(s.stadt); }
+      if (r.ok) { ton("sieg"); meldung("🤝", a.name + ": „Abgemacht.“ Der Slot gehört dir."); zeigeStadt(s.stadt); }
       else if (r.grund === "nein") { meldung("✋", a.name + ": „Das reicht nicht. In zwei Tagen können wir wieder reden.“"); zeigeHandel(sid); }
     } });
     const setzen = (v) => { betrag = v; textSetzen(knopf, "Angebot machen · " + geld(v) + (tausch ? " + Slot" : "")); };
@@ -1133,7 +1174,8 @@
       sitzplan(e.auslastung),
       geldstapel(e),
       (L.vergleich(st, rid) || []).length > 1 ? el("button", { class: "nebenknopf", text: "⚔️ Mit den Rivalen vergleichen", onclick: () => zeigeDuell(rid) }) : null,
-      el("button", { class: "hauptknopf", text: "✏️ Im Editor bearbeiten", onclick: () => editorOeffnen({ linie: rid }) }));
+      el("button", { class: "hauptknopf", text: "＋ Weiterer Flug auf dieser Linie", onclick: () => { const fl = L.fluegeAuf(p, rid)[0]; const a = fl ? fl.von : r.a; flugSeite(a, a === r.a ? r.b : r.a); } }),
+      el("button", { class: "nebenknopf", text: "✏️ Im Editor bearbeiten", onclick: () => editorOeffnen({ linie: rid }) }));
   }
 
   // Zwei (oder mehr) gleiche Linien nebeneinander: Preis, Qualität, Gäste. Bei gleichem Preis gewinnt die bessere Airline.
@@ -1394,6 +1436,88 @@
     meldung("⏳", x.name + ": Bin dran! " + (gruendlich ? "Gründlich dauert einen Tag." : "In ein paar Stunden weiß ich mehr."));
     if (ui.tempo === 0) tempo(1);
   }
+  // ---------- Berater: Tipps der Assistenten als Sprechblase an der Linie ----------
+  const STUFE_ORDNUNG = { angreifen: 0, normal: 1, abschoepfen: 2 };
+  function tippInhalt(t) {
+    const p = ich(), N = (id) => L.STADT[id].name;
+    const r = t.route && p.routen.find((x) => x.id === t.route);
+    const linie = r ? N(r.a) + "–" + N(r.b) : "";
+    const plus = t.plus ? (t.plus[0] === t.plus[1] ? "etwa " + kurz(t.plus[0]) : kurz(t.plus[0]) + " bis " + kurz(t.plus[1]).replace("+", "")) + " am Tag" : "";
+    const typ = t.typ ? L.TYPEN[t.typ].kurz : "";
+    switch (t.art) {
+      case "preis": {
+        const rauf = STUFE_ORDNUNG[t.stufe] > STUFE_ORDNUNG[r.stufe];
+        return rauf ? { text: `${linie} ist gefragter, als Plätze da sind. Teurere Tickets bringen ${plus}.`, knopf: "🔺 Preis erhöhen" }
+          : { text: `Auf ${linie} bleiben Plätze leer. Günstigere Tickets bringen ${plus}.`, knopf: "🔻 Preis senken" };
+      }
+      case "dazu": return { text: `${linie} ist ausgebucht. Ein weiterer Flug mit der ${typ} bringt ${plus}` + (t.preis > 0 ? `, die Slots kosten einmalig ${geld(t.preis)}.` : "."), knopf: "＋ Flug hinzufügen" };
+      case "umruesten": return { text: `${linie} ist ständig ausgebucht. Auf ${typ} umrüsten kostet ${geld(t.preis)} und bringt ${plus}.`, knopf: "⬆ Umrüsten · " + geld(t.preis) };
+      case "abziehen": return { text: `Auf ${linie} bleibt viel leer. Ein Flug weniger bringt ${plus}.`, knopf: "− Einen Flug streichen" };
+      case "kabine": return { text: `${linie}: Die Kabine der ${typ} passt nicht zu den Gästen. ${Math.round(t.business * 100)} % Business${t.first ? " und " + Math.round(t.first * 100) + " % First" : ""} bringen ${plus}. Der Umbau kostet ${geld(t.preis)} und einen Tag Werkstatt.`, knopf: "💺 Umbauen · " + geld(t.preis) };
+      case "bieten": return { text: `In ${N(t.stadt)} wird ein Slot um ${uhr(t.h)} Uhr vergeben. Den können wir gut brauchen: Ich würde etwa ${geld(t.betrag)} bieten.`, knopf: "🎟️ Slot ansehen" };
+      case "schliessen": return { text: `${linie} verliert seit ${t.tage} Tagen Geld, und nichts hilft. Schließen bringt ${plus}.`, knopf: "Linie schließen", sicher: true };
+      case "neu": return { text: `Gute Strecke gefunden: ${N(t.start)}–${N(t.ziel)} mit ${typ}. Bringt ${plus}` + (t.kosten > 0 ? `, kostet einmalig ${geld(t.kosten)}.` : "."), knopf: "✏️ Ansehen" };
+      case "plan": return { text: `${st.airlines[t.wer2 || "k"] ? "" : ""}${L.RIVALEN[tippRivale(t)] ? st.airlines[tippRivale(t)].name : "Ein Rivale"} will ${N(t.start)}–${N(t.ziel)} fliegen. Sind wir zuerst da, verzichten sie, und es lohnt sich: ${plus}.`, knopf: "✏️ Zuvorkommen" };
+      default: return null;
+    }
+  }
+  function tippRivale(t) { const g = st.gelegenheiten.find((x) => x.id === t.gel); return g ? g.aid : null; }
+  function tippWer(t) { return L.assistent(ich(), t.rolle); }
+  function tippAnnehmen(t) {
+    const p = ich();
+    if (t.art === "neu" || t.art === "plan") { L.tippAusfuehren(st); editorOeffnen({ start: t.start, ziel: t.ziel, vor: { typ: t.typ } }); return; }
+    if (t.art === "bieten") { zeigeSlot(t.slot); return; }
+    const res = L.tippAusfuehren(st);
+    L.zielPruefen(st);
+    nachAktion();
+    if (res && res.ok === false) meldung("⚠️", "Das hat leider nicht geklappt.");
+    else meldung("✅", (tippWer(t) || { name: "" }).name + ": Erledigt!");
+    if (ui.tafel === "route" && ui.route && !p.routen.some((r) => r.id === ui.route)) tafelZu();
+  }
+  let beraterEl = null;
+  function beraterZeigen() {
+    const t = st && !ui.heimat && !ui.editor && !ui.modal ? L.tipp(st) : null;
+    const inhalt = t ? tippInhalt(t) : null;
+    const wer = t && tippWer(t);
+    if (!inhalt || !wer) { if (beraterEl) { beraterEl.remove(); beraterEl = null; } return; }
+    const sig = t.key + "|" + t.tag;
+    if (!beraterEl || beraterEl.dataset.sig !== sig) {
+      if (beraterEl) beraterEl.remove();
+      beraterEl = el("div", { class: "berater" },
+        el("div", { class: "berater-kopf" },
+          el("span", { class: "berater-gesicht" }, bildEl(wer.bild, "🧑‍💼")),
+          el("div", { class: "berater-name" }, el("b", { text: wer.name }), el("small", { text: { analyst: "Analyse", preis: "Preise", controller: "Controlling" }[t.rolle] })),
+          el("button", { class: "berater-zu", text: "✕", "aria-label": "Später", onclick: () => { L.tippWeg(st); speichern(); karteZeichnen(); } })),
+        el("div", { class: "berater-text", text: inhalt.text }),
+        inhalt.sicher ? sicherKnopf(inhalt.knopf, () => tippAnnehmen(t)) : el("button", { class: "hauptknopf klein", text: inhalt.knopf, onclick: () => tippAnnehmen(t) }));
+      beraterEl.dataset.sig = sig;
+      feld.append(beraterEl);
+      if (!einf.gesehen["regel-berater"]) setTimeout(() => { if (!ui.modal) erklaeren("berater"); }, 600);
+    }
+    // An die Linie heften: über ihre Mitte, sonst darunter. Am Rand bleibt die Blase im Bild.
+    const p = ich();
+    const r = t.route && p.routen.find((x) => x.id === t.route);
+    const [mx, my] = r ? mitteVon(r.a, r.b) : t.stadt ? stadtXY[t.stadt] : mitteVon(t.start, t.ziel);
+    const k = ui.kamera;
+    let ax = mx * k.z + k.x;
+    if (ax < 0) ax += L.WELT ? 0 : 0;
+    const ay = my * k.z + k.y;
+    const B = beraterEl.offsetWidth || 250, H = beraterEl.offsetHeight || 110;
+    const cs = getComputedStyle(feld);
+    const sl = parseFloat(cs.getPropertyValue("--sl")) || 0, sr = parseFloat(cs.getPropertyValue("--sr")) || 0;
+    const rechtsFrei = feld.classList.contains("tafel-an") ? 300 : 0;
+    const minX = 8 + sl, maxX = FELD_B - B - 8 - sr - rechtsFrei, minY = 52, maxY = FELD_H - H - 52;
+    const oben = ay - H - 14 >= minY;
+    const x = Math.max(minX, Math.min(maxX, ax - B / 2));
+    const y = Math.max(minY, Math.min(maxY, oben ? ay - H - 14 : ay + 14));
+    beraterEl.style.left = x + "px";
+    beraterEl.style.top = y + "px";
+    beraterEl.classList.toggle("unten", !oben);
+    const imBild = ax >= minX && ax <= FELD_B - sr && Math.abs((oben ? ay - H - 14 : ay + 14) - y) < 2;
+    beraterEl.classList.toggle("ohne-zipfel", !imBild);
+    beraterEl.style.setProperty("--zipfel", Math.max(14, Math.min(B - 14, ax - x)) + "px");
+  }
+
   function meldung(icon, text) {
     const e = el("div", { class: "meldung" }, icon, el("span", { text }));
     feld.append(e);
@@ -1775,6 +1899,7 @@
         onclick: () => {
           const r = L.flugAnlegen(st, L.SPIELER, plan);
           if (!r.ok) return;
+          ton(test.kosten.flugzeug ? "kauf" : "linie"); if (test.kosten.flugzeug) setTimeout(() => ton("linie"), 350);
           if (ui.tempo === 0 && p.fluege.length === 1) tempo(1);
           L.zielPruefen(st);
           zu(true);
@@ -1982,6 +2107,7 @@
     meine: { bild: "air-regel-meine", icon: "✈️", titel: "Meine Airline", text: "Im Menü ☰ unter „Meine Airline“: Name, Farbe und deine Grundsätze wie Essen, Koffer und Sitzabstand. Unter jeder Einstellung steht, was sie sofort bewirkt. Am nächsten Morgen meldet das Spiel, was eine Änderung wirklich gebracht hat." },
     reisende: { bild: "air-regel-reisende", icon: "👥", titel: "Reisende sind begrenzt", text: "Jede Stadt hat nur eine feste Zahl Reisender am Tag. Alle Flüge und alle Airlines teilen sie sich. Der Balken am Flughafen zeigt, wie viele schon fliegen. Zwei Flüge kurz nacheinander nehmen sich die Gäste weg." },
     assistenten: { bild: "air-regel-assistenten", icon: "🔎", titel: "Assistenten", text: "In „Meine Airline“ stellst du Leute ein: 🔎 der Analyst berät dich bei jeder Entscheidung und sucht neue Strecken, 💶 prüft deine Preise, 📋 Controlling meldet Probleme. Ihre Berichte liegen unter 📋." },
+    berater: { bild: "air-regel-berater", icon: "💬", titel: "Tipps deiner Leute", text: "Deine Assistenten arbeiten von selbst. Finden sie etwas, das sich wirklich lohnt, erscheint eine Sprechblase auf der Karte: ein Tipp genügt. Nie mehr als ein Tipp auf einmal. ✕ heißt: später." },
     rat: { bild: "air-regel-rat", icon: "✨", titel: "Der Analyst rät dir", text: "✨ zeigt bei Uhrzeit, Flugzeug, Kabine, Preis und Geboten, was dein Analyst empfiehlt, dazu eine Spanne in Euro. Gute Analysten ★★★ liegen näher an der Wahrheit. Ohne Analyst gibt es keinen Rat." },
     verlieren: { bild: "air-regel-verlieren", icon: "⚠️", titel: "Nutzen oder verlieren", text: "Am Ende jeder Jahreszeit gehen Slots an fremden Flughäfen zurück, wenn kein Flug darauf liegt. Zwei Tage vorher wirst du gewarnt. Slots zu Hause bleiben immer deine." },
     saison: { bild: "air-regel-saison", icon: "🗓️", titel: "Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. ☀️ und ⛷️ an einer Stadt zeigen, wo gerade Hochsaison ist." },
@@ -2005,7 +2131,7 @@
     spaet: { bild: "air-regel-spaet", icon: "🎯", titel: "Besser statt mehr", text: "Ab jetzt fragen die Ziele auch nach Qualität: alle Linien im Plus, volle Flieger, bester Ruf, starke Linien. Und Entscheidungen halten die Uhr an, bis du sie getroffen hast." },
     pleite: { bild: "air-regel-pleite", icon: "⚠️", titel: "Achtung, Minus!", text: "Ist dein Konto im Minus, mahnt die 🏦 Bank. Drei Stufen: Mahnung, Kredit, dann will dich ein Rivale kaufen. Streiche rote Flüge oder verkaufe ein Flugzeug." },
   };
-  const REGEL_FOLGE = ["start", "slots", "farben", "tempo", "flugzeuge", "tafel", "tagesplan", "linie", "bieten", "meine", "reisende", "assistenten", "rat", "verlieren", "saison", "drehkreuz", "rivalen", "rangliste", "handel", "kabine", "gelegenheiten", "plaene", "duell", "trends", "wahl", "rennen", "ausbau", "rivalpleite", "ruf", "statistik", "controlling", "verwaltung", "spaet", "pleite"];
+  const REGEL_FOLGE = ["start", "slots", "farben", "tempo", "flugzeuge", "tafel", "tagesplan", "linie", "bieten", "meine", "reisende", "assistenten", "berater", "rat", "verlieren", "saison", "drehkreuz", "rivalen", "rangliste", "handel", "kabine", "gelegenheiten", "plaene", "duell", "trends", "wahl", "rennen", "ausbau", "rivalpleite", "ruf", "statistik", "controlling", "verwaltung", "spaet", "pleite"];
   // Erklärung beim ersten Auftauchen einer Funktion (z. B. beim ersten Öffnen der Slot-Tafel).
   function erklaeren(id) { if (!einf.gesehen["regel-" + id]) regelkarte(id); }
   function regelnPruefen() {
@@ -2154,7 +2280,7 @@
     for (const m of auswahl) {
       setTimeout(() => {
         const mitBild = /^\p{Extended_Pictographic}/u.test(m.text);   // neue Meldungen bringen ihr Zeichen selbst mit
-        const e = el("div", { class: "meldung" + (m.art === "ziel" ? " ziel" : "") }, mitBild ? null : MELDUNG_ICON[m.art] || "📰", el("span", { text: m.text }));
+        const e = el("div", { class: "meldung" + (m.art === "ziel" ? " ziel" : ""), "data-art": m.art }, mitBild ? null : MELDUNG_ICON[m.art] || "📰", el("span", { text: m.text }));
         feld.append(e);
         setTimeout(() => e.remove(), m.art === "wirkung" || m.art === "slotwarnung" ? 6500 : 4300);
       }, verzoegerung);
@@ -2174,6 +2300,7 @@
     const unter = gewonnen ? (v.gebote.length === 1 ? "Nur du hast geboten: Du zahlst den Grundpreis von " + geld(v.preis) + "." : "Der Slot gehört dir für " + geld(v.preis) + ".")
       : "Der Slot geht an " + st.airlines[v.sieger].name + ". Du zahlst nichts.";
     ui.modal = true;
+    ton(gewonnen ? "sieg" : "verloren");
     const zu = () => { seite.remove(); ui.modal = false; nachAktion(); meldungenZeigen(); bietErgebnisZeigen(); };
     const seite = el("div", { class: "seite ergebnis-seite" },
       el("div", { class: "ergebnis-karte" + (gewonnen ? " sieg" : "") },

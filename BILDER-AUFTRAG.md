@@ -120,6 +120,7 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-regel-linie.png` | 1024 × 1024 | Blick von oben in eine aufgeschnittene Flugzeugkabine: vorne wenige breite Sitze in Gold, dann Sitze in Blau, hinten viele schmale Sitze in Grün. |
 | `air-regel-meine.png` | 1024 × 1024 | Ein gemütliches Chefbüro mit Fenster zum Vorfeld, auf dem Tisch ein Flugzeugmodell, ein Tablett mit Essen und ein Koffer, warmes Licht. |
 | `air-regel-assistenten.png` | 1024 × 1024 | Zwei Mitarbeitende beugen sich mit Lupe und Notizblock über eine große Weltkarte voller Fluglinien, konzentrierte Stimmung. |
+| `air-regel-berater.png` | 1024 × 1024 | Eine Assistentin zeigt mit einer Sprechblase auf eine leuchtende Fluglinie auf der Weltkarte, freundlich und hilfsbereit. |
 | `air-regel-rangliste.png` | 1024 × 1024 | Ein Siegertreppchen auf einem Rollfeld, auf den drei Stufen stehen Flugzeugmodelle in Grün, Rot und Violett, darüber Konfetti. |
 | `air-regel-verwaltung.png` | 1024 × 1024 | Ein Büro voller Aktenstapel, Telefone und Bildschirme, im Fenster dahinter ein Flughafen mit vielen Flugzeugen, leicht überfordert wirkende Stimmung mit Augenzwinkern. |
 | `air-regel-ruf.png` | 1024 × 1024 | Zufriedene Reisende steigen lächelnd aus einem Flugzeug, über ihnen leuchten fünf goldene Sterne am Abendhimmel. |
@@ -256,6 +257,9 @@ Wichtig: PNG mit **durchsichtigem Hintergrund**, quadratisch 256 × 256. Das Spi
 | `ico-homescreen.png` | 256 × 256 | Handy mit einem Plus-Zeichen auf dem Bildschirm |
 | `ico-angebot.png` | 256 × 256 | Sprechblase mit drei Punkten |
 | `ico-nein.png` | 256 × 256 | erhobene flache Hand, Stopp-Geste |
+| `ico-ton-an.png` | 256 × 256 | Lautsprecher mit zwei Schallwellen |
+| `ico-ton-aus.png` | 256 × 256 | Lautsprecher, daneben ein kleines Kreuz statt Schallwellen |
+| `ico-musik.png` | 256 × 256 | Zwei verbundene Musiknoten |
 
 ## Kontrolle
 
