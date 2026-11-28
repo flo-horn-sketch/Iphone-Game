@@ -745,13 +745,19 @@
   let tafelEl = null;
   function tafel(art, titel, untertitel, ...inhalt) {
     if (ui.entscheidung && art !== "gelegenheit") entscheidungFertig();
+    // Wird dieselbe Tafel neu gezeichnet (z. B. nach einem Tipp im Editor), bleibt sie an derselben Stelle gescrollt.
+    // Sonst springt sie nach oben, und der nächste Tipp trifft einen ganz anderen Knopf.
+    const schluessel = art + "|" + (typeof titel === "string" ? titel : "");
+    const alt = tafelEl && tafelEl.dataset.schluessel === schluessel ? [...tafelEl.querySelectorAll("*")].filter((x) => x.scrollTop > 0).map((x) => x.scrollTop)[0] || tafelEl.scrollTop : 0;
     if (tafelEl) tafelEl.remove();
     ui.tafel = art;
     tafelEl = el("div", { class: "tafel" + (ui.editor ? " im-editor" : "") },
       el("div", { class: "kopf" }, el("h2", {}, titel, untertitel ? el("small", { text: untertitel }) : null),
         ui.editor ? null : el("button", { class: "zu", text: "✕", onclick: tafelZu, "aria-label": "Schließen" })),
       el("div", { class: "rumpf" }, inhalt));
+    tafelEl.dataset.schluessel = schluessel;
     feld.append(tafelEl);
+    if (alt) { const r = tafelEl.querySelector(".rumpf"); if (r && r.scrollHeight > r.clientHeight) r.scrollTop = alt; else tafelEl.scrollTop = alt; }
     feld.classList.add("tafel-an");
     karteZeichnen();
     return tafelEl;
@@ -1048,7 +1054,7 @@
     if (!r) { tafelZu(); return; }
     if (h.vorschlag === "vergleich") { zeigeDuell(r.id); return; }
     if (h.vorschlag === "groesser") { editorOeffnen({ linie: r.id }); return; }
-    if (h.vorschlag === "abziehen") L.abziehen(st, L.SPIELER, r.id);
+    if (h.vorschlag === "abziehen") { if (L.flugzeugeAuf(p, r.id).length > 1) L.abziehen(st, L.SPIELER, r.id); }
     else if (h.vorschlag === "schliessen") L.routeSchliessen(st, L.SPIELER, r.id);
     else if (h.vorschlag === "billiger") L.preisStufe(st, L.SPIELER, r.id, "angreifen");
     nachAktion();
@@ -1057,7 +1063,8 @@
   function hinweisBox(h, mitName) {
     h.gelesen = true;
     return el("div", { class: "hinweis orange" }, el("div", { text: "❗ " + (mitName ? L.STADT[h.a].name + " – " + L.STADT[h.b].name + ": " : "") + h.text }),
-      h.vorschlag ? el("button", { class: "nebenknopf", text: VORSCHLAG[h.vorschlag], onclick: () => hinweisAusfuehren(h) }) : null,
+      h.vorschlag === "schliessen" ? sicherKnopf(VORSCHLAG.schliessen, () => hinweisAusfuehren(h))
+        : h.vorschlag ? el("button", { class: "nebenknopf", text: VORSCHLAG[h.vorschlag], onclick: () => hinweisAusfuehren(h) }) : null,
       mitName ? el("button", { class: "nebenknopf", text: "Ansehen", onclick: () => zeigeRoute(h.id) }) : null);
   }
   function meineZu() { const m = feld.querySelector(".meine"); if (m) m.remove(); ui.modal = false; }
@@ -1418,15 +1425,30 @@
       el("div", { class: "blass mini", text: "Flugzeuge auf dieser Linie:" }),
       el("div", { class: "flugzeugreihe" },
         fs.map((f) => el("div", { class: "flugzeug-chip" }, bildEl("air-flugzeug-" + f.typ, TYP_ICON[f.typ]), el("small", { text: L.TYPEN[f.typ].kurz }))),
-        el("button", { class: "flugzeug-chip minus-knopf", text: "−", onclick: () => { L.abziehen(st, L.SPIELER, rid); nachAktion(); editorZeichnen(); }, "aria-label": "Flugzeug abziehen" }),
+        // Das letzte Flugzeug lässt sich hier nicht abziehen, sonst wäre die Linie weg. Dafür gibt es "Linie schließen".
+        fs.length > 1 ? el("button", { class: "flugzeug-chip minus-knopf", text: "−", onclick: () => { if (L.flugzeugeAuf(ich(), rid).length > 1) L.abziehen(st, L.SPIELER, rid); nachAktion(); editorZeichnen(); }, "aria-label": "Flugzeug abziehen" }) : null,
         passend.map((typ) => el("button", { class: "flugzeug-chip plus-knopf", onclick: () => { L.fliegen(st, L.SPIELER, r.a, r.b, typ, { nurFrei: true }); L.zielPruefen(st); nachAktion(); editorZeichnen(); } }, "＋", el("small", { text: L.TYPEN[typ].kurz })))),
       passend.length ? null : el("div", { class: "blass mini", text: e.auslastung > 0.9 ? "Fast voll! Ein weiteres Flugzeug würde sich lohnen: 🛒 Store." : "Kein freies Flugzeug zum Dazunehmen." }),
       el("div", { class: "blass mini", text: "Ticketpreis:" }),
       preisSegment(r.stufe, e.km, (s) => { L.preisStufe(st, L.SPIELER, rid, s); nachAktion(); editorZeichnen(); }),
       detailsBox("linie", "Details: Umrüsten, Sitzklassen", umruestenZeile(r, e), klassenEditor(r, e)),
-      el("button", { class: "nebenknopf", text: "Linie schließen", onclick: () => { L.routeSchliessen(st, L.SPIELER, rid); nachAktion(); ui.editor = { start: p.basis, ziel: null, linie: null, typ: null, stufe: "normal" }; editorZeichnen(); } }),
+      sicherKnopf("Linie schließen", () => { L.routeSchliessen(st, L.SPIELER, rid); nachAktion(); ui.editor = { start: p.basis, ziel: null, linie: null, typ: null, stufe: "normal" }; editorZeichnen(); }),
       el("div", { class: "blass mini", text: "Abgezogene Flugzeuge stehen danach frei." }));
     if (einf.gesehen["erste-linie"] && !tippEl) erklaeren("linie");
+  }
+
+  // Knopf für Schritte, die etwas wegnehmen: erst beim zweiten Tippen passiert es.
+  function sicherKnopf(text, aktion) {
+    let scharf = false, uhr = null;
+    const b = el("button", { class: "nebenknopf", text, onclick: () => {
+      if (!scharf) {
+        scharf = true; b.textContent = "Wirklich? Nochmal tippen"; b.classList.add("warnknopf");
+        uhr = setTimeout(() => { scharf = false; b.textContent = text; b.classList.remove("warnknopf"); }, 3000);
+        return;
+      }
+      clearTimeout(uhr); aktion();
+    } });
+    return b;
   }
 
   // Eingeklappter Bereich für alles, was man selten braucht. Bleibt offen, wenn man ihn geöffnet hat.
