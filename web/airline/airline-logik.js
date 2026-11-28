@@ -1379,7 +1379,7 @@
   function umbenennen(st, aid, name, farbe) {
     const a = st.airlines[aid];
     const n = String(name || "").trim().slice(0, 18);
-    if (n && n !== a.name) { a.name = n; delete a.kurz; }
+    if (n) a.name = n;       // das Kürzel bleibt: Daran hängt die Lackierung der Flugzeuge
     if (farbe) a.farbe = farbe;
     return true;
   }

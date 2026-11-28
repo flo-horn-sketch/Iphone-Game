@@ -97,6 +97,22 @@
   // Jedes Bild hat einen festen Namen (siehe BILDER-AUFTRAG.md, Abschnitt Luftlinie).
   const dateien = new Set();
   function bild(name) { return dateien.has(name + ".png") ? "../grafiken/" + name + ".png" : null; }
+  // Flugzeuge in der Lackierung der eigenen Airline: grafiken/lack/air-flugzeug-<typ>-<kürzel>.png.
+  // Gibt es das Bild (noch) nicht, erscheint das neutrale Flugzeug.
+  const lack = new Set();
+  const lackKurz = () => (st && st.airlines[L.SPIELER].kurz ? st.airlines[L.SPIELER].kurz.toLowerCase() : "");
+  function flugzeugBild(typ, ersatz) {
+    const n = "air-flugzeug-" + typ + "-" + lackKurz() + ".png";
+    if (!lackKurz() || !lack.has(n)) return bildEl("air-flugzeug-" + typ, ersatz);
+    const img = el("img", { src: "../grafiken/lack/" + n, alt: "" });
+    const neutral = bild("air-flugzeug-" + typ);
+    img.onerror = () => { img.onerror = null; if (neutral) img.src = neutral; };
+    return img;
+  }
+  function lackMerken() {
+    try { localStorage.setItem("luftlinie-lack", lackKurz()); } catch (e) { /* egal */ }
+    if (lackKurz() && window.luftlinieLackLaden) window.luftlinieLackLaden(lackKurz());
+  }
   function bildEl(name, ersatz) {
     const pfad = bild(name);
     return pfad ? el("img", { src: pfad, alt: "" }) : ersatz != null ? el("span", { class: "ersatz", text: ersatz }) : null;
@@ -1217,7 +1233,7 @@
         const gr = L.kabineGrenzen(f.typ);
         return el("div", { class: "flieger-karte" },
           el("div", { class: "zeile" },
-            el("div", { class: "fz-bild klein" }, bildEl("air-flugzeug-" + f.typ, TYP_ICON[f.typ])),
+            el("div", { class: "fz-bild klein" }, flugzeugBild(f.typ, TYP_ICON[f.typ])),
             el("div", { class: "mitte" }, el("b", { text: t.name }), el("span", { class: "blass mini", text: kabineText(f.typ, f.kabine) })),
             el("b", { class: "rechts", text: ohne ? "ohne Flug" : Math.round(L.auslastungFlugzeug(st, L.SPIELER, f.id) * 100) + " % voll" })),
           tagesbalken(f.id),
@@ -1878,15 +1894,15 @@
       el("span", { class: "blass mini", text: "Das Flugzeug braucht nach der Landung " + Math.round(zRef.wende * 60) + " Minuten am Boden." }),
       zRef.passt ? el("span", { class: "flug-zeit", text: "Ab " + L.STADT[b].name + " " + uhr(zRef.rueck) + (zRef.rueck >= 24 ? " am nächsten Tag" : "") + ", an " + L.STADT[a].name + " " + uhr(zRef.heim) + "." + (zRef.tage > 1 ? " Fliegt jeden zweiten Tag." : "") })
         : el("span", { class: "flug-zeit rot", text: "Diese Zeiten passen nicht zusammen: Wähle einen späteren Rückflug oder einen früheren Hinflug." }));
-    const chip = (an, bildName, ersatz, name, unter, tipp, wenn) => el("button", { class: "fz-chip" + (an ? " an" : ""), onclick: wenn },
-      el("div", { class: "fz-bild" }, bildEl(bildName, ersatz)), el("b", { text: name + (tipp ? " ✨" : "") }), el("small", { text: unter }));
+    const chip = (an, typ, ersatz, name, unter, tipp, wenn) => el("button", { class: "fz-chip" + (an ? " an" : ""), onclick: wenn },
+      el("div", { class: "fz-bild" }, flugzeugBild(typ, ersatz)), el("b", { text: name + (tipp ? " ✨" : "") }), el("small", { text: unter }));
     const hin = schau && schau.flug ? fuellung(schau.flug.hin.last) : null, zur = schau && schau.flug ? fuellung(schau.flug.zur.last) : null;
     const neuLinie = !vorhanden;
     const spalte3 = el("div", { class: "flug-spalte ergebnis" },
       el("b", { text: "3. Flugzeug" }),
       el("div", { class: "fz-reihe" },
-        eigene.map(({ f }) => chip(F.fid === f.id, "air-flugzeug-" + f.typ, TYP_ICON[f.typ], "Dein " + L.TYPEN[f.typ].kurz, "hat Zeit", false, () => { F.fid = f.id; F.typ = null; flugSeite(a, b); })),
-        neue.map((x) => chip(!F.fid && F.typ === x.typ, "air-flugzeug-" + x.typ, TYP_ICON[x.typ], L.TYPEN[x.typ].kurz, "kaufen " + geld(L.TYPEN[x.typ].preis), !!rat && rat.typ === x.typ, () => { F.fid = null; F.typ = x.typ; F.kabine = null; flugSeite(a, b); }))),
+        eigene.map(({ f }) => chip(F.fid === f.id, f.typ, TYP_ICON[f.typ], "Dein " + L.TYPEN[f.typ].kurz, "hat Zeit", false, () => { F.fid = f.id; F.typ = null; flugSeite(a, b); })),
+        neue.map((x) => chip(!F.fid && F.typ === x.typ, x.typ, TYP_ICON[x.typ], L.TYPEN[x.typ].kurz, "kaufen " + geld(L.TYPEN[x.typ].preis), !!rat && rat.typ === x.typ, () => { F.fid = null; F.typ = x.typ; F.kabine = null; flugSeite(a, b); }))),
       typ ? el("span", { class: "blass mini", text: flieger ? kabineText(typ, flieger.kabine) : L.TYPEN[typ].sitze + " Sitze · " + L.TYPEN[typ].reichweite.toLocaleString("de-DE") + " km weit · " + (TYP_TEXT[typ] || "") }) : el("span", { class: "flug-zeit rot", text: "Kein Flugzeug schafft diese Zeiten." }),
       typ && zRef.passt ? tagesbalken(F.fid, { ab: zRef.ab, dauer: zRef.dauer, ziel: b }) : null,
       kabinen.length ? el("div", { class: "segment klein" }, kabinen.map((x) => el("button", { class: F.kabine === x.id ? "an" : "", onclick: () => { F.kabine = x.id; flugSeite(a, b); } }, x.name + (x.rat ? " ✨" : "")))) : null,
@@ -2419,6 +2435,7 @@
     st = L.neuesSpiel({ basis: id, service: "standard", gegner: gegnerWahl });
     einf = { gesehen: {} };
     schreiben(EINFUEHRUNG, einf);
+    lackMerken();
     spielStarten();
     angeboteZeigen();
     tippZeigen("Willkommen bei " + st.airlines[L.SPIELER].name + "! Alle Airlines starten bei Null. Hier sind drei Vorschläge für deine erste Linie: Tippe einen an. Dann wählst du nur noch die Uhrzeiten, das Flugzeug kaufst du gleich mit.", tafelEl, "links", "Los geht's");
@@ -2534,11 +2551,14 @@
   // Erst wenn alle Grafiken offline da sind (airline-laden.js), geht es los.
   (window.luftlinieBereit || Promise.resolve()).then(() => fetch("../grafiken/vorhanden.json", { cache: "no-cache" })).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
     for (const n of liste) dateien.add(n);
+    return fetch("../grafiken/lack.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+  }).then((lacke) => {
+    for (const n of lacke) lack.add(n);
     if (!alsAppGestartet()) { anleitungZeigen(); return; }
     const alt = lesen(SPEICHER, null);
     st = alt ? L.laden(alt) : null;
     try { altHinweis = !st && !!localStorage.getItem(SPEICHER_ALT); } catch (e) { /* egal */ }
-    if (st && !st.ende) spielStarten();
+    if (st && !st.ende) { spielStarten(); lackMerken(); }
     else startSeite();
     requestAnimationFrame(schleife);
   });

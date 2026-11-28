@@ -20,6 +20,14 @@
   let fertig;
   window.luftlinieBereit = new Promise((r) => { fertig = r; });
 
+  // Flugzeuge in Airline-Lackierung (grafiken/lack/): Es gibt sie für viele Airlines, gebraucht wird nur die eigene.
+  // Deshalb lädt die App nur die Bilder mit dem Kürzel der gespielten Airline (das Spiel merkt es in "luftlinie-lack").
+  const LACK = "grafiken/lack/";
+  const LACK_KEY = "luftlinie-lack";
+  const meinLack = () => { try { return (localStorage.getItem(LACK_KEY) || "").toLowerCase(); } catch (e) { return ""; } };
+  const gebraucht = (pfad) => !pfad.startsWith(LACK) || (!!meinLack() && pfad.endsWith("-" + meinLack() + ".png"));
+  window.luftlinieLackLaden = () => Promise.resolve();
+
   // Wie im Spiel: Geladen wird nur in der App vom Home-Bildschirm (im Browser kommt die Installationsanleitung).
   function alsApp() {
     if (window.navigator.standalone === true) return true;
@@ -100,6 +108,8 @@
       return;
     }
 
+    const alle = liste.dateien;
+    liste.dateien = alle.filter((d) => gebraucht(d.pfad));
     const zuLaden = liste.dateien.filter((d) => stand.hashes[d.pfad] !== d.hash || !vorhanden.has(adresse(d.pfad)));
     const gesamt = zuLaden.reduce((s, d) => s + d.groesse, 0);
     let geladen = 0, stueck = 0;
@@ -143,7 +153,7 @@
       return;
     }
     // Alte Dateien, die es nicht mehr gibt, wegräumen.
-    const aktuell = new Set(liste.dateien.map((d) => adresse(d.pfad)));
+    const aktuell = new Set(alle.map((d) => adresse(d.pfad)));
     for (const q of await cache.keys()) if (!aktuell.has(q.url.split("?")[0])) cache.delete(q);
     stand = { version: liste.version, hashes: Object.fromEntries(liste.dateien.map((d) => [d.pfad, d.hash])) };
     merken(stand);
@@ -157,5 +167,24 @@
     weg();
     fertig();
   }
+  // Neue Airline gewählt: ihre Flugzeugbilder im Hintergrund nachladen, ohne das Spiel aufzuhalten.
+  window.luftlinieLackLaden = async (kurz) => {
+    try {
+      localStorage.setItem(LACK_KEY, String(kurz || "").toLowerCase());
+      const r = await fetch(adresse("dateien.json") + "?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const liste = await r.json();
+      const cache = await caches.open(CACHE);
+      const stand = lesen() || { version: null, hashes: {} };
+      for (const d of liste.dateien) {
+        if (!d.pfad.startsWith(LACK) || !gebraucht(d.pfad) || stand.hashes[d.pfad] === d.hash) continue;
+        const a = await fetch(adresse(d.pfad) + "?laden=" + d.hash, { cache: "no-store" });
+        if (!a.ok) continue;
+        await cache.put(adresse(d.pfad), a);
+        stand.hashes[d.pfad] = d.hash;
+        merken(stand);
+      }
+    } catch (e) { /* ohne Netz bleibt es beim neutralen Flugzeug */ }
+  };
   pruefen().catch(() => { weg(); fertig(); });
 })();
