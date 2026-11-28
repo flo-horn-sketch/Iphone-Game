@@ -1085,6 +1085,7 @@
     setzen(betrag);
     tafel("handel", titel, "Slot von " + a.name,
       el("div", { class: "blass mini", text: (F ? a.name + " fliegt darauf nach " + L.STADT[F.von === s.stadt ? F.nach : F.von].name + ". " : a.name + " nutzt den Slot gerade nicht. ") + "Die Antwort kommt sofort. Nach einem Nein ist zwei Tage Pause." }),
+      h.groll >= 0.5 ? el("div", { class: "laune groll", text: a.name + " ärgert sich gerade über dich und verlangt deshalb mehr." }) : null,
       ratBox(rat && rat.wer, rat ? a.name + " gibt ihn wohl für " + geld(rat.noetig[0]) + " bis " + geld(rat.noetig[1]) + " her." + (rat.wert ? " Dir ist er etwa " + geld(rat.wert[0]) + " bis " + geld(rat.wert[1]) + " wert." : " Du kannst ihn von hier kaum nutzen.") : null),
       el("div", { class: "blass mini", text: "Dein Angebot: am Rad drehen" }),
       rad(radWerte(0, max), betrag, (v) => geld(v), setzen),
@@ -1279,12 +1280,13 @@
     const max = Math.max(...liste.map((r) => r.wert), 1);
     const meinPlatz = liste.findIndex((x) => x.id === L.SPIELER);
     const R = st.rennen;
-    tafel("rang", "Rangliste der Welt", "gezählt wird der Firmenwert",
+    tafel("rang", "Rangliste der Welt", "gezählt wird der Firmenwert · Rivalen: " + (L.GEGNER[st.gegner] || L.GEGNER.mittel).name,
       R ? el("div", { class: "rennen" }, el("b", { text: "🏁 " + R.text }),
         el("small", { text: `Preis ${R.preis / 1e6} Mio + Pokal · noch ${Math.max(0, R.bis - L.tagVon(st) + 1)} Tage · du: ${Math.min(L.rennenStand(st, L.SPIELER), R.soll)} / ${R.soll}` })) : null,
       liste.map((r, i) => {
         const riv = L.RIVALEN[r.id];
         const spruch = riv ? (i === 0 ? riv.sprueche.gross : meinPlatz < i ? riv.sprueche.verliert : riv.sprueche.gegen) : null;
+        const laune = riv ? L.laune(st, r.id) : null;
         return el("div", { class: "rang" + (riv ? "" : " ich") },
           el("span", { class: "nr", text: ["🥇", "🥈", "🥉", "4"][i] }),
           el("div", { class: "gesicht", style: { background: r.farbe } }, riv ? bildEl(CHEF[r.id], riv.chef[0]) : "★"),
@@ -1292,7 +1294,7 @@
             el("b", { text: r.name + (riv ? " · " + riv.chef : " (du)") + (st.airlines[r.id].pokale ? " " + "🏆".repeat(Math.min(5, st.airlines[r.id].pokale)) : "") }),
             el("span", { class: "blass mini", text: `${geld(r.wert)} · ${r.routen} Linien · ${r.flugzeuge} ✈` }),
             el("div", { class: "spur" }, el("i", { style: { width: (r.wert / max * 100).toFixed(1) + "%", background: r.farbe } })),
-            spruch ? el("div", { class: "spruch", text: "„" + spruch + "“" }) : null));
+            laune && laune.art !== "normal" ? el("div", { class: "laune " + laune.art, text: laune.text }) : spruch ? el("div", { class: "spruch", text: "„" + spruch + "“" }) : null));
       }));
     erklaeren("rangliste");
   }
@@ -2112,7 +2114,7 @@
     verlieren: { bild: "air-regel-verlieren", icon: "⚠️", titel: "Nutzen oder verlieren", text: "Am Ende jeder Jahreszeit gehen Slots an fremden Flughäfen zurück, wenn kein Flug darauf liegt. Zwei Tage vorher wirst du gewarnt. Slots zu Hause bleiben immer deine." },
     saison: { bild: "air-regel-saison", icon: "🗓️", titel: "Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. ☀️ und ⛷️ an einer Stadt zeigen, wo gerade Hochsaison ist." },
     drehkreuz: { bild: "air-regel-drehkreuz", icon: "🔁", titel: "Dein Drehkreuz!", text: "Ab drei Linien steigen Gäste in deiner Stadt um. Kleine Zubringer füllen so deine großen Flugzeuge." },
-    rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Fliegen sie dieselbe Strecke, teilt ihr euch die Gäste. Ihre Linien zeigst du unten links: Kon, Spa und Aur antippen." },
+    rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Sie spielen nach denselben Regeln wie du, mit demselben Startgeld und denselben Prämien. Sie machen Fehler, und sie merken sich, wenn du ihnen einen Slot wegschnappst oder ihre Strecke fliegst: Dann bieten sie höher und fliegen dir nach. Ihre Laune steht in der Rangliste. Ihre Linien zeigst du unten links: Kon, Spa und Aur antippen." },
     rangliste: { bild: "air-regel-rangliste", icon: "🏆", titel: "Die Rangliste", text: "Gezählt wird, was deine Airline wert ist: Geld, Flugzeuge, Slots und Gewinn. Wer wird die Nummer eins?" },
     handel: { bild: "air-regel-handel", icon: "🤝", titel: "Slots kaufen und tauschen", text: "Tippe am Flughafen den Slot eines Rivalen an und mach ein Angebot mit dem Rad. Die Antwort kommt sofort. Du kannst auch einen eigenen freien Slot dazugeben. Nach einem Nein ist zwei Tage Pause. Manchmal fragen Rivalen auch dich: 💬." },
     kabine: { bild: "air-regel-kabine", icon: "💺", titel: "Die Kabine", text: "Economy, Business und First gehören zum Flugzeug. Du legst sie beim Kauf fest. Später umbauen kostet Geld und einen Tag Werkstatt: An dem Tag fliegt das Flugzeug nicht." },
@@ -2369,6 +2371,9 @@
   }
 
   let altHinweis = false;
+  const GEGNER_KEY = "luftlinie-gegner";
+  let gegnerWahl = "mittel";
+  try { const g = localStorage.getItem(GEGNER_KEY); if (L.GEGNER[g]) gegnerWahl = g; } catch (e) { /* egal */ }
   function startSeite() {
     feld.replaceChildren();
     feld.classList.remove("editor-an", "tafel-an");
@@ -2379,8 +2384,13 @@
       seite.append(...[
         bild("air-start") ? el("img", { class: "bg", src: bild("air-start"), alt: "" }) : null,
         el("h1", {}, "Airlines", el("small", { text: "Alle starten bei Null. Wer wird die größte Airline der Welt?" })),
-        el("div", { class: "start-punkte" },
-          el("span", { text: "🎟️ Slots sichern" }), el("span", { text: "✏️ Flüge planen" }), el("span", { text: "🏆 Die Rivalen überholen" })),
+        el("div", { class: "gegnerwahl" },
+          el("b", { text: "Wie gut sollen deine drei Rivalen spielen?" }),
+          el("div", { class: "gegner-reihe" }, Object.entries(L.GEGNER).map(([id, g], i) =>
+            el("button", { class: "gegner" + (gegnerWahl === id ? " an" : ""), "data-gegner": id, onclick: () => { gegnerWahl = id; try { localStorage.setItem(GEGNER_KEY, id); } catch (e) { /* egal */ } zeichnen(); } },
+              el("span", { class: "gegner-stufe" }, [0, 1, 2].map((n) => el("i", { class: n <= i ? "voll" : "" }))),
+              el("b", { text: g.name }), el("small", { text: g.text })))),
+          el("small", { class: "blass", text: "Alle spielen nach denselben Regeln wie du und starten mit demselben Geld." })),
         altHinweis ? el("div", { class: "hinweis", style: { maxWidth: "520px" }, text: "Neue Fassung: Slots haben jetzt Uhrzeiten, und ein Flugzeug kann mehrmals am Tag fliegen. Dein alter Spielstand passt nicht mehr dazu, deshalb beginnt ein neues Spiel." }) : null,
         el("button", { class: "hauptknopf", text: "Airline gründen ▶", onclick: () => { altHinweis = false; try { localStorage.removeItem(SPEICHER_ALT); } catch (e) { /* egal */ } heimatWaehlen(); } })].filter(Boolean));
     }
@@ -2401,7 +2411,7 @@
 
   function heimatGewaehlt(id) {
     ui.heimat = false;
-    st = L.neuesSpiel({ basis: id, service: "standard", name: L.NAMEN[0] });
+    st = L.neuesSpiel({ basis: id, service: "standard", name: L.NAMEN[0], gegner: gegnerWahl });
     einf = { gesehen: {} };
     schreiben(EINFUEHRUNG, einf);
     spielStarten();
@@ -2529,5 +2539,5 @@
   });
 
   // Für Tests im Browser.
-  window.luftlinie = { get st() { return st; }, set st(x) { st = x; }, ui, tempo, zeigeGelegenheit, zeigeDuell, editorOeffnen, zeigeSlot, zeigeHandel, flugSeite, tafelSeite, zeigeFlotte, meineAirline, kabineSeite, zeigeStadt, slotListe, statistikZeigen, regelkarte, regelbuch, bietErgebnisZeigen, nachAktion, spielStarten, zeigeRoute, zeigeBericht, zoomAuf: (id) => { kameraPassend(gegend(id)); kameraSetzen(); } };
+  window.luftlinie = { get st() { return st; }, set st(x) { st = x; }, ui, tempo, zeigeRang, zeigeGelegenheit, zeigeDuell, editorOeffnen, zeigeSlot, zeigeHandel, flugSeite, tafelSeite, zeigeFlotte, meineAirline, kabineSeite, zeigeStadt, slotListe, statistikZeigen, regelkarte, regelbuch, bietErgebnisZeigen, nachAktion, spielStarten, zeigeRoute, zeigeBericht, zoomAuf: (id) => { kameraPassend(gegend(id)); kameraSetzen(); } };
 })();

@@ -471,6 +471,21 @@ button:disabled { opacity: .4; cursor: default; }
 .vorschlag { display: flex; flex-direction: column; gap: 5px; background: rgba(255,255,255,.05); border-radius: 10px; padding: 7px; }
 .vorschlag b { font-size: 13px; }
 .vorschlag .nebenknopf { padding: 5px 8px; font-size: 11px; }
+.gegnerwahl { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.gegnerwahl > b { font-size: 14px; }
+.gegnerwahl > small { font-size: 11px; }
+.gegner-reihe { display: flex; gap: 10px; }
+.gegner { width: 190px; min-height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 10px;
+  background: var(--tafel); border: 1px solid var(--linie); border-radius: 12px; color: inherit; font-family: inherit; text-align: center; }
+.gegner b { font-size: 15px; }
+.gegner small { font-size: 11px; color: var(--blass); line-height: 1.25; }
+.gegner.an { border: 2px solid var(--gold); background: rgba(242,193,78,.16); }
+.gegner-stufe { display: flex; gap: 4px; }
+.gegner-stufe i { width: 16px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.18); }
+.gegner-stufe i.voll { background: var(--gold); }
+.laune { font-size: 10.5px; font-weight: 600; color: var(--blass); }
+.laune.groll, .laune.wut { color: #F6AD55; }
+.laune.wut { color: #F87171; }
 .start-punkte { display: flex; gap: 10px; }
 .start-punkte span { background: var(--tafel); border: 1px solid var(--linie); border-radius: 12px; padding: 8px 12px; font-weight: 600; }
 
