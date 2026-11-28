@@ -141,13 +141,29 @@
   };
 
   // Sitzklassen. Business braucht doppelt so viel Platz wie Economy, First dreimal so viel.
-  // anteil: welcher Teil der Geschäftsreisenden diese Klasse will.
+  // anteil: welcher Teil der Geschäftsreisenden diese Klasse will (wie in echt: die meisten fliegen Economy).
+  // First gibt es fast nur auf Langstrecken zwischen großen Städten (siehe klassenNachfrage).
   const KLASSEN = {
-    eco: { name: "Economy", farbe: "#7FC4E8", platz: 1, preis: 1, service: 1, anteil: 0.3 },
-    business: { name: "Business", farbe: "#F2C14E", platz: 2, preis: 2.6, service: 3, anteil: 0.62 },
-    first: { name: "First", farbe: "#C9A0F0", platz: 3, preis: 4.5, service: 6, anteil: 0.08 },
+    eco: { name: "Economy", farbe: "#7FC4E8", platz: 1, preis: 1, service: 1, anteil: 0.67 },
+    business: { name: "Business", farbe: "#F2C14E", platz: 2, preis: 2.6, service: 3, anteil: 0.25 },
+    first: { name: "First", farbe: "#C9A0F0", platz: 3, preis: 4.5, service: 6, anteil: 0.03 },
   };
-  const KLASSEN_START = { billig: { business: 0, first: 0 }, standard: { business: 0.2, first: 0 }, premium: { business: 0.3, first: 0.1 } };
+  const KLASSEN_START = { billig: { business: 0, first: 0 }, standard: { business: 0.2, first: 0 }, premium: { business: 0.3, first: 0 } };
+  const KLASSEN_MAX = { business: 0.5, first: 0.2 };
+  // Wie viele Gäste wollen welche Klasse? Business: knapp ein Drittel der Geschäftsleute und ein paar Urlauber,
+  // auf kurzen Strecken weniger. First: nur ab etwa 2.500 km, richtig erst auf Langstrecke, und vor allem zwischen großen Städten.
+  // Premium-Airlines ziehen mehr zahlende Gäste in die vorderen Klassen, Billigflieger weniger.
+  function klassenNachfrage(e, sv) {
+    const g = e.lokal.geschaeft, u = e.lokal.urlaub;
+    const vorne = Math.max(0.6, Math.min(1.5, 1 + 0.18 * (sv ? sv.komfort : 0)));
+    const lang = Math.max(0, Math.min(1, (e.km - 2500) / 4500));
+    const kMin = Math.min(STADT[e.a].k, STADT[e.b].k);
+    const gross = kMin >= 3 ? 1 : kMin >= 2 ? 0.5 : 0.1;
+    const kurz = Math.min(1, 0.5 + e.km / 3000);
+    const first = g * KLASSEN.first.anteil * lang * gross * vorne;
+    const business = (g * KLASSEN.business.anteil * kurz + u * 0.02) * vorne;
+    return { first, business, eco: u + g - first - business };
+  }
   function klassenVon(r, a) { return r.klassen || KLASSEN_START[profil(a).klassen]; }
 
   // Preis pro Route: angreifen, normal, abschöpfen.
@@ -657,8 +673,8 @@
   function klassenSetzen(st, aid, rid, business, first) {
     const r = st.airlines[aid].routen.find((x) => x.id === rid);
     if (!r) return false;
-    business = Math.max(0, Math.min(0.6, Math.round(business * 10) / 10));
-    first = Math.max(0, Math.min(0.3, Math.round(first * 10) / 10));
+    business = Math.max(0, Math.min(KLASSEN_MAX.business, Math.round(business * 10) / 10));
+    first = Math.max(0, Math.min(KLASSEN_MAX.first, Math.round(first * 10) / 10));
     r.klassen = { business, first };
     geaendert(st);
     return true;
@@ -666,8 +682,8 @@
   // Probiert alle Aufteilungen durch und nimmt die beste.
   function besteKlassen(st, aid, rid) {
     let best = null;
-    for (let b = 0; b <= 0.6001; b += 0.1) {
-      for (let f = 0; f <= 0.3001; f += 0.1) {
+    for (let b = 0; b <= KLASSEN_MAX.business + 0.0001; b += 0.1) {
+      for (let f = 0; f <= KLASSEN_MAX.first + 0.0001; f += 0.1) {
         const k = klonen(st);
         klassenSetzen(k, aid, rid, b, f);
         const g = berechnen(k, tagVon(k)).summe[aid];
@@ -806,8 +822,7 @@
       const kl = klassenVon(r, a);
       const S = { first: e.sitze * kl.first / KLASSEN.first.platz, business: e.sitze * kl.business / KLASSEN.business.platz };
       S.eco = e.sitze * (1 - kl.first - kl.business);
-      const g = e.lokal.geschaeft;
-      const D = { first: g * KLASSEN.first.anteil * Math.min(2, 1 + e.km / 3000), business: g * KLASSEN.business.anteil, eco: e.lokal.urlaub + g * KLASSEN.eco.anteil };
+      const D = klassenNachfrage(e, profil(a));
       const f = Math.min(D.first, S.first);
       D.business += (D.first - f) * 0.6;
       const b = Math.min(D.business, S.business);
@@ -2008,13 +2023,15 @@
     for (const a of Object.values(st.airlines)) {
       a.grundsaetze = a.grundsaetze || { ...VORLAGEN[a.service || "standard"] };
       a.assistenten = a.assistenten || {};
+      // Ältere Stände: Sitzklassen in die realistischen Grenzen bringen.
+      for (const r of a.routen || []) if (r.klassen) r.klassen = { business: Math.min(KLASSEN_MAX.business, r.klassen.business || 0), first: Math.min(KLASSEN_MAX.first, r.klassen.first || 0) };
     }
     return st;
   }
 
   return {
     SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
-    KLASSEN, KLASSEN_START, klassenVon, klassenSetzen, besteKlassen,
+    KLASSEN, KLASSEN_START, KLASSEN_MAX, klassenVon, klassenSetzen, besteKlassen,
     neuesSpiel, laden, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     flugzeugeAuf, freieFlugzeuge, slotsBelegt, slotsFrei, slotPreis, slotsGenutzt, slotsUebrig, typFrei, routeVon,
     kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, kaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, CONTROLLER, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruesten,

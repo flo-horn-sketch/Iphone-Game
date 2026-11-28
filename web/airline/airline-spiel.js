@@ -1479,8 +1479,8 @@
     return el("div", { class: "klassen" },
       el("div", { class: "blass mini", text: "Sitzaufteilung (Gäste / Plätze pro Richtung und Tag):" }),
       kabine,
-      zeile("first", kl.first, 0.3, 0.1, (v) => setzen(kl.business, v)),
-      zeile("business", kl.business, 0.6, 0.1, (v) => setzen(v, kl.first)),
+      zeile("first", kl.first, L.KLASSEN_MAX.first, 0.1, (v) => setzen(kl.business, v)),
+      zeile("business", kl.business, L.KLASSEN_MAX.business, 0.1, (v) => setzen(v, kl.first)),
       zeile("eco", 0, 0, 0, null),
       el("button", { class: "nebenknopf", text: "✨ Beste Aufteilung finden", onclick: () => { const b = L.besteKlassen(st, L.SPIELER, r.id); setzen(b.business, b.first); } }));
   }
