@@ -355,6 +355,19 @@ button:disabled { opacity: .4; cursor: default; }
 
 /* Regelkarten */
 .regelkarte-seite { background: rgba(5, 10, 16, .78); }
+.berater { position: absolute; z-index: 6; width: 250px; background: rgba(12,24,38,.96); border: 1px solid var(--gold); border-radius: 14px; padding: 8px 10px 9px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 8px 26px rgba(0,0,0,.55); animation: rein .3s ease-out; transition: opacity .15s; }
+.berater::after { content: ""; position: absolute; left: calc(var(--zipfel, 125px) - 7px); bottom: -7px; width: 12px; height: 12px; background: rgba(12,24,38,.96); border-right: 1px solid var(--gold); border-bottom: 1px solid var(--gold); transform: rotate(45deg); }
+.berater.unten::after { bottom: auto; top: -7px; transform: rotate(225deg); }
+.berater.ohne-zipfel::after { display: none; }
+.geste .berater { opacity: 0; pointer-events: none; }
+.berater-kopf { display: flex; align-items: center; gap: 7px; }
+.berater-gesicht { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,.1); display: grid; place-items: center; flex: none; }
+.berater-gesicht img { width: 100%; height: 100%; object-fit: cover; }
+.berater-name { flex: 1; line-height: 1.1; }
+.berater-name small { display: block; color: var(--blass); font-size: 10px; }
+.berater-zu { color: var(--blass); font-size: 13px; padding: 2px 4px; }
+.berater-text { font-size: 11.5px; line-height: 1.35; }
+.berater .hauptknopf, .berater .nebenknopf { width: 100%; padding: 6px 8px; font-size: 12px; }
 .ergebnis-seite { background: rgba(6,14,26,.72); }
 .ergebnis-karte { width: 440px; max-width: 100%; background: var(--tafel); border: 1px solid rgba(255,255,255,.15); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.6); animation: rein .3s ease-out; }
 .ergebnis-karte.sieg { border-color: var(--gold); }
