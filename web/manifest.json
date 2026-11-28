@@ -1,11 +1,12 @@
 {
-  "name": "Die Fahrenden",
-  "short_name": "Fahrenden",
-  "start_url": ".",
+  "name": "Luftlinie",
+  "short_name": "Luftlinie",
+  "start_url": "airline/",
+  "scope": "./",
   "display": "fullscreen",
   "orientation": "landscape",
-  "background_color": "#0D1718",
-  "theme_color": "#0D1718",
+  "background_color": "#0B1622",
+  "theme_color": "#0B1622",
   "icons": [
     { "src": "app-icon-180.png", "sizes": "180x180", "type": "image/png" },
     { "src": "app-icon.png", "sizes": "1024x1024", "type": "image/png" }

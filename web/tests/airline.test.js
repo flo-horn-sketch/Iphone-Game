@@ -7,25 +7,59 @@ const K = require("../airline/airline-karte.js");
 function leer(opt) {
   // Spiel ohne Rivalen-Netze, damit Zahlen gut vergleichbar sind.
   const st = L.neuesSpiel(Object.assign({ seed: 1, basis: "frankfurt", service: "standard" }, opt));
-  for (const id of ["k", "s", "a"]) Object.assign(st.airlines[id], { routen: [], flotte: [], slots: {} });
+  for (const id of ["k", "s", "a"]) Object.assign(st.airlines[id], { routen: [], flotte: [], slots: {}, stil: "ruhig" });
+  L.kaufen(st, "p", "falke");
   return st;
 }
 
-test("Start: Heimat mit zwei Slots, ein freies Flugzeug, Rivalen haben schon ein Netz", () => {
+test("Start bei Null: kein Flugzeug, keine Linie, für alle gleich", () => {
   const st = L.neuesSpiel({ seed: 3, basis: "london" });
-  const p = st.airlines.p;
-  assert.equal(p.slots.london, 2);
-  assert.equal(L.freieFlugzeuge(p).length, 1);
-  assert.equal(p.geld, L.REGELN.startGeld);
-  for (const id of ["k", "s", "a"]) assert.ok(st.airlines[id].routen.length >= 2, id);
-  assert.equal(L.platz(st), 4);
-  assert.equal(L.STAEDTE.length, 43);
-  assert.equal(L.STAEDTE.filter((s) => s.k === 3).length, 6);
+  for (const id of st.reihenfolge) {
+    const a = st.airlines[id];
+    assert.equal(a.flotte.length, 0, id);
+    assert.equal(a.routen.length, 0, id);
+    assert.equal(a.geld, L.REGELN.startGeld, id);
+    assert.equal(a.slots[a.basis], L.REGELN.startSlots, id);
+  }
+  assert.equal(L.zielStand(st).id, "kaufen");
+  assert.ok(L.ALLE.length > 90);
 });
 
-test("Rivalen weichen aus, wenn ihre Heimat schon vergeben ist", () => {
-  const st = L.neuesSpiel({ seed: 3, basis: "paris" });
-  assert.equal(st.airlines.k.basis, "frankfurt");
+test("Rivalen sitzen in der Nähe der Heimat, jeder woanders", () => {
+  for (const basis of ["paris", "tokio", "newyork"]) {
+    const st = L.neuesSpiel({ seed: 3, basis });
+    const orte = st.reihenfolge.map((id) => st.airlines[id].basis);
+    assert.equal(new Set(orte).size, 4, basis);
+    for (const o of orte) assert.ok(L.entfernung(basis, o) < 2500, basis + " " + o);
+  }
+});
+
+test("Ziele: kaufen, Linie, Prämien", () => {
+  const st = L.neuesSpiel({ seed: 3, basis: "frankfurt" });
+  L.kaufen(st, "p", "falke");
+  L.zielPruefen(st);
+  assert.equal(L.zielStand(st).id, "route");
+  L.fliegen(st, "p", "frankfurt", "rom", "falke", { nurFrei: true });
+  L.zielPruefen(st);
+  assert.equal(L.zielStand(st).id, "gewinn");
+});
+
+test("Ohne freies Flugzeug keine Linie im Editor", () => {
+  const st = L.neuesSpiel({ seed: 3, basis: "frankfurt" });
+  assert.equal(L.kannFliegen(st, "p", "frankfurt", "rom", "falke", { nurFrei: true }).grund, "keinFlugzeug");
+});
+
+test("Sitzklassen: Business bringt auf Geschäftsstrecken mehr", () => {
+  const st = leer();
+  const r = L.fliegen(st, "p", "frankfurt", "london", "falke");
+  L.klassenSetzen(st, "p", r.route.id, 0, 0);
+  const nurEco = L.rechnung(st).routen[r.route.id];
+  L.klassenSetzen(st, "p", r.route.id, 0.3, 0);
+  const mitBusiness = L.rechnung(st).routen[r.route.id];
+  assert.ok(mitBusiness.klassen.business.pax > 0);
+  assert.ok(mitBusiness.sitzePlaetze < nurEco.sitzePlaetze, "Business braucht mehr Platz");
+  const beste = L.besteKlassen(st, "p", r.route.id);
+  assert.ok(beste.g >= mitBusiness.gewinn - 1);
 });
 
 test("Karte: alle Städte liegen im Bild", () => {
@@ -196,17 +230,18 @@ test("Speichern und Laden ergibt denselben Stand", () => {
   assert.equal(Math.round(kopie.airlines.p.geld), Math.round(st.airlines.p.geld));
 });
 
-test("Platz 1 öffnet die Welt und den Albatros", () => {
+test("Großer Firmenwert schaltet Kranich und Albatros frei, dann geht es um die Welt", () => {
   const st = leer();
   const p = st.airlines.p;
   assert.ok(!L.typFrei(st, p, "albatros"));
-  assert.equal(L.kannFliegen(st, "p", "london", "newyork", "albatros").grund, "gesperrt");
+  assert.equal(L.kannFliegen(st, "p", "london", "tokio", "albatros").grund, "gesperrt");
   p.geld = 5e8;
   L.vorruecken(st, 24 - (st.zeit % 24));
-  assert.ok(st.welt && st.platz1);
+  assert.equal(st.stufe, 3);
   assert.ok(L.typFrei(st, p, "albatros"));
   p.slots.london = 3;
-  assert.ok(L.fliegen(st, "p", "london", "newyork", "albatros").ok);
+  assert.ok(L.fliegen(st, "p", "london", "tokio", "albatros").ok);
+  assert.ok(L.fliegen(st, "p", "london", "newyork", "kranich").ok, "Kranich schafft den Atlantik");
 });
 
 test("Probepartie: Rivalen bauen aus, nichts geht kaputt", () => {
@@ -215,4 +250,96 @@ test("Probepartie: Rivalen bauen aus, nichts geht kaputt", () => {
   for (let i = 0; i < 20; i++) L.vorruecken(st, 24);
   assert.ok(st.airlines.k.routen.length > start);
   for (const id of st.reihenfolge) assert.ok(Number.isFinite(st.airlines[id].geld));
+});
+
+test("Grundsätze: Vorlagen ergeben die alten Service-Profile", () => {
+  const st = leer();
+  const p = st.airlines.p;
+  const std = L.profil(p);
+  assert.equal(std.art, "standard");
+  assert.ok(Math.abs(std.preis - 1) < 1e-9 && std.extra === 0);
+  L.vorlageSetzen(st, "p", "billig");
+  const b = L.profil(p);
+  assert.equal(b.art, "billig");
+  assert.ok(b.sitze > 1.2 && b.preis < 0.8 && b.extra > 0 && b.gast.urlaub > 2);
+  L.vorlageSetzen(st, "p", "premium");
+  const pr = L.profil(p);
+  assert.equal(pr.art, "premium");
+  assert.ok(pr.preis > 1.2 && pr.gast.geschaeft > 1.3 && pr.treu);
+});
+
+test("Grundsatz verschlechtern kostet Ruf, verbessern nicht", () => {
+  const st = leer();
+  const p = st.airlines.p;
+  const ruf = p.ruf;
+  assert.ok(L.grundsatzSetzen(st, "p", "koffer", "gebuehr"));
+  assert.ok(p.ruf < ruf);
+  const r2 = p.ruf;
+  assert.ok(L.grundsatzSetzen(st, "p", "essen", "gourmet"));
+  assert.equal(p.ruf, r2);
+  assert.equal(L.grundsatzSetzen(st, "p", "essen", "gourmet"), false);
+});
+
+test("Gebühren bringen Zusatzerlöse pro Gast", () => {
+  const st = leer();
+  const r = L.fliegen(st, "p", "frankfurt", "rom", "falke", { nurFrei: true });
+  assert.ok(r.ok);
+  const vor = L.rechnung(st).routen[r.route.id];
+  assert.equal(vor.extras, 0);
+  L.grundsatzSetzen(st, "p", "platzwahl", "gebuehr");
+  const nach = L.rechnung(st).routen[r.route.id];
+  assert.ok(nach.extras > 0);
+});
+
+test("Analystin liefert nach einiger Zeit drei Vorschläge mit Spannen", () => {
+  const st = leer();
+  const p = st.airlines.p;
+  assert.equal(L.auftragGeben(st, "p", "analyst", "frankfurt"), false);
+  L.einstellen(st, "p", "analyst", "mia");
+  assert.ok(L.auftragGeben(st, "p", "analyst", "frankfurt"));
+  L.vorruecken(st, 4);
+  assert.ok(!p.auftraege.analyst.bericht);
+  L.vorruecken(st, 5);
+  const b = p.auftraege.analyst.bericht;
+  assert.equal(b.length, 3);
+  for (const v of b) {
+    assert.ok(v.gewinn[0] < v.gewinn[1], "Spanne statt genauer Zahl");
+    assert.ok(L.STADT[v.ziel] && L.TYPEN[v.typ]);
+  }
+  assert.ok(st.meldungen.some((m) => m.art === "bericht"));
+});
+
+test("Gründlicher Auftrag dauert länger, Gehalt wird täglich abgezogen", () => {
+  const st = leer();
+  const p = st.airlines.p;
+  L.einstellen(st, "p", "analyst", "kern");
+  L.auftragGeben(st, "p", "analyst", "frankfurt", true);
+  L.vorruecken(st, 10);
+  assert.ok(!p.auftraege.analyst.bericht);
+  L.vorruecken(st, 16);
+  assert.ok(p.auftraege.analyst.bericht);
+  assert.ok(p.verlauf[0] <= -L.ANALYSTEN.kern.gehalt);
+});
+
+test("Preisprofi schlägt Preise vor, Vorschlag lässt sich übernehmen", () => {
+  const st = leer();
+  const p = st.airlines.p;
+  const r = L.fliegen(st, "p", "frankfurt", "rom", "falke", { nurFrei: true });
+  L.einstellen(st, "p", "preis", "paul");
+  L.auftragGeben(st, "p", "preis");
+  L.vorruecken(st, 9);
+  const b = p.auftraege.preis.bericht;
+  assert.equal(b.length, 1);
+  assert.ok(b[0].lage);
+  if (b[0].stufe !== r.route.stufe) {
+    assert.ok(L.preisVorschlagUebernehmen(st, r.route.id));
+    assert.equal(p.routen[0].stufe, b[0].stufe);
+  }
+});
+
+test("Umbenennen", () => {
+  const st = leer();
+  L.umbenennen(st, "p", "  Himmelsrand  ", "#F2C14E");
+  assert.equal(st.airlines.p.name, "Himmelsrand");
+  assert.equal(st.airlines.p.farbe, "#F2C14E");
 });

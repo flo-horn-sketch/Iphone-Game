@@ -1,7 +1,0 @@
-Hier kommen alle Bilder des Spiels hinein (PNG oder JPG).
-
-Der Dateiname muss genau zur Liste in GRAFIKEN.md passen, zum Beispiel
-karte-mittelreich.png oder portrait-lene.png. Unterordner sind erlaubt
-(etwa Karten/, Portraits/), aber jeder Dateiname darf nur einmal vorkommen.
-
-Fehlt ein Bild, zeigt das Spiel einen Platzhalter mit Name und Größe.
