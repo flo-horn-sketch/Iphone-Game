@@ -1254,7 +1254,7 @@
       el("div", { class: "store-kopf" },
         el("h1", { text: "🛒 Flugzeug-Store" }),
         el("span", { class: "store-geld", text: "Dein Geld: " + geld(p.geld) }),
-        el("button", { class: "zu", text: "✕", onclick: () => { seite.remove(); ui.modal = false; } })),
+        el("button", { class: "zu", text: "✕", onclick: () => { seite.remove(); ui.modal = false; if (ui.editor) editorZeichnen(); } })),
       el("div", { class: "segment store-reiter" }, Object.entries(L.GRUPPEN).map(([g, name]) => el("button", { class: ui.storeGruppe === g ? "an" : "", onclick: () => { ui.storeGruppe = g; seite.remove(); storeZeigen(); } }, name,
         el("small", { text: Object.values(L.TYPEN).filter((t) => t.gruppe === g).length + " Typen" })))),
       el("div", { class: "store-reihe" }, Object.entries(L.TYPEN).filter(([, t]) => t.gruppe === ui.storeGruppe).map(([typ, t]) => {
@@ -1273,6 +1273,7 @@
             class: "hauptknopf", disabled: p.geld < t.preis, text: "Kaufen · " + geld(t.preis),
             onclick: () => {
               L.kaufen(st, L.SPIELER, typ); L.zielPruefen(st); nachAktion(); meldungenZeigen();
+              if (ui.editor) editorZeichnen();   // der Editor dahinter kennt das neue Flugzeug sofort
               seite.remove(); ui.modal = false; storeZeigen();
               if (!gesehen("gekauft")) tippZeigen("Gekauft! Jetzt öffne den ✏️ Linien-Editor und gib deinem Flugzeug eine Linie.", hud.linien, "unten", "Okay");
             },
@@ -1626,5 +1627,5 @@
   });
 
   // Für Tests im Browser.
-  window.luftlinie = { get st() { return st; }, ui, tempo, zeigeGelegenheit, zeigeDuell, zoomAuf: (id) => { kameraPassend(gegend(id)); kameraSetzen(); } };
+  window.luftlinie = { get st() { return st; }, ui, tempo, zeigeGelegenheit, zeigeDuell, editorOeffnen, zoomAuf: (id) => { kameraPassend(gegend(id)); kameraSetzen(); } };
 })();
