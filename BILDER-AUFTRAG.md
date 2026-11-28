@@ -230,6 +230,8 @@ Wichtig: PNG mit **durchsichtigem Hintergrund**, quadratisch 256 × 256. Das Spi
 | `ico-statistik.png` | 256 × 256 | Balkendiagramm mit drei Balken |
 | `ico-verwaltung.png` | 256 × 256 | Bürogebäude |
 | `ico-werbung.png` | 256 × 256 | Fernseher mit Stern auf dem Bildschirm |
+| `ico-teilen.png` | 256 × 256 | Teilen-Symbol wie in Safari: Quadrat mit Pfeil nach oben |
+| `ico-homescreen.png` | 256 × 256 | Handy mit einem Plus-Zeichen auf dem Bildschirm |
 
 ## Kontrolle
 

@@ -526,6 +526,30 @@ img.ico { position: static !important; inset: auto !important; width: 1.25em !im
 .rennen-abzeichen { background: transparent; top: -7px; right: -7px; font-size: 11px; }
 .trendpfeil { font-family: var(--schrift); font-weight: 800; paint-order: stroke; stroke: rgba(8,16,24,.9); stroke-linejoin: round; pointer-events: none; }
 .hinweis.rot { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.35); }
+
+/* Anleitung im Browser: nicht skaliert, funktioniert hoch und quer */
+body.anleitung-an > :not(.anleitung) { display: none !important; }
+.anleitung { position: fixed; inset: 0; overflow-y: auto; background: radial-gradient(circle at 50% 30%, #173A55, #0A1828); color: #EAF2F8; font-family: Outfit, system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); text-align: center; }
+.anleitung > :first-child { margin-top: auto; }
+.anleitung > :last-child { margin-bottom: auto; }
+.anleitung-logo { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+.anleitung h1 { margin: 4px 0 0; font-size: 24px; font-weight: 800; }
+.anleitung p { margin: 0; color: #9FB4C4; font-size: 15px; max-width: 420px; }
+.anleitung ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 420px; }
+.anleitung li { display: flex; align-items: center; gap: 12px; text-align: left; background: rgba(255,255,255,.06); border: 1px solid rgba(242,193,78,.35); border-radius: 14px; padding: 12px 14px; font-size: 16px; font-weight: 600; }
+.anleitung .nr { width: 28px; height: 28px; border-radius: 50%; background: #F2C14E; color: #0B1622; display: grid; place-items: center; font-weight: 800; flex: none; }
+.anleitung-ic { width: 36px; height: 36px; display: grid; place-items: center; font-size: 26px; flex: none; }
+.anleitung-ic .ico { width: 36px; height: 36px; font-size: 26px; }
+.anleitung-ic.klein-logo { border-radius: 9px; }
+@media (max-height: 500px) {
+  .anleitung { gap: 6px; }
+  .anleitung-logo { width: 48px; height: 48px; border-radius: 11px; }
+  .anleitung h1 { font-size: 20px; margin: 0; }
+  .anleitung p { font-size: 13px; }
+  .anleitung ol { gap: 6px; margin-top: 4px; max-width: 520px; }
+  .anleitung li { padding: 7px 12px; font-size: 14px; }
+}
 </style>
 
 <div id="rahmen"><div id="feld"></div></div>
