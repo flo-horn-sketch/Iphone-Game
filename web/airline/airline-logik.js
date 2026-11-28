@@ -373,7 +373,7 @@
     k: {
       name: "Kontinentia", chef: "Harald Brenner", farbe: "#E0574F", service: "standard", basis: "paris", ersatz: "frankfurt",
       stil: "platzhirsch", geld: 9000000, start: 7, text: "Der Platzhirsch: alt, groß, sitzt auf den besten Slots.",
-      sprueche: { gross: "Die guten Landerechte? Gehören bald alle mir.", gegen: "Junge Airlines kommen und gehen.", verliert: "Hm. Sie sind hartnäckiger als gedacht." },
+      sprueche: { gross: "Die guten Slots? Gehören bald alle mir.", gegen: "Junge Airlines kommen und gehen.", verliert: "Hm. Sie sind hartnäckiger als gedacht." },
     },
     s: {
       name: "Spatzflug", chef: "Bruno Kiesel", farbe: "#F08A24", service: "billig", basis: "barcelona", ersatz: "mailand",
@@ -548,7 +548,7 @@
       st.airlines[id] = a;
     }
     // An jedem Flughafen liegt am Anfang genau ein freier Slot für alle zusammen. Wer zuerst kommt, bekommt ihn.
-    for (const c of ALLE) poolNeu(st, c.id, false);
+    for (const c of ALLE) poolNeu(st, c.id, false, null, true);
     st.ziel = 0;
     geaendert(st);
     return st;
@@ -665,13 +665,14 @@
   }
   const poolIn = (st, stadt) => st.pool.filter((s) => s.stadt === stadt);
   // Ein neuer Slot kommt in den Topf. Mit Frist wird einen Tag lang verdeckt geboten, ohne Frist ist er sofort zu haben.
-  function poolNeu(st, stadt, bieten, h) {
+  // "tags": Der erste Slot jedes Flughafens liegt zwischen 9 und 17 Uhr, damit ein Flugzeug am selben Tag hin und zurück kommt.
+  function poolNeu(st, stadt, bieten, h, tags) {
     if (h == null) {
       const belegt = new Set();
       for (const s of st.pool) if (s.stadt === stadt) belegt.add(Math.round(s.h * 6));
       for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt) belegt.add(Math.round(s.h * 6));
       let n = 0, versuche = 0;
-      do { n = 30 + Math.floor(zufall(st) * 109); versuche++; } while (belegt.has(n) && versuche < 40);
+      do { n = tags ? 54 + Math.floor(zufall(st) * 49) : 30 + Math.floor(zufall(st) * 109); versuche++; } while (belegt.has(n) && versuche < 40);
       h = n / 6;
     }
     const s = { id: "s" + st.naechsterSlot++, stadt, h, bis: bieten ? st.zeit + 24 : null, gebote: {} };
@@ -1873,7 +1874,7 @@
         if (aid === SPIELER) {
           st.stufe = stufe;
           const neu = Object.keys(TYPEN).filter((t) => TYPEN[t].stufe === stufe);
-          melden(st, { art: "stufe", text: "Neu im Store: " + neu.map((t) => TYPEN[t].name).join(", ") + (stufe === 2 ? ". Damit geht es über den Atlantik!" : stufe === 3 ? ". Damit fliegst du um die halbe Welt!" : "."), typ: neu[0] });
+          melden(st, { art: "stufe", text: "Neue Flugzeuge: " + neu.map((t) => TYPEN[t].name).join(", ") + (stufe === 2 ? ". Damit geht es über den Atlantik!" : stufe === 3 ? ". Damit fliegst du um die halbe Welt!" : "."), typ: neu[0] });
         }
       }
     }
@@ -1937,7 +1938,7 @@
       const z = zielAktuell(st);
       if (z.ist(st, p) < z.soll) break;
       p.geld += z.belohnung;
-      melden(st, { art: "ziel", text: "Ziel geschafft: " + z.text + (z.belohnung ? " · Prämie " + Math.round(z.belohnung / 1e5) / 10 + " Mio" : ""), ziel: z.id, belohnung: z.belohnung });
+      melden(st, { art: "ziel", text: "Ziel geschafft: " + z.text + (z.belohnung ? " · Prämie " + (z.belohnung >= 1e6 ? String(Math.round(z.belohnung / 1e5) / 10).replace(".", ",") + " Mio" : Math.round(z.belohnung / 1000) + " Tsd") : ""), ziel: z.id, belohnung: z.belohnung });
       st.ziel++;
     }
   }
@@ -2449,6 +2450,13 @@
     }
     return { wer, typ: best.typ, kabine, gewinn: spanne(brille(st, wer, best.gewinn, "kg" + plan.x + plan.y + best.typ), wer.streuung).map((v2) => Math.round(v2 / 100) * 100) };
   }
+  // Was bringt ein geplanter Flug am Tag? Der Analyst nennt eine Spanne.
+  function ratFlug(st, plan, delta) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    if (!wer) return null;
+    const gesehen = delta + (brille(st, wer, 1, "flug" + plan.x + plan.y + plan.typ + plan.e1.h + "-" + plan.e2.h) - 1) * Math.max(4000, Math.abs(delta));
+    return { wer, gewinn: spanne(gesehen, wer.streuung).map((v) => Math.round(v / 100) * 100) };
+  }
   // Passt die Kabine noch zu den Flügen? Der Analyst meldet sich, wenn ein Umbau lohnt.
   function ratKabine(st, fid) {
     const p = st.airlines[SPIELER];
@@ -2548,6 +2556,7 @@
         const n = a.slots.filter((s) => !s.heim).length;
         melden(st, { art: "pleite", wer: aid, text: `💥 ${a.name} ist pleite! ${n} Slots werden frei: Biete mit. Die Airline fängt mit neuem Geld von vorn an.` });
         rivalNeustart(st, aid);
+        st.rivalPleite = true;
         return;
       }
     }
@@ -2628,7 +2637,7 @@
     gelegenheitAnnehmen, gelegenheitAblehnen, uebernahmeAnnehmen, uebernahmeAblehnen, tilgen,
     firmenwert, rangliste, platz, kiTag, kiAusbauen, kiFliegen, kiKandidaten, tagesAbschluss, zielStand, zielPruefen, ZIELE,
     bieten, poolAuswerten, slotInGefahr, tageBisSaisonende, slotNutzen, slotWertFuer, slotBesitzer, handelPruefen, handelAnbieten,
-    ratSlot, ratHandel, ratGrundsatz, ratPreis, ratKauf, ratKabine, flugVorschau,
+    ratSlot, ratHandel, ratGrundsatz, ratPreis, ratKauf, ratKabine, ratFlug, flugVorschau,
     trendVon, stadtTrend, vergleich, duellAntwort, drehkreuzPreis, kannAusbauen, drehkreuzAusbauen, rennenStand, wahlTreffen, wirkung, ausgebaut, KONTINENTE_PAARE: PAARE,
   };
 });

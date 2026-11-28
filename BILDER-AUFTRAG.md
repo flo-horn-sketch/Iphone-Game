@@ -128,6 +128,28 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-regel-spaet.png` | 1024 × 1024 | Ein einzelnes großes, glänzendes Flugzeug wird in einem hellen Hangar sorgfältig poliert, statt vieler kleiner – Qualität statt Masse, goldenes Licht. |
 | `air-regel-pleite.png` | 1024 × 1024 | Ein Flugzeug steht im Regen vor einem Bankgebäude, darüber ein großes Warndreieck aus Licht, ernste, aber nicht düstere Stimmung. |
 
+### 6c. Regelkarten für die Slots (quadratisch, neu)
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-regel-slots.png` | 1024 × 1024 | Eine große Flughafen-Abflugtafel ohne lesbare Schrift, eine Zeile leuchtet golden, davor startet ein Flugzeug in den Morgenhimmel, eine Uhr am Rand. |
+| `air-regel-tafel.png` | 1024 × 1024 | Eine Wand mit vielen kleinen Fächern wie ein Stundenplan, in jedem Fach eine kleine Uhr, zwei Fächer leuchten grün, die anderen golden und blaugrau, warmes Licht. |
+| `air-regel-flugzeuge.png` | 1024 × 1024 | Ein neues Flugzeug rollt aus einem hellen Hangar direkt auf eine leuchtende Fluglinie, die über eine Landkarte führt, Aufbruchsstimmung. |
+| `air-regel-tagesplan.png` | 1024 × 1024 | Ein einzelnes Flugzeug, dahinter ein langer Zeitstrahl vom Sonnenaufgang bis zur Nacht mit mehreren farbigen Balken, das Flugzeug fliegt den Strahl entlang. |
+| `air-regel-bieten.png` | 1024 × 1024 | Vier verschlossene Umschläge in Grün, Rot, Orange und Violett liegen auf einem Tisch, daneben ein großes goldenes Drehrad, im Fenster ein Flughafen mit einem goldenen Lichtring. |
+| `air-regel-reisende.png` | 1024 × 1024 | Eine Wartehalle mit einer überschaubaren Gruppe Reisender, die sich auf drei Gates mit verschiedenfarbigen Flugzeugen verteilt, über der Halle ein halb gefüllter Balken aus Licht. |
+| `air-regel-rat.png` | 1024 × 1024 | Eine Analystin mit Brille zeigt auf einen Bildschirm, auf dem eine von drei Karten mit einem goldenen Funkeln markiert ist, ruhige freundliche Stimmung. |
+| `air-regel-verlieren.png` | 1024 × 1024 | Ein leeres Gate mit abgesperrtem Zugang, darüber eine große Sanduhr, deren Sand fast durchgelaufen ist, kein Flugzeug am Gate, Abendlicht. |
+| `air-regel-handel.png` | 1024 × 1024 | Zwei Airline-Chefs geben sich über einem Tisch die Hand, auf dem Tisch zwei kleine Uhren in verschiedenen Farben, die getauscht werden, im Fenster ein Vorfeld. |
+| `air-regel-kabine.png` | 1024 × 1024 | Ein Flugzeug in einer Werkstatt, der Rumpf ist von oben geöffnet, Mechaniker tauschen schmale blaue Sitze gegen breite goldene Sessel, helles Arbeitslicht. |
+| `air-regel-rivalpleite.png` | 1024 × 1024 | Ein verlassener Schalter einer Airline mit heruntergelassenem Rollgitter, davor auf dem Vorfeld mehrere leere Gates, über denen goldene Lichtringe aufleuchten. |
+
+### 6d. Ereignis für die Slots (breit, neu)
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-ereignis-slotangebot.png` | 1536 × 1024 | Ein Rivalen-Chef schiebt einen Geldkoffer über einen Konferenztisch, auf dem Tisch steht eine kleine goldene Uhr, im Fenster dahinter ein Flughafen in der Dämmerung. |
+
 ### 7. App-Symbol (für den Home-Bildschirm)
 
 Diese zwei Dateien kommen ausnahmsweise **nicht** nach `web/grafiken/`, sondern direkt nach `web/` und ersetzen die alten Dateien dort.
@@ -232,6 +254,8 @@ Wichtig: PNG mit **durchsichtigem Hintergrund**, quadratisch 256 × 256. Das Spi
 | `ico-werbung.png` | 256 × 256 | Fernseher mit Stern auf dem Bildschirm |
 | `ico-teilen.png` | 256 × 256 | Teilen-Symbol wie in Safari: Quadrat mit Pfeil nach oben |
 | `ico-homescreen.png` | 256 × 256 | Handy mit einem Plus-Zeichen auf dem Bildschirm |
+| `ico-angebot.png` | 256 × 256 | Sprechblase mit drei Punkten |
+| `ico-nein.png` | 256 × 256 | erhobene flache Hand, Stopp-Geste |
 
 ## Kontrolle
 
