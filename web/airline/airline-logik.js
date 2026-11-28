@@ -391,6 +391,36 @@
     { name: "Silberfalke", farbe: "#6EC6FF" },
     { name: "Morgenrot", farbe: "#FF7FA8" },
   ];
+  // ---------- Manager ----------
+  // Du bist der Manager deiner Airline: Name, Geschlecht und Aussehen legst du beim Start fest (später in "Meine Airline" änderbar).
+  // Jedes Aussehen ist ein Porträt (mgr-*.png, malt ChatGPT, siehe BILDER-AUFTRAG.md 4c). "farbe" ist nur der Platzhalter, bis das Bild da ist.
+  const GESCHLECHTER = { frau: { name: "Frau", anrede: "Frau" }, mann: { name: "Mann", anrede: "Herr" }, divers: { name: "Divers", anrede: "" } };
+  const AUSSEHEN = [
+    { id: "frau-1", geschlecht: "frau", farbe: "#C98B5E" }, { id: "frau-2", geschlecht: "frau", farbe: "#E8C39E" }, { id: "frau-3", geschlecht: "frau", farbe: "#8D5A3B" },
+    { id: "frau-4", geschlecht: "frau", farbe: "#F0D2B6" }, { id: "frau-5", geschlecht: "frau", farbe: "#B07850" }, { id: "frau-6", geschlecht: "frau", farbe: "#D9A77C" },
+    { id: "mann-1", geschlecht: "mann", farbe: "#D9A77C" }, { id: "mann-2", geschlecht: "mann", farbe: "#8D5A3B" }, { id: "mann-3", geschlecht: "mann", farbe: "#F0D2B6" },
+    { id: "mann-4", geschlecht: "mann", farbe: "#B07850" }, { id: "mann-5", geschlecht: "mann", farbe: "#E8C39E" }, { id: "mann-6", geschlecht: "mann", farbe: "#C98B5E" },
+  ];
+  const aussehenFuer = (g) => AUSSEHEN.filter((a) => g === "divers" || a.geschlecht === g);
+  // Prüft ein Profil und macht es sauber; ohne Namen gibt es kein Profil.
+  function managerPruefen(m) {
+    if (!m || typeof m !== "object") return null;
+    const name = String(m.name || "").replace(/\s+/g, " ").trim().slice(0, 24);
+    if (!name) return null;
+    const geschlecht = GESCHLECHTER[m.geschlecht] ? m.geschlecht : "divers";
+    const passend = aussehenFuer(geschlecht);
+    const aussehen = passend.some((a) => a.id === m.aussehen) ? m.aussehen : passend[0].id;
+    return { name, geschlecht, aussehen };
+  }
+  function managerSetzen(st, m) { const neu = managerPruefen(m); if (neu) st.manager = neu; return !!neu; }
+  // So sprechen dich Assistenten und Rivalen an: "Frau Horn", "Herr Horn", bei Divers mit ganzem Namen.
+  function anrede(m) {
+    if (!m) return null;
+    const g = GESCHLECHTER[m.geschlecht];
+    const teile = m.name.split(" ");
+    return g && g.anrede && teile.length > 1 ? g.anrede + " " + teile[teile.length - 1] : g && g.anrede ? g.anrede + " " + m.name : m.name;
+  }
+
   const HEIMAT = ["london", "paris", "frankfurt", "amsterdam", "madrid", "istanbul", "muenchen", "berlin", "rom", "wien",
     "newyork", "losangeles", "chicago", "atlanta", "mexiko", "saopaulo", "dubai", "delhi", "mumbai", "bangkok", "singapur", "hongkong", "peking", "shanghai", "tokio", "seoul", "sydney",
     "dublin", "lissabon", "kopenhagen", "athen", "helsinki", "warschau", "hamburg", "toronto", "miami", "denver", "seattle", "houston",
@@ -533,6 +563,7 @@
       gegner: GEGNER[opt.gegner] ? opt.gegner : "mittel",
     };
     st.saat = st.rng;
+    st.manager = managerPruefen(opt.manager);
     const basis = opt.basis || "frankfurt";
     const name = opt.name || NAMEN[0];
     // Alle starten bei Null: kein Flugzeug, keine Linie, nur Startgeld und zwei geschenkte Slots auf der eigenen Tafel.
@@ -2978,6 +3009,7 @@
     try { st = typeof json === "string" ? JSON.parse(json) : json; } catch (e) { return null; }
     // Ältere Stände (ohne Slots mit Uhrzeit) lassen sich nicht umrechnen: Dann beginnt ein neues Spiel.
     if (!st || st.version !== 3) return null;
+    st.manager = managerPruefen(st.manager);
     for (const a of Object.values(st.airlines)) {
       a.grundsaetze = a.grundsaetze || { ...VORLAGEN[a.service || "standard"] };
       a.assistenten = a.assistenten || {};
@@ -2989,6 +3021,7 @@
   return {
     SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
     KLASSEN, KLASSEN_MAX, klassenVon, kabineGrenzen, kabineStandard, kabineSetzen, umbauPreis, inWerkstatt, besteKabine,
+    GESCHLECHTER, AUSSEHEN, aussehenFuer, managerPruefen, managerSetzen, anrede,
     neuesSpiel, laden, istAlterStand, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen,
     slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,

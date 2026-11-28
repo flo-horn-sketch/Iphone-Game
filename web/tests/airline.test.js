@@ -682,3 +682,26 @@ test("Rivalen: Wer überboten wird, ärgert sich und verlangt beim Handel mehr",
   for (let d = 0; d < 12; d++) L.kiTag(st, "k");
   assert.notEqual(L.laune(st, "k").art, "groll");
 });
+
+test("Manager-Profil: Name, Geschlecht, Aussehen; alte Stände laufen ohne Profil weiter", () => {
+  const st = L.neuesSpiel({ seed: 2, basis: "frankfurt", manager: { name: "  Florian   Horn ", geschlecht: "mann", aussehen: "mann-3" } });
+  assert.deepEqual(st.manager, { name: "Florian Horn", geschlecht: "mann", aussehen: "mann-3" });
+  assert.equal(L.anrede(st.manager), "Herr Horn");
+  assert.equal(L.anrede({ name: "Anna Weber", geschlecht: "frau", aussehen: "frau-1" }), "Frau Weber");
+  assert.equal(L.anrede({ name: "Kim Lee", geschlecht: "divers", aussehen: "frau-1" }), "Kim Lee");
+  // Aussehen passt immer zum Geschlecht, ohne Namen gibt es kein Profil.
+  assert.equal(L.managerPruefen({ name: "Eva", geschlecht: "frau", aussehen: "mann-2" }).aussehen, "frau-1");
+  assert.equal(L.managerPruefen({ name: "  ", geschlecht: "frau" }), null);
+  assert.equal(L.aussehenFuer("divers").length, L.AUSSEHEN.length);
+  // Später änderbar.
+  assert.ok(L.managerSetzen(st, { name: "Eva Horn", geschlecht: "frau", aussehen: "frau-4" }));
+  assert.equal(L.anrede(st.manager), "Frau Horn");
+  assert.equal(L.managerSetzen(st, { name: "" }), false);
+  assert.equal(st.manager.name, "Eva Horn");
+  // Speichern und Laden behält das Profil; ein Stand ohne Profil lädt trotzdem.
+  assert.deepEqual(L.laden(JSON.stringify(st)).manager, st.manager);
+  const alt = L.neuesSpiel({ seed: 2 }); delete alt.manager;
+  const geladen = L.laden(JSON.stringify(alt));
+  assert.ok(geladen);
+  assert.equal(geladen.manager, null);
+});
