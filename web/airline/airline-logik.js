@@ -26,8 +26,11 @@
     heimGeschenk: 2,         // so viele Slots auf der Heimat-Tafel sind am Anfang geschenkt
     slotMax: { 1: 8, 2: 14, 3: 20 },              // so viele Slots gibt ein Flughafen höchstens an fremde Airlines
     slotTakt: { 1: 6, 2: 4, 3: 3 },               // alle so viele Tage gibt ein Flughafen einen neuen Slot frei
-    sofortFaktor: 2.5,       // Sofortkauf beim Flughafen: so viel mal der Grundpreis. Dafür ohne Bieten und ohne Warten.
-    slotSchonTage: 3,        // ein frisch erworbener Slot ist so lange vor "nutzen oder verlieren" sicher
+    slotSchonTage: 3,
+    kiBlick: 14,
+    bietSchritt: 0.1,        // beim Bieten geht es in Schritten von 10 % des Grundpreises (mindestens 10.000) nach oben
+    bietSekunden: 5,         // so lange haben die anderen Zeit, ein Gebot zu überbieten
+    rueckgabeAnteil: 0.5,    // gibt man einen ungenutzten Slot zurück, kommt so viel vom Grundpreis zurück             // so viele fremde Städte schaut sich ein Rivale täglich neu an        // ein frisch erworbener Slot ist so lange vor "nutzen oder verlieren" sicher
     reisende: 220,           // Reisende pro Tag an einem Flughafen = reisende × Größe²
     daheim: 0.5,             // wie leicht ein Gast lieber gar nicht fliegt, wenn keine Zeit passt
     handelSperre: 2,         // nach einem Nein redet der Rivale so viele Tage nicht mehr über diesen Slot
@@ -603,8 +606,7 @@
       if (e) a.kurz = e.kurz;
       st.airlines[id] = a;
     }
-    // An jedem Flughafen liegt am Anfang genau ein freier Slot für alle zusammen. Wer zuerst kommt, bekommt ihn.
-    for (const c of ALLE) poolNeu(st, c.id, false, null, true);
+    // Alle Flughäfen bieten alle ihre Slots an. Wer einen bucht, bietet direkt, die anderen können sofort dagegenhalten.
     st.ziel = 0;
     geaendert(st);
     return st;
@@ -771,43 +773,101 @@
     geaendert(st);
     return { ok: true, slot: neu, preis };
   }
-  // Sofortkauf: Der Flughafen gibt seinen nächsten Slot schon jetzt heraus, zu einer Uhrzeit nach Wahl, aber teurer.
-  // Es kommen dadurch nicht mehr Slots ins Spiel: Der nächste reguläre Slot dieses Flughafens kommt entsprechend später.
-  // Geht nur, wenn dort gerade kein Slot vergeben wird, der Flughafen nicht voll ist und er nicht gerade erst einen herausgegeben hat.
-  function sofortStatus(st, aid, stadt) {
-    const a = st.airlines[aid], c = STADT[stadt];
-    if (!c || hatTafel(a, stadt)) return { ok: false, grund: "tafel" };
-    if (st.pool.some((s) => s.stadt === stadt && s.bis != null)) return { ok: false, grund: "bieten" };     // erst die Vergabe abwarten
-    if (slotZahl(st, stadt) >= REGELN.slotMax[c.k]) return { ok: false, grund: "voll" };
-    const tag = tagVon(st), uhr = (st.slotUhr || {})[stadt];
-    const warten = uhr == null ? 0 : Math.max(0, uhr - tag - REGELN.slotTakt[c.k] + 1);
-    if (warten > 0) return { ok: false, grund: "warten", tage: warten };
-    return { ok: true };
-  }
-  const sofortPreis = (stadt, h) => runde10k(slotGrundpreis(stadt, h) * REGELN.sofortFaktor);
-  // Welche vollen Stunden sind an diesem Flughafen noch nicht vergeben? (5 bis 23 Uhr)
-  function sofortStunden(st, stadt) {
+  // Freie Slots an einem fremden Flughafen: jede volle Stunde von 5 bis 23 Uhr, die noch keine fremde Airline hat,
+  // solange der Flughafen seine Obergrenze nicht erreicht hat. (Die Tafeln der Heimat-Airlines zählen extra.)
+  function freieStunden(st, stadt) {
+    const c = STADT[stadt];
+    if (!c || slotZahl(st, stadt) >= REGELN.slotMax[c.k]) return [];
     const belegt = [];
-    for (const s of st.pool) if (s.stadt === stadt) belegt.push(s.h);
-    for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt) belegt.push(s.h);
+    for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt && !s.heim) belegt.push(s.h);
     return HEIM_STUNDEN.filter((h) => !belegt.some((b) => Math.abs(b - h) < 0.5));
   }
-  function sofortKaufen(st, aid, stadt, h) {
-    const a = st.airlines[aid], c = STADT[stadt];
-    const s0 = sofortStatus(st, aid, stadt);
-    if (!s0.ok) return s0;
-    if (!sofortStunden(st, stadt).includes(h)) return { ok: false, grund: "belegt" };
-    const preis = sofortPreis(stadt, h);
-    if (a.geld < preis) return { ok: false, grund: "geld" };
-    a.geld -= preis;
-    const s = { id: "s" + st.naechsterSlot++, stadt, h, seit: tagVon(st), sofort: true };
-    a.slots.push(s);
-    // Der nächste reguläre Slot dieses Flughafens rückt um einen Takt nach hinten.
-    st.slotUhr = st.slotUhr || {};
-    const tag = tagVon(st);
-    st.slotUhr[stadt] = Math.max(st.slotUhr[stadt] == null ? tag : st.slotUhr[stadt], tag) + REGELN.slotTakt[c.k];
+  // Einen Slot buchen heißt bieten, offen wie bei einer Versteigerung (Florian, 2026-11-28):
+  // Wer bucht, bietet den Grundpreis. Dann können die anderen in festen Schritten darübergehen, jeweils 5 Sekunden lang,
+  // bis keiner mehr bietet. Das letzte Gebot gewinnt und wird bezahlt.
+  // Die Rivalen haben ein Limit (was ihnen der Slot wert ist); sie bieten, solange das nächste Gebot darunter liegt.
+  const bietSchritt = (gp) => Math.max(10000, runde10k(gp * REGELN.bietSchritt));
+  let spielerFragen = false;                 // nur im echten Spiel (Oberfläche): Rivalen-Buchungen in deinem Netz fragen dich
+  function fragenAn(an) { spielerFragen = !!an; }
+  function auktionStart(st, aid, stadt, h, warte) {
+    const a = st.airlines[aid];
+    if (st.auktion) return { ok: false, grund: "laeuft" };
+    if (hatTafel(a, stadt)) return { ok: false, grund: "tafel" };
+    if (!freieStunden(st, stadt).includes(h)) return { ok: false, grund: "belegt" };
+    const gp = slotGrundpreis(stadt, h);
+    if (a.geld < gp) return { ok: false, grund: "geld" };
+    // Was ist der Slot den Rivalen wert? Wer selbst bucht, geht mindestens etwas über den Grundpreis mit.
+    const limits = st.probe ? {} : kiGebote(st, { id: "?", stadt, h }, aid === SPIELER ? SPIELER : null);
+    if (aid !== SPIELER && !st.probe) limits[aid] = Math.max(limits[aid] || 0, runde10k(gp * 1.3));
+    st.auktion = { stadt, h, gp, schritt: bietSchritt(gp), stand: gp, fuehrt: aid, starter: aid, limits, gebote: [{ aid, betrag: gp }], warte: warte || null, tag: tagVon(st) };
+    return { ok: true, auktion: st.auktion };
+  }
+  // Ein Schritt höher. Wer schon vorne liegt, kann sich nicht selbst überbieten.
+  function auktionBieten(st, aid) {
+    const A = st.auktion;
+    if (!A || A.fuehrt === aid) return false;
+    const n = A.stand + A.schritt;
+    if (st.airlines[aid].geld < n) return false;
+    A.stand = n; A.fuehrt = aid; A.gebote.push({ aid, betrag: n });
+    return true;
+  }
+  // Will ein Rivale höher gehen? Der mit dem höchsten Limit zuerst. Gibt zurück, wer geboten hat.
+  function auktionKi(st) {
+    const A = st.auktion;
+    if (!A) return null;
+    const n = A.stand + A.schritt;
+    const wer = Object.entries(A.limits).filter(([k, l]) => k !== A.fuehrt && l >= n && st.airlines[k].geld >= n).sort((x, y) => y[1] - x[1])[0];
+    if (!wer) return null;
+    auktionBieten(st, wer[0]);
+    return wer[0];
+  }
+  // Keiner bietet mehr: Wer vorne liegt, zahlt sein Gebot und bekommt den Slot.
+  function auktionEnde(st) {
+    const A = st.auktion;
+    if (!A) return null;
+    st.auktion = null;
+    const sieger = st.airlines[A.fuehrt];
+    const preis = A.stand;
+    sieger.geld -= preis;
+    const slot = { id: "s" + st.naechsterSlot++, stadt: A.stadt, h: A.h, seit: tagVon(st) };
+    sieger.slots.push(slot);
+    const mit = [...new Set(A.gebote.map((g) => g.aid))];
+    if (mit.length > 1) sieger.geboten = (sieger.geboten || 0) + 1;
+    if (mit.includes(SPIELER) && mit.length > 1) {
+      if (A.fuehrt === SPIELER) for (const k of mit) if (k !== SPIELER) aergern(st, k, 1, `${st.airlines[k].name} ärgert sich: Du hast den Slot in ${STADT[A.stadt].name} weggeschnappt.`);
+    }
+    // Ein Rivale hatte einen Flug vor: Gewinnt er, fliegt er ihn jetzt.
+    if (A.frage && A.warte && A.warte.plan && A.fuehrt === A.starter && A.starter !== SPIELER) {
+      const plan = Object.assign({}, A.warte.plan, { [A.warte.ende]: { art: "slot", id: slot.id, h: slot.h, preis: 0 } });
+      kiFliegen(st, A.starter, plan);
+    }
     geaendert(st);
-    return { ok: true, slot: s, preis };
+    return { sieger: A.fuehrt, preis, slot, gebote: A.gebote, starter: A.starter, stadt: A.stadt, h: A.h };
+  }
+  // Ohne dich: Die Rivalen bieten untereinander, bis keiner mehr will.
+  function auktionAuto(st) { let n = 0; while (auktionKi(st) && n++ < 500); return auktionEnde(st); }
+  // Wird der Spieler gefragt, wenn ein Rivale hier einen Slot will? Nur in seinem Netz, nur mit genug Geld, höchstens einmal am Tag.
+  function spielerGefragt(st, stadt, h) {
+    if (!spielerFragen || st.probe) return false;
+    const p = st.airlines[SPIELER];
+    if (p.konkurs || hatTafel(p, stadt) || st.gefragtAm === tagVon(st)) return false;
+    if (!p.slots.some((s) => s.stadt === stadt) && !p.routen.some((r) => r.a === stadt || r.b === stadt)) return false;
+    const gp = slotGrundpreis(stadt, h);
+    return p.geld >= gp + bietSchritt(gp);
+  }
+  // Buchen ohne Oberfläche (Rivalen, Tests): Versteigerung starten und gleich auswerten.
+  // Will ein Rivale einen Slot in deinem Netz, bleibt die Versteigerung offen, und das Spiel fragt dich.
+  function slotBuchen(st, aid, stadt, h, warte) {
+    const r = auktionStart(st, aid, stadt, h, warte);
+    if (!r.ok) return r;
+    if (aid !== SPIELER && spielerGefragt(st, stadt, h)) {
+      st.auktion.frage = true;             // offen lassen: Die Oberfläche fragt dich, ob du mitbietest
+      st.gefragtAm = tagVon(st);
+      return { ok: false, grund: "auktion" };
+    }
+    const e = auktionAuto(st);
+    if (e.sieger !== aid) return { ok: false, grund: "ueberboten", sieger: e.sieger, betrag: e.preis, slot: e.slot };
+    return { ok: true, slot: e.slot, preis: e.preis, gebote: e.gebote };
   }
   function typFrei(st, a, typ) {
     const t = TYPEN[typ];
@@ -863,21 +923,19 @@
 
   // Welche Slots kann die Airline an diesem Flughafen für einen neuen Flug nehmen?
   function slotIndex(st, a) {
-    const idx = { benutzt: benutzteSlots(a), eigene: {}, pool: {}, geschenk: a.geschenk || 0 };
+    const idx = { benutzt: benutzteSlots(a), eigene: {}, frei: {}, geschenk: a.geschenk || 0 };
     for (const s of a.slots) if (!idx.benutzt.has(s.id)) (idx.eigene[s.stadt] = idx.eigene[s.stadt] || []).push(s);
-    for (const s of st.pool) if (s.bis == null) (idx.pool[s.stadt] = idx.pool[s.stadt] || []).push(s);
     return idx;
   }
-  // mitSofort: auch Slots, die man beim Flughafen sofort kaufen kann (nur für den Spieler im Editor).
-  function enden(st, a, stadt, idx, mitSofort) {
+  function enden(st, a, stadt, idx) {
     idx = idx || slotIndex(st, a);
     const liste = [];
     for (const s of idx.eigene[stadt] || []) liste.push({ art: "slot", id: s.id, h: s.h, preis: 0 });
     if (hatTafel(a, stadt)) {
       for (const h of tafelStunden(a, stadt)) if (!a.slots.some((s) => s.heim && s.stadt === stadt && s.h === h)) liste.push({ art: "tafel", h, preis: idx.geschenk > 0 ? 0 : heimPreis(stadt, h) });
     } else {
-      for (const s of idx.pool[stadt] || []) liste.push({ art: "pool", id: s.id, h: s.h, preis: slotGrundpreis(stadt, s.h) });
-      if (mitSofort && sofortStatus(st, a.id, stadt).ok) for (const h of sofortStunden(st, stadt)) liste.push({ art: "sofort", h, preis: sofortPreis(stadt, h) });
+      if (!idx.frei[stadt]) idx.frei[stadt] = freieStunden(st, stadt);
+      for (const h of idx.frei[stadt]) liste.push({ art: "frei", h, preis: slotGrundpreis(stadt, h) });
     }
     return liste;
   }
@@ -893,7 +951,7 @@
     const km = entfernung(x, y);
     if (km > TYPEN[typ].reichweite) return { ok: false, grund: "reichweite" };
     const idx = opt.idx || slotIndex(st, a);
-    const e1 = opt.e1 ? [opt.e1] : enden(st, a, x, idx, opt.sofort), e2 = opt.e2 ? [opt.e2] : enden(st, a, y, idx, opt.sofort);
+    const e1 = opt.e1 ? [opt.e1] : enden(st, a, x, idx), e2 = opt.e2 ? [opt.e2] : enden(st, a, y, idx);
     if (!e1.length || !e2.length) return { ok: false, grund: "slots", fehlt: !e1.length ? x : y };
     const eigene = opt.neu ? [] : a.flotte.filter((f) => (opt.fid ? f.id === opt.fid : f.typ === typ));
     const w = (STADT[x].w + STADT[y].w) / 2;
@@ -920,11 +978,11 @@
   function kannFliegen(st, aid, x, y, typ, opt) { return flugFinden(st, aid, x, y, typ, opt); }
 
   // Nimmt einen Slot für einen Flug in Besitz (kauft ihn, wenn nötig).
-  function endeNehmen(st, a, stadt, e) {
+  function endeNehmen(st, a, stadt, e, warte) {
     if (e.art === "slot") return slotVon(a, e.id);
     if (e.art === "tafel") { const r = heimSlotKaufen(st, a.id, stadt, e.h); return r.ok ? r.slot : null; }
-    if (e.art === "sofort") { const r = sofortKaufen(st, a.id, stadt, e.h); return r.ok ? r.slot : null; }
-    const r = slotNehmen(st, a.id, e.id);
+    const r = slotBuchen(st, a.id, stadt, e.h, warte);
+    if (!r.ok) st.letzteBuchung = r;
     return r.ok ? r.slot : null;
   }
   // Legt einen Flug an: kauft fehlende Slots und (wenn nötig) das Flugzeug, eröffnet die Linie, wenn es sie noch nicht gibt.
@@ -932,8 +990,11 @@
     const a = st.airlines[aid];
     const test = flugFinden(st, aid, plan.x, plan.y, plan.typ, { e1: plan.e1, e2: plan.e2, fid: plan.fid, neu: !plan.fid, schulden: plan.schulden });
     if (!test.ok) return test;
-    const s1 = endeNehmen(st, a, plan.x, plan.e1), s2 = endeNehmen(st, a, plan.y, plan.e2);
-    if (!s1 || !s2) return { ok: false, grund: "slots" };
+    // Erst das Ende buchen, um das geboten wird (meist das Ziel). Geht es verloren, bleibt das andere unberührt.
+    st.letzteBuchung = null;
+    const s2 = endeNehmen(st, a, plan.y, plan.e2, { plan, ende: "e2" });
+    const s1 = s2 ? endeNehmen(st, a, plan.x, plan.e1, { plan: Object.assign({}, plan, { e2: { art: "slot", id: s2.id, h: s2.h, preis: 0 } }), ende: "e1" }) : null;
+    if (!s1 || !s2) { const b = st.letzteBuchung; st.letzteBuchung = null; return Object.assign({ ok: false, grund: "slots" }, b && b.grund === "ueberboten" ? { grund: "ueberboten", sieger: b.sieger, betrag: b.betrag, stadt: b.slot.stadt, h: b.slot.h } : {}); }
     let f = plan.fid ? a.flotte.find((z) => z.id === plan.fid) : null;
     if (!f) { a.geld -= TYPEN[plan.typ].preis; f = flugzeugHinzu(a, plan.typ, plan.kabine); f.seit = tagVon(st); }
     f.ort = plan.x;
@@ -2273,7 +2334,12 @@
     const budget = ohneGeld ? Infinity : a.geld - reserve;
     const maxWeite = Math.max(0, ...typen.map((t) => TYPEN[t].reichweite));
     const verwZusatz = verwaltungKosten(a, a.routen.length + 1) - verwaltungKosten(a);   // eine neue Linie kostet auch Verwaltung
-    const ziele = new Set([...Object.keys(idx.eigene), ...Object.keys(idx.pool), a.basis, ...(a.ausgebaut || [])]);
+    // Alle Slots sind offen. Damit die Airline nicht jeden Tag die ganze Welt durchrechnet, schaut sie sich
+    // neben ihren eigenen Orten täglich eine wechselnde Handvoll Städte an (wie eine echte Netzplanung).
+    const ziele = new Set([...Object.keys(idx.eigene), a.basis, ...(a.ausgebaut || [])]);
+    { const tag = tagVon(st), liste = ALLE.filter((c) => !ziele.has(c.id) && entfernung(a.basis, c.id) <= maxWeite);
+      const n = Math.min(liste.length, REGELN.kiBlick);
+      for (let i = 0; i < n; i++) ziele.add(liste[Math.floor(fest(st, aid + "blick" + tag + "-" + i) * liste.length)].id); }
     const K = koennen(st, aid);
     const kf = aid === SPIELER ? null : kopf(a);
     const spieler = st.airlines[SPIELER];
@@ -2426,11 +2492,13 @@
     return best;
   }
   // Die Rivalen legen ihr Gebot fest, sobald der Slot ausgeschrieben wird.
-  function kiGebote(st, s) {
+  function kiGebote(st, s, ohne) {
     const gebote = {};
     const gp = slotGrundpreis(s.stadt, s.h);
     for (const aid of ["k", "s", "a"]) {
+      if (aid === ohne) continue;
       const a = st.airlines[aid];
+      if (a && a.stil === "ruhig") continue;      // ruhige Rivalen (für Tests) tun nichts
       if (!a || a.konkurs || hatTafel(a, s.stadt) || a.geld < gp * 2 || slotsFreiVon(a, s.stadt).length) continue;
       { const b = benutzteSlots(a); if (a.slots.filter((x) => !x.heim && !b.has(x.id)).length >= 2) continue; }     // erst nutzen, was man hat
       const K = koennen(st, aid), kf = kopf(a);
@@ -2501,7 +2569,6 @@
       const weg = a.slots.filter((s) => !s.heim && !b.has(s.id) && tag - (s.seit || 0) >= REGELN.slotSchonTage);
       if (!weg.length) continue;
       a.slots = a.slots.filter((s) => !weg.includes(s));
-      for (const s of weg) poolNeu(st, s.stadt, true, s.h);
       if (aid === SPIELER) melden(st, { art: "slotweg", text: `🎟 ${weg.length === 1 ? "Ein ungenutzter Slot geht" : weg.length + " ungenutzte Slots gehen"} zurück: ${weg.map((s) => STADT[s.stadt].name + " " + uhrText(s.h)).join(", ")}.` });
     }
   }
@@ -2511,19 +2578,20 @@
     const gefahr = p.slots.filter((s) => !s.heim && !b.has(s.id) && tag + 2 - (s.seit || 0) >= REGELN.slotSchonTage);
     if (gefahr.length) melden(st, { art: "slotwarnung", stadt: gefahr[0].stadt, text: `⚠️ In zwei Tagen ist Saisonende. ${gefahr.length === 1 ? "Ein Slot ist" : gefahr.length + " Slots sind"} ungenutzt und ${gefahr.length === 1 ? "geht" : "gehen"} dann zurück: ${gefahr.map((s) => STADT[s.stadt].name + " " + uhrText(s.h)).join(", ")}.` });
   }
-  // Flughäfen geben von sich aus neue Slots frei, große öfter als kleine, bis zu ihrer Obergrenze.
-  function slotsNachschub(st, tag) {
-    st.slotUhr = st.slotUhr || {};
-    for (const c of ALLE) {
-      const naechster = st.slotUhr[c.id];
-      if (naechster == null) { st.slotUhr[c.id] = tag + 1 + Math.floor(zufall(st) * REGELN.slotTakt[c.k]); continue; }
-      if (tag < naechster) continue;
-      st.slotUhr[c.id] = tag + REGELN.slotTakt[c.k] + Math.floor(zufall(st) * 2);
-      // Nie mehr als ein offener Slot je Flughafen: Slots bleiben knapp.
-      if (slotZahl(st, c.id) < REGELN.slotMax[c.k] && !st.pool.some((s) => s.stadt === c.id)) poolNeu(st, c.id, true);
-    }
-  }
+  // Früher gaben Flughäfen Slots nach und nach frei. Jetzt sind alle Slots von Anfang an zu haben (Florian, 2026-11-28).
+  function slotsNachschub() {}
 
+  // Einen ungenutzten Slot an einem fremden Flughafen zurückgeben: Die Hälfte des Grundpreises kommt zurück.
+  function slotZurueckgeben(st, aid, sid) {
+    const a = st.airlines[aid];
+    const s = slotVon(a, sid);
+    if (!s || s.heim || slotFlug(a, sid)) return { ok: false };
+    const geld = runde10k(slotGrundpreis(s.stadt, s.h) * REGELN.rueckgabeAnteil);
+    a.slots = a.slots.filter((x) => x !== s);
+    a.geld += geld;
+    geaendert(st);
+    return { ok: true, geld };
+  }
   // Was ist ein Slot seinem Besitzer wert? Ungenutzt wenig, mit einer guten Linie darauf viel.
   function slotWertFuer(st, aid, s) {
     const a = st.airlines[aid];
@@ -2627,6 +2695,22 @@
     const irrtum = fest(st, "wer" + sid) < wer.streuung;
     const mit = irrtum ? (echte.length ? [] : [waehleFest(st, ["k", "s", "a"], "x" + sid)]) : echte;
     return { wer, wert: wert > 0 ? spanne(wert, wer.streuung).map((v) => Math.max(0, runde10k(v))) : null, lohnt: wert >= gp, mit: mit.filter((id) => !st.airlines[id].konkurs), von: n ? n.von : null, typ: n ? n.typ : null, grundpreis: gp };
+  }
+  // Beim Buchen: Wer hält wohl dagegen, und was ist der Slot wert? Ein guter Analyst liegt meist richtig.
+  function ratBuchung(st, stadt, h) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    if (!wer) return null;
+    const kopie = klonen(st);
+    const echte = kiGebote(kopie, { id: "?", stadt, h }, SPIELER);
+    const key = stadt + Math.round(h) + "-" + tagVon(st);
+    const irrtum = fest(st, "wer" + key) < wer.streuung;
+    const mit = (irrtum ? (Object.keys(echte).length ? [] : [waehleFest(st, ["k", "s", "a"], "x" + key)]) : Object.keys(echte)).filter((id) => st.airlines[id] && !st.airlines[id].konkurs);
+    const hoch = Math.max(0, ...Object.values(echte));
+    const gp = slotGrundpreis(stadt, h);
+    // Was reicht wohl zum Gewinnen? Bei Gegnern etwas über ihrem Gebot, geschätzt mit der Brille des Analysten.
+    // Wie weit gehen sie wohl? Der Analyst schätzt das höchste Limit, mit seiner Brille.
+    const bis = mit.length ? runde10k(Math.max(gp, brille(st, wer, hoch || gp * 1.4, "reicht" + key))) : gp;
+    return { wer, mit, bis, grundpreis: gp };
   }
   const waehleFest = (st, liste, text) => liste[Math.floor(fest(st, text) * liste.length)];
   function ratHandel(st, sid) {
@@ -2795,7 +2879,6 @@
   // Rivalen können pleitegehen. Dann werden ihre Slots frei, und sie fangen mit neuem Geld von vorn an.
   function rivalNeustart(st, aid) {
     const a = st.airlines[aid];
-    for (const s of a.slots) if (!s.heim) poolNeu(st, s.stadt, true, s.h);
     a.routen = []; a.fluege = []; a.flotte = []; a.slots = []; a.geschenk = REGELN.heimGeschenk;
     a.geld = REGELN.startGeld; a.kredit = 0; a.ziel = ZIELE.length; a.kopf = null; a.konkurs = false; a.minusTage = 0; a.ausgebaut = []; a.verlauf = [];
     st.plaene = (st.plaene || []).filter((x) => x.aid !== aid);
@@ -3153,6 +3236,8 @@
     // Ältere Stände (ohne Slots mit Uhrzeit) lassen sich nicht umrechnen: Dann beginnt ein neues Spiel.
     if (!st || st.version !== 3) return null;
     st.manager = managerPruefen(st.manager);
+    // Seit 2026-11-28 gibt es keinen Topf und keine Versteigerungen mehr: Alle Slots sind offen und werden beim Buchen entschieden.
+    st.pool = [];
     for (const a of Object.values(st.airlines)) {
       a.grundsaetze = a.grundsaetze || { ...VORLAGEN[a.service || "standard"] };
       a.assistenten = a.assistenten || {};
@@ -3166,7 +3251,7 @@
     KLASSEN, KLASSEN_MAX, klassenVon, kabineGrenzen, kabineStandard, kabineSetzen, umbauPreis, inWerkstatt, besteKabine,
     GESCHLECHTER, AUSSEHEN, aussehenFuer, managerPruefen, managerSetzen, anrede,
     neuesSpiel, laden, istAlterStand, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
-    HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen, sofortStatus, sofortPreis, sofortStunden, sofortKaufen,
+    HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen, freieStunden, slotBuchen, ratBuchung, slotZurueckgeben, auktionStart, auktionBieten, auktionKi, auktionEnde, auktionAuto, fragenAn, bietSchritt,
     slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,
     flugzeugeAuf, freieFlugzeuge, fluegeVon, fluegeAuf, typFrei, routeVon, flugFinden, flugAnlegen, flugStreichen,
     kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ASSISTENTEN, ANALYSTEN: ASSISTENTEN, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruestenGeht, umruesten,

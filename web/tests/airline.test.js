@@ -12,10 +12,10 @@ function leer(opt) {
 }
 // Ein Slot-Ende für flugFinden: eine Stunde auf der eigenen Tafel oder der liegen gebliebene Slot am Flughafen.
 const tafelEnde = (h) => ({ art: "tafel", h, preis: 0 });
+// Seit 2026-11-28 sind alle Slots offen: Gebucht wird eine freie volle Stunde, die Rivalen können dagegen bieten.
 function poolEnde(st, stadt, h) {
-  const s = st.pool.find((x) => x.stadt === stadt);
-  if (h != null) s.h = h;
-  return { art: "pool", id: s.id, h: s.h, preis: L.slotGrundpreis(stadt, s.h) };
+  if (h == null) h = 12;
+  return { art: "frei", h, preis: L.slotGrundpreis(stadt, h) };
 }
 function flug(st, x, y, typ, h1, h2, opt) {
   const res = L.fliegen(st, "p", x, y, typ, Object.assign({ e1: tafelEnde(h1), e2: poolEnde(st, y, h2) }, opt));
@@ -37,17 +37,14 @@ test("Start bei Null: kein Flugzeug, keine Linie, kein Slot, für alle gleich", 
   assert.ok(L.ALLE.length > 90);
 });
 
-test("An jedem Flughafen liegt am Anfang genau ein freier Slot", () => {
+test("Alle Flughäfen bieten alle Slots an: jede volle Stunde, bis zur Obergrenze", () => {
   const st = L.neuesSpiel({ seed: 4, basis: "hamburg" });
-  assert.equal(st.pool.length, L.ALLE.length);
+  assert.equal(st.pool.length, 0);
   for (const c of L.ALLE) {
-    const liste = L.poolIn(st, c.id);
-    assert.equal(liste.length, 1, c.id);
-    assert.equal(liste[0].bis, null);
-    assert.ok(liste[0].h >= 5 && liste[0].h < 23.5);
+    if (L.hatTafel(st.airlines.p, c.id)) continue;
+    assert.deepEqual(L.freieStunden(st, c.id), L.HEIM_STUNDEN, c.id);
   }
 });
-
 test("Rivalen sitzen in der Nähe der Heimat, jeder woanders", () => {
   for (const basis of ["paris", "athen", "helsinki"]) {
     const st = L.neuesSpiel({ seed: 3, basis });
@@ -86,11 +83,11 @@ test("Ein Flug braucht an jedem Ende einen eigenen Slot und kauft das Flugzeug m
   assert.equal(p.fluege.length, 1);
   assert.equal(p.slots.length, 2);
   assert.equal(p.slots.filter((s) => s.stadt === "rom").length, 1);
-  assert.equal(L.poolIn(st, "rom").length, 0);                 // der eine Slot in Rom ist weg
+  assert.ok(!L.freieStunden(st, "rom").includes(12));          // 12 Uhr in Rom ist jetzt vergeben
   assert.equal(res.kosten.flugzeug, L.TYPEN.falke.preis);
   assert.equal(p.geld, L.REGELN.startGeld - L.TYPEN.falke.preis - L.slotGrundpreis("rom", 12));
-  // Ein zweiter Flug nach Rom geht nicht: kein Slot mehr da.
-  assert.equal(L.flugFinden(st, "p", "frankfurt", "rom", "falke").grund, "slots");
+  // Ein zweiter Flug um dieselbe Zeit geht nicht: Der Slot gehört schon dir und ist belegt.
+  assert.ok(!L.enden(st, p, "rom").some((e) => e.h === 12));
 });
 
 test("Das Spiel rechnet Ankunft und Rückflug: 45 Minuten am Boden, sonst erst am nächsten Tag", () => {
@@ -120,7 +117,7 @@ test("Ein Flugzeug fliegt mehrere Flüge am Tag, wenn die Zeiten passen", () => 
   const fid = a.flugzeug.id;
   // Überschneidung: 8 Uhr geht nicht mit demselben Flugzeug.
   assert.equal(L.flugFinden(st, "p", "frankfurt", "wien", "falke", { e1: tafelEnde(8), e2: poolEnde(st, "wien", 11), fid }).grund, "belegt");
-  const b = flug(st, "frankfurt", "wien", "falke", 13, 15.5, { fid });
+  const b = flug(st, "frankfurt", "wien", "falke", 13, 16, { fid });
   assert.equal(b.flugzeug.id, fid);
   assert.equal(b.kosten.flugzeug, 0);
   assert.equal(p.flotte.length, 1);
@@ -164,65 +161,65 @@ test("Nutzen oder verlieren: ungenutzter fremder Slot geht am Saisonende zurück
   assert.ok(arten.includes("slotweg"));
   assert.equal(p.slots.filter((s) => !s.heim).length, 0);
   assert.equal(p.slots.filter((s) => s.heim).length, 1);
-  const rom = L.poolIn(st, "rom");
-  assert.ok(rom.some((s) => s.bis != null));                   // er wird neu ausgeschrieben
+  assert.ok(L.freieStunden(st, "rom").includes(12));           // er ist wieder für alle zu haben
 });
 
-test("Bieten: ein Bieter zahlt den Grundpreis, sonst gewinnt das höchste Gebot", () => {
+test("Buchen heißt bieten: offen, in festen Schritten, bis keiner mehr bietet", () => {
   const st = leer();
-  const p = st.airlines.p, k = st.airlines.k;
-  st.pool = st.pool.filter((s) => s.stadt !== "rom");
-  const s = { id: "x1", stadt: "rom", h: 8, bis: st.zeit + 24, gebote: {}, ki: {} };
-  st.pool.push(s);
-  const gp = L.slotGrundpreis("rom", 8);
-  assert.ok(L.bieten(st, "x1", gp + 200000));
-  let geld = p.geld;
-  L.vorruecken(st, 25);
-  assert.ok(L.slotVon(p, "x1"));
-  assert.equal(p.geld <= geld - gp && p.geld > geld - gp - 100000, true);   // nur der Grundpreis (plus Tagesabschluss)
-  assert.equal(st.bietErgebnisse[0].preis, gp);
-  // Zwei Bieter: das höhere Gebot gewinnt und wird voll bezahlt.
-  const s2 = { id: "x2", stadt: "wien", h: 8, bis: st.zeit + 24, gebote: {}, ki: { k: gp + 300000 } };
-  st.pool.push(s2);
-  L.bieten(st, "x2", gp + 100000);
-  L.vorruecken(st, 25);
-  assert.ok(L.slotVon(k, "x2"));
-  assert.equal(st.bietErgebnisse[1].sieger, "k");
-  // Gleichstand: Wer dort weniger Slots hat, gewinnt.
-  const g3 = L.slotGrundpreis("wien", 9) + 100000;
-  const s3 = { id: "x3", stadt: "wien", h: 9, bis: st.zeit + 24, gebote: {}, ki: { k: g3 } };
-  st.pool.push(s3);
-  L.bieten(st, "x3", g3);
-  L.vorruecken(st, 25);
-  assert.ok(L.slotVon(p, "x3"));
-});
-
-test("Bieten geht in 10.000er-Schritten und nie unter dem Grundpreis", () => {
-  const st = leer();
-  const s = { id: "x1", stadt: "rom", h: 13, bis: st.zeit + 24, gebote: {}, ki: {} };
-  st.pool.push(s);
-  L.bieten(st, "x1", 1);
-  assert.equal(s.gebote.p, L.slotGrundpreis("rom", 13));
-  L.bieten(st, "x1", 234567);
-  assert.equal(s.gebote.p, 230000);
-  L.bieten(st, "x1", 0);
-  assert.equal(s.gebote.p, undefined);
-  assert.ok(!L.slotNehmen(st, "p", "x1").ok);                  // solange geboten wird, kann ihn keiner einfach nehmen
-});
-
-test("Flughäfen geben neue Slots frei, aber nie über ihre Obergrenze", () => {
-  const st = leer();
-  for (let d = 0; d < 30; d++) L.vorruecken(st, 24);
-  for (const c of L.ALLE) assert.ok(L.slotZahl(st, c.id) <= L.REGELN.slotMax[c.k], c.id);
-  // Wo der Slot weg ist, kommt ein neuer nach.
   const p = st.airlines.p;
-  flug(st, "frankfurt", "rom", "falke", 8, 12);
-  let neu = false;
-  for (let d = 0; d < 8 && !neu; d++) { L.vorruecken(st, 24); neu = L.poolIn(st, "rom").length > 0; }
-  assert.ok(neu);
-  assert.ok(p.fluege.length === 1);
+  const gp = L.slotGrundpreis("rom", 8);
+  let geld = p.geld;
+  const r = L.slotBuchen(st, "p", "rom", 8);                    // ruhige Rivalen bieten nicht mit: Grundpreis
+  assert.ok(r.ok);
+  assert.equal(p.geld, geld - gp);
+  assert.equal(L.slotBuchen(st, "p", "rom", 8).grund, "belegt");
+  assert.equal(L.slotBuchen(st, "p", "frankfurt", 8).grund, "tafel");
+  // Von Hand: Du startest, ein Rivale mit Limit geht mit, du gehst einen Schritt höher, dann gibt er auf.
+  const st2 = leer();
+  const k = st2.airlines.k;
+  assert.ok(L.auktionStart(st2, "p", "wien", 8).ok);
+  const A = st2.auktion;
+  assert.equal(A.schritt, L.bietSchritt(A.gp));
+  A.limits = { k: A.gp + A.schritt };                           // Kontinentia geht genau einen Schritt mit
+  assert.equal(L.auktionKi(st2), "k");
+  assert.equal(A.stand, A.gp + A.schritt);
+  assert.equal(L.auktionKi(st2), null);                         // wer vorne liegt, überbietet sich nicht
+  assert.ok(!L.auktionBieten(st2, "k"));
+  assert.ok(L.auktionBieten(st2, "p"));
+  assert.equal(L.auktionKi(st2), null);                         // über ihr Limit geht sie nicht
+  const kGeld = k.geld, pGeld = st2.airlines.p.geld;
+  const e = L.auktionEnde(st2);
+  assert.equal(e.sieger, "p");
+  assert.equal(e.preis, A.gp + 2 * A.schritt);
+  assert.equal(st2.airlines.p.geld, pGeld - e.preis);
+  assert.equal(k.geld, kGeld);
+  assert.equal(st2.auktion, null);
+  assert.equal(L.laune(st2, "k").art, "groll");                 // überboten: Sie ärgert sich
 });
-
+test("Schritte von 10 % des Grundpreises, mindestens 10.000; Rückgabe bringt die Hälfte", () => {
+  assert.equal(L.bietSchritt(40000), 10000);
+  assert.equal(L.bietSchritt(450000), 50000);
+  const st = leer();
+  const p = st.airlines.p;
+  const geld = p.geld;
+  const r = L.slotBuchen(st, "p", "rom", 13);
+  assert.ok(r.ok);
+  assert.equal(geld - p.geld, L.slotGrundpreis("rom", 13));
+  const g2 = p.geld;
+  const z = L.slotZurueckgeben(st, "p", r.slot.id);
+  assert.ok(z.ok);
+  assert.equal(p.geld - g2, Math.round(L.slotGrundpreis("rom", 13) * L.REGELN.rueckgabeAnteil / 10000) * 10000);
+  assert.ok(L.freieStunden(st, "rom").includes(13));
+});
+test("Ein Flughafen gibt nie mehr Slots her als seine Obergrenze", () => {
+  const st = leer();
+  st.airlines.p.geld = 1e9;
+  const c = L.STADT.rom;
+  for (const h of L.HEIM_STUNDEN) L.slotBuchen(st, "p", "rom", h);
+  assert.equal(L.slotZahl(st, "rom"), L.REGELN.slotMax[c.k]);
+  assert.deepEqual(L.freieStunden(st, "rom"), []);
+  assert.equal(L.slotBuchen(st, "p", "rom", 23).grund, "belegt");
+});
 test("Slot-Handel: Antwort kommt sofort, nach einem Nein zwei Tage Sperre", () => {
   const st = leer();
   const p = st.airlines.p, k = st.airlines.k;
@@ -257,7 +254,7 @@ test("Slot-Handel: Tausch Slot gegen Slot zählt mit", () => {
 test("Die Uhrzeit wirkt: morgens mehr Gäste als nachts", () => {
   const früh = leer(), spät = leer();
   flug(früh, "frankfurt", "rom", "falke", 8, 17);
-  flug(spät, "frankfurt", "rom", "falke", 23, 5.5);
+  flug(spät, "frankfurt", "rom", "falke", 23, 6);
   const a = Object.values(L.rechnung(früh).routen)[0], b = Object.values(L.rechnung(spät).routen)[0];
   assert.ok(a.fluege[0].hin.dem.geschaeft > 1.8 * b.fluege[0].hin.dem.geschaeft);
   assert.ok(a.gewinn > b.gewinn);
@@ -268,8 +265,7 @@ test("Zwei Flüge kurz hintereinander nehmen sich Gäste weg", () => {
   for (const [st, h] of [[nah, 9], [fern, 17]]) {
     st.airlines.p.geld = 1e7;
     flug(st, "frankfurt", "rom", "falke", 8, 12);
-    st.pool.push({ id: "z1", stadt: "rom", h: h + 4, bis: null, gebote: {} });
-    const res = L.fliegen(st, "p", "frankfurt", "rom", "falke", { e1: tafelEnde(h), e2: { art: "pool", id: "z1", h: h + 4, preis: 0 }, neu: true });
+    const res = L.fliegen(st, "p", "frankfurt", "rom", "falke", { e1: tafelEnde(h), e2: poolEnde(st, "rom", h + 4), neu: true });
     assert.ok(res.ok, res.grund);
   }
   const pax = (st) => Object.values(L.rechnung(st).routen)[0].fluege.reduce((s, f) => s + f.hin.dem.urlaub + f.hin.dem.geschaeft, 0);
@@ -328,18 +324,17 @@ test("Analyst empfiehlt beim Kauf Flugzeug und Kabine, ohne Analyst kein Rat", (
   assert.deepEqual(L.ratKauf(st, plan).gewinn, rat.gewinn);
 });
 
-test("Analyst berät beim Bieten: Spanne für den Wert und wer mitbietet", () => {
+test("Analyst berät beim Buchen: wer wohl dagegenhält und was reicht", () => {
   const st = leer();
-  st.pool = st.pool.filter((s) => s.stadt !== "london");
-  st.pool.push({ id: "x1", stadt: "london", h: 8, bis: st.zeit + 24, gebote: {}, ki: { k: 900000 } });
-  assert.equal(L.ratSlot(st, "x1"), null);
+  assert.equal(L.ratBuchung(st, "london", 8), null);
   L.einstellen(st, "p", "analyst", "kern");
-  const rat = L.ratSlot(st, "x1");
-  assert.ok(rat.wert && rat.wert[0] <= rat.wert[1]);
+  const rat = L.ratBuchung(st, "london", 8);
   assert.ok(Array.isArray(rat.mit));
   assert.equal(rat.grundpreis, L.slotGrundpreis("london", 8));
+  assert.ok(rat.bis >= rat.grundpreis);
+  // Der Rat ändert nichts am Spiel.
+  assert.deepEqual(L.freieStunden(st, "london"), L.HEIM_STUNDEN);
 });
-
 test("Jede Einstellung zeigt ihre festen Tatsachen, der Analyst schätzt die Wirkung", () => {
   for (const g of Object.values(L.GRUNDSAETZE)) for (const o of Object.values(g.optionen)) assert.ok(o.fakt && o.fakt.length > 10);
   const st = leer();
@@ -527,10 +522,9 @@ test("Rivale auf deiner Strecke startet einen Preiskampf", () => {
   const s = st.airlines.s;
   const r = flug(st, "frankfurt", s.basis, "falke", 8, 12).route;
   s.geld = 1e8;
-  st.pool.push({ id: "n1", stadt: s.basis, h: 15, bis: null, gebote: {} });   // der Rivale nimmt in Frankfurt den einen freien Slot
   const t = L.flugFinden(st, "s", s.basis, "frankfurt", "falke");
   assert.ok(t.ok, t.grund);
-  assert.equal(t.plan.e2.art, "pool");                         // an der Heimat des Spielers hat der Rivale keine Tafel
+  assert.equal(t.plan.e2.art, "frei");                         // an der Heimat des Spielers hat der Rivale keine Tafel, er bucht einen freien Slot
   assert.ok(L.kiFliegen(st, "s", t.plan).ok);
   assert.equal(r.duell.gegen, "s");
   assert.equal(L.vergleich(st, r.id).length, 2);
@@ -542,8 +536,7 @@ test("Zweites Drehkreuz: eigene Tafel mit zehn Slots", () => {
   p.geld = 5e7;
   flug(st, "frankfurt", "rom", "falke", 6, 9);
   for (const [ziel, h] of [["wien", 8], ["madrid", 12], ["athen", 16]]) {
-    st.pool.push({ id: "r" + ziel, stadt: "rom", h, bis: null, gebote: {} });
-    const res = L.fliegen(st, "p", "rom", ziel, "falke", { e1: { art: "pool", id: "r" + ziel, h, preis: 0 }, neu: true });
+    const res = L.fliegen(st, "p", "rom", ziel, "falke", { e1: poolEnde(st, "rom", h), neu: true });
     assert.ok(res.ok, ziel + " " + res.grund);
   }
   assert.ok(L.kannAusbauen(st, "p", "rom"));
@@ -648,13 +641,13 @@ test("Pleite eines Rivalen: Seine Slots werden frei, Flugzeuge gibt es nicht zu 
   k.slots.push({ id: "k1", stadt: "rom", h: 8, seit: 0 }, { id: "k2", stadt: k.basis, h: 8, heim: true, seit: 0 });
   k.flotte.push({ id: "kf1", typ: "falke", ort: null, kabine: { business: 0, first: 0 } });
   k.geld = -5e6;
-  st.pool = st.pool.filter((s) => s.stadt !== "rom");
   const arten = [];
   for (let d = 0; d < 6; d++) { L.vorruecken(st, 24); for (const m of st.meldungen.splice(0)) arten.push(m.art); }
   assert.ok(arten.includes("pleite"));
   assert.equal(k.flotte.length, 0);
   assert.ok(!st.gelegenheiten.some((g) => g.art === "aufkauf" || g.art === "gebraucht"));
-  assert.ok(st.pool.some((s) => s.stadt === "rom") || st.reihenfolge.some((id) => st.airlines[id].slots.some((s) => s.id !== "k1" && s.stadt === "rom")));
+  assert.ok(!k.slots.some((s) => s.id === "k1"));
+  assert.ok(L.freieStunden(st, "rom").includes(8) || st.reihenfolge.some((id) => st.airlines[id].slots.some((s) => s.stadt === "rom" && s.h === 8)));
 });
 
 test("Rivalen: drei Stufen, gleiche Regeln, spürbar verschieden", () => {
@@ -677,17 +670,17 @@ test("Rivalen: drei Stufen, gleiche Regeln, spürbar verschieden", () => {
 test("Rivalen: Wer überboten wird, ärgert sich und verlangt beim Handel mehr", () => {
   const st = L.neuesSpiel({ seed: 7, basis: "hamburg", gegner: "schwer" });
   assert.equal(L.laune(st, "k").art, "normal");
-  const s = st.pool.find((x) => !L.hatTafel(st.airlines.k, x.stadt) && !L.hatTafel(st.airlines.p, x.stadt));
-  s.bis = st.zeit + 24; s.gebote = { p: 900000 }; s.ki = { k: 200000 };
-  const w = L.poolAuswerten(st, s);
-  assert.equal(w.aid, "p");
+  assert.ok(L.auktionStart(st, "p", "rom", 8).ok);
+  st.auktion.limits = { k: st.auktion.gp + st.auktion.schritt };
+  L.auktionKi(st);
+  L.auktionBieten(st, "p");
+  assert.equal(L.auktionEnde(st).sieger, "p");
   assert.equal(L.laune(st, "k").art, "groll");
   assert.ok(st.meldungen.some((m) => /ärgert sich/.test(m.text)));
   // Der Ärger verraucht mit der Zeit.
   for (let d = 0; d < 12; d++) L.kiTag(st, "k");
   assert.notEqual(L.laune(st, "k").art, "groll");
 });
-
 test("Manager-Profil: Name, Geschlecht, Aussehen; alte Stände laufen ohne Profil weiter", () => {
   const st = L.neuesSpiel({ seed: 2, basis: "frankfurt", manager: { name: "  Florian   Horn ", geschlecht: "mann", aussehen: "mann-3" } });
   assert.deepEqual(st.manager, { name: "Florian Horn", geschlecht: "mann", aussehen: "mann-3" });
@@ -796,41 +789,24 @@ test("Der Analyst schätzt Linien der Rivalen als Spanne", () => {
   assert.ok(e.gewinn[0] <= e.gewinn[1]);
 });
 
-test("Sofortkauf: Slot zur Wunschzeit, teurer, und der Flughafen gibt seinen nächsten Slot später heraus", () => {
-  const st = leer();
-  const p = st.airlines.p;
-  const c = L.STADT.paris;
-  st.pool = st.pool.filter((s) => s.stadt !== "paris");
-  st.slotUhr = { paris: 2 };
-  assert.ok(L.sofortStatus(st, "p", "paris").ok);
-  const preis = L.sofortPreis("paris", 13);
-  assert.equal(preis, Math.round(L.slotGrundpreis("paris", 13) * L.REGELN.sofortFaktor / 10000) * 10000);
-  const vorher = p.geld;
-  const r = L.fliegen(st, "p", "frankfurt", "paris", "dash8", { e1: tafelEnde(7), e2: { art: "sofort", h: 13, preis } });
-  assert.ok(r.ok, r.grund);
-  assert.equal(vorher - p.geld, preis + L.TYPEN.dash8.preis);
-  assert.ok(p.slots.some((s) => s.stadt === "paris" && s.h === 13));
-  // Der reguläre Nachschub rückt einen Takt nach hinten, ein zweiter Sofortkauf geht erst später.
-  assert.equal(st.slotUhr.paris, 2 + L.REGELN.slotTakt[c.k]);
-  const zweit = L.sofortStatus(st, "p", "paris");
-  assert.equal(zweit.ok, false);
-  assert.equal(zweit.grund, "warten");
-  // Läuft eine Vergabe, wird geboten statt sofort gekauft; an der eigenen Heimat gibt es die Tafel.
-  const st2 = leer();
-  st2.pool = st2.pool.filter((s) => s.stadt !== "wien");
-  const s = { id: "x1", stadt: "wien", h: 10, bis: st2.zeit + 24, gebote: {} };
-  st2.pool.push(s);
-  assert.equal(L.sofortStatus(st2, "p", "wien").grund, "bieten");
-  assert.equal(L.sofortStatus(st2, "p", "frankfurt").grund, "tafel");
-  // Rivalen und die normale Suche sehen keinen Sofortkauf.
-  assert.ok(!L.enden(st2, st2.airlines.k, "paris").some((e) => e.art === "sofort"));
-});
 
-test("Sofortkauf: nie über die Obergrenze eines Flughafens", () => {
-  const st = leer();
-  const c = L.STADT.paris;
-  st.pool = st.pool.filter((s) => s.stadt !== "paris");
-  const k = st.airlines.k;
-  for (let i = 0; i < L.REGELN.slotMax[c.k]; i++) k.slots.push({ id: "v" + i, stadt: "paris", h: 5 + i * 0.9, seit: 0 });
-  assert.equal(L.sofortStatus(st, "p", "paris").grund, "voll");
+test("Rivalen bieten untereinander, und ein Rivale fliegt erst, wenn er den Slot gewonnen hat", () => {
+  const st = L.neuesSpiel({ seed: 9, basis: "frankfurt" });
+  for (let d = 0; d < 20; d++) L.vorruecken(st, 24);
+  assert.equal(st.auktion, null);                                // ohne Oberfläche wird nie auf dich gewartet
+  for (const id of ["k", "s", "a"]) for (const F of st.airlines[id].fluege) assert.ok(L.slotVon(st.airlines[id], F.s2), id);
+  // Mit Oberfläche: Will ein Rivale einen Slot in deinem Netz, bleibt die Versteigerung offen.
+  const st2 = leer();
+  flug(st2, "frankfurt", "rom", "falke", 8, 12);
+  st2.airlines.k.stil = "bot";
+  L.fragenAn(true);
+  try {
+    const r = L.slotBuchen(st2, "k", "rom", 15, { plan: null, ende: "e2" });
+    assert.equal(r.grund, "auktion");
+    assert.ok(st2.auktion && st2.auktion.frage);
+    assert.equal(L.slotBuchen(st2, "s", "rom", 16).grund, "laeuft");
+    assert.equal(L.auktionEnde(st2).sieger, "k");
+    // Höchstens eine Frage am Tag.
+    assert.equal(L.slotBuchen(st2, "k", "rom", 17).ok, true);
+  } finally { L.fragenAn(false); }
 });
