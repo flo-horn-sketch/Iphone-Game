@@ -106,6 +106,20 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-regel-ausbau.png` | 1024 × 1024 | Ein Flughafen-Terminal wird mit Kränen und Gerüsten erweitert, neue Gates, Flugzeuge rollen schon heran, goldenes Abendlicht. |
 | `air-regel-aufkauf.png` | 1024 × 1024 | Ein Schild „Sale“ ohne Schrift, nur mit Prozentzeichen, hängt an einem Flugzeug, im Hintergrund weitere abgestellte Flugzeuge, leicht melancholische Stimmung. |
 
+### 6b. Weitere Regelkarten (quadratisch, auch im Menü unter „Spielregeln“)
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `air-regel-start.png` | 1024 × 1024 | Ein einzelnes kleines Flugzeug steht im Morgenlicht auf einer leeren Startbahn, vor ihm eine leuchtende goldene Linie über eine Landkarte bis zum Horizont, Aufbruchsstimmung. |
+| `air-regel-store.png` | 1024 × 1024 | Ein heller Hangar wie ein Schaufenster: nebeneinander ein kleines Propellerflugzeug, ein mittlerer Jet und ein riesiger Großraumjet, Scheinwerfer von oben. |
+| `air-regel-farben.png` | 1024 × 1024 | Eine Landkarte von oben mit drei leuchtenden Fluglinien: eine grün, eine gelb, eine rot, kleine Flugzeuge darauf. |
+| `air-regel-tempo.png` | 1024 × 1024 | Eine große Flughafen-Uhr, deren Zeiger sich schnell drehen, dahinter wechselt der Himmel von Tag zu Nacht, Flugzeuge als Lichtspuren. |
+| `air-regel-linie.png` | 1024 × 1024 | Blick von oben in eine aufgeschnittene Flugzeugkabine: vorne wenige breite Sitze in Gold, dann Sitze in Blau, hinten viele schmale Sitze in Grün. |
+| `air-regel-meine.png` | 1024 × 1024 | Ein gemütliches Chefbüro mit Fenster zum Vorfeld, auf dem Tisch ein Flugzeugmodell, ein Tablett mit Essen und ein Koffer, warmes Licht. |
+| `air-regel-assistenten.png` | 1024 × 1024 | Zwei Mitarbeitende beugen sich mit Lupe und Notizblock über eine große Weltkarte voller Fluglinien, konzentrierte Stimmung. |
+| `air-regel-rangliste.png` | 1024 × 1024 | Ein Siegertreppchen auf einem Rollfeld, auf den drei Stufen stehen Flugzeugmodelle in Grün, Rot und Violett, darüber Konfetti. |
+| `air-regel-pleite.png` | 1024 × 1024 | Ein Flugzeug steht im Regen vor einem Bankgebäude, darüber ein großes Warndreieck aus Licht, ernste, aber nicht düstere Stimmung. |
+
 ### 7. App-Symbol (für den Home-Bildschirm)
 
 Diese zwei Dateien kommen ausnahmsweise **nicht** nach `web/grafiken/`, sondern direkt nach `web/` und ersetzen die alten Dateien dort.
@@ -114,6 +128,96 @@ Diese zwei Dateien kommen ausnahmsweise **nicht** nach `web/grafiken/`, sondern 
 |---|---|---|
 | `web/app-icon.png` | 1024 × 1024 | App-Symbol: ein stilisiertes weißes Flugzeug mit goldenem Streifen steigt schräg nach oben vor nachtblauem Hintergrund mit einem goldenen Bogen wie eine Fluglinie. Sehr einfache, klare Form, ohne Rand, ohne Schrift. |
 | `web/app-icon-180.png` | 180 × 180 | Genau dasselbe Bild, nur verkleinert auf 180 × 180. |
+
+### 8. Symbole (klein, ersetzen alle Standard-Symbole im Spiel)
+
+Alle Symbole im selben Stil. Diesen Satz **statt** des allgemeinen Stils vor jeden Symbol-Prompt setzen:
+
+> Einzelnes Spiel-Symbol, flach mit leichtem Verlauf, kräftige klare Umrisse, Farben Nachtblau, Himmelblau, warmes Gold und Weiß, mittig, füllt das Bild fast ganz aus, **durchsichtiger Hintergrund**, kein Rahmen, kein Schatten nach außen, keine Schrift. Muss auch winzig klein (20 Pixel) noch erkennbar sein.
+
+Wichtig: PNG mit **durchsichtigem Hintergrund**, quadratisch 256 × 256. Das Spiel zeigt jedes Symbol in fester Größe, auch wenn das Bild größer ist.
+
+| Datei | Größe | Motiv |
+|---|---|---|
+| `ico-stift.png` | 256 × 256 | Bleistift, schräg, Linien-Editor |
+| `ico-store.png` | 256 × 256 | Einkaufswagen |
+| `ico-flugzeug.png` | 256 × 256 | Passagierjet von oben, schräg nach rechts oben |
+| `ico-propeller.png` | 256 × 256 | kleines Propellerflugzeug von der Seite |
+| `ico-start.png` | 256 × 256 | Flugzeug beim Abheben, schräg nach oben |
+| `ico-landung.png` | 256 × 256 | Flugzeug beim Landen, schräg nach unten |
+| `ico-duell.png` | 256 × 256 | zwei gekreuzte Säbel |
+| `ico-mode.png` | 256 × 256 | kleine Flamme |
+| `ico-hoch.png` | 256 × 256 | schlichtes Dreieck, Spitze nach oben, kräftiges Grün |
+| `ico-runter.png` | 256 × 256 | schlichtes Dreieck, Spitze nach unten, kräftiges Rot |
+| `ico-trend-hoch.png` | 256 × 256 | kleines Diagramm mit grüner Linie nach oben |
+| `ico-trend-runter.png` | 256 × 256 | kleines Diagramm mit roter Linie nach unten |
+| `ico-messe.png` | 256 × 256 | Messezelt mit Fähnchen |
+| `ico-sonne.png` | 256 × 256 | Sonne |
+| `ico-ski.png` | 256 × 256 | Skifahrer in der Abfahrt |
+| `ico-palme.png` | 256 × 256 | Palme |
+| `ico-regen.png` | 256 × 256 | Wolke mit Regentropfen |
+| `ico-fruehling.png` | 256 × 256 | junger grüner Spross |
+| `ico-herbst.png` | 256 × 256 | Herbstblatt |
+| `ico-winter.png` | 256 × 256 | Schneeflocke |
+| `ico-landerecht.png` | 256 × 256 | Eintrittskarte / Ticketabschnitt |
+| `ico-hammer.png` | 256 × 256 | Auktionshammer |
+| `ico-ankuendigung.png` | 256 × 256 | Megafon |
+| `ico-versteigerung.png` | 256 × 256 | Gebäude mit Säulen |
+| `ico-aufkauf.png` | 256 × 256 | Handschlag |
+| `ico-streik.png` | 256 × 256 | erhobene Faust |
+| `ico-sturm.png` | 256 × 256 | Gewitterwolke mit Blitz |
+| `ico-kerosin.png` | 256 × 256 | Zapfsäule |
+| `ico-pfeil-runter.png` | 256 × 256 | Pfeil nach unten |
+| `ico-pfeil-hoch.png` | 256 × 256 | Pfeil nach oben |
+| `ico-billiger.png` | 256 × 256 | Dreieck nach unten, rot |
+| `ico-teurer.png` | 256 × 256 | Dreieck nach oben, grün |
+| `ico-rivalen.png` | 256 × 256 | zwei Personen-Silhouetten |
+| `ico-rennen.png` | 256 × 256 | Zielflagge, schwarz-weiß kariert |
+| `ico-pokal.png` | 256 × 256 | goldener Pokal |
+| `ico-gold.png` | 256 × 256 | Goldmedaille |
+| `ico-silber.png` | 256 × 256 | Silbermedaille |
+| `ico-bronze.png` | 256 × 256 | Bronzemedaille |
+| `ico-sanduhr.png` | 256 × 256 | Sanduhr |
+| `ico-stoppuhr.png` | 256 × 256 | Stoppuhr |
+| `ico-bericht.png` | 256 × 256 | Klemmbrett mit Blatt |
+| `ico-ziel.png` | 256 × 256 | Zielscheibe mit Pfeil |
+| `ico-geschenk.png` | 256 × 256 | Geschenk mit Schleife |
+| `ico-geschaeft.png` | 256 × 256 | Krawatte / Geschäftshemd |
+| `ico-urlaub.png` | 256 × 256 | Sonnenschirm am Strand |
+| `ico-ticket.png` | 256 × 256 | Flugticket |
+| `ico-kosten.png` | 256 × 256 | Geldschein mit Flügeln |
+| `ico-kasse.png` | 256 × 256 | Geldsack |
+| `ico-preis.png` | 256 × 256 | Euro-Geldschein |
+| `ico-muenze.png` | 256 × 256 | goldene Münze |
+| `ico-bank.png` | 256 × 256 | Bankgebäude |
+| `ico-essen.png` | 256 × 256 | Teller mit Messer und Gabel |
+| `ico-premium.png` | 256 × 256 | zwei Sektgläser |
+| `ico-koffer.png` | 256 × 256 | Rollkoffer |
+| `ico-sitz.png` | 256 × 256 | Flugzeugsitz |
+| `ico-reichweite.png` | 256 × 256 | Lineal |
+| `ico-crew.png` | 256 × 256 | Pilotin mit Mütze |
+| `ico-umsteiger.png` | 256 × 256 | zwei Pfeile im Kreis |
+| `ico-neu.png` | 256 × 256 | kreisförmiger Aktualisieren-Pfeil |
+| `ico-stern.png` | 256 × 256 | goldener Stern, gefüllt |
+| `ico-stern-leer.png` | 256 × 256 | Stern nur als Umriss, blass |
+| `ico-aufgeben.png` | 256 × 256 | weiße Fahne |
+| `ico-ausbau.png` | 256 × 256 | Baukran |
+| `ico-lupe.png` | 256 × 256 | Lupe |
+| `ico-gruendlich.png` | 256 × 256 | Mikroskop |
+| `ico-schnell.png` | 256 × 256 | Blitz |
+| `ico-extra.png` | 256 × 256 | Pluszeichen in einem Kreis |
+| `ico-sicher.png` | 256 × 256 | Schutzschild |
+| `ico-risiko.png` | 256 × 256 | Spielwürfel |
+| `ico-ok.png` | 256 × 256 | Häkchen in grünem Kreis |
+| `ico-beste.png` | 256 × 256 | drei Funkelsterne |
+| `ico-schloss.png` | 256 × 256 | Vorhängeschloss |
+| `ico-warnung.png` | 256 × 256 | Warndreieck |
+| `ico-welt.png` | 256 × 256 | Erdkugel |
+| `ico-kalender.png` | 256 × 256 | Kalenderblatt |
+| `ico-zeitung.png` | 256 × 256 | Zeitung |
+| `ico-pleite.png` | 256 × 256 | Explosion / Knall |
+| `ico-regeln.png` | 256 × 256 | aufgeschlagenes Buch |
+| `ico-heimat.png` | 256 × 256 | kleines Haus |
 
 ## Kontrolle
 
