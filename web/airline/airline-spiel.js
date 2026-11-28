@@ -248,9 +248,10 @@
   }
 
   function tippen(ziel) {
-    const t = ziel.closest ? ziel.closest("[data-stadt],[data-route],[data-gel]") : null;
+    const t = ziel.closest ? ziel.closest("[data-stadt],[data-route],[data-gel],[data-duell]") : null;
     if (ui.heimat) { if (t && t.dataset.stadt && L.HEIMAT.includes(t.dataset.stadt)) heimatGewaehlt(t.dataset.stadt); return; }
     if (t && t.dataset.gel) { zeigeGelegenheit(t.dataset.gel); return; }
+    if (t && t.dataset.duell && !ui.editor) { zeigeDuell(t.dataset.duell); return; }
     if (ui.editor) { editorTippen(t); return; }
     if (!t) { tafelZu(); return; }
     if (t.dataset.route) zeigeRoute(t.dataset.route);
@@ -344,6 +345,24 @@
         karte.schilder.append(schild);
       }
     }
+    // Preiskampf ⚔️ und Trend-Pfeile auf deinen Linien.
+    if (p && !ui.editor) {
+      const punktAuf = (a, b, t) => { const [x1, y1, x2, y2] = strecke(a, b); return [umlauf(x1 + (x2 - x1) * t), y1 + (y2 - y1) * t]; };
+      for (const r of p.routen) {
+        if (r.duell) {
+          const [dx, dy] = punktAuf(r.a, r.b, 0.68);
+          const grp = sv("g", { "data-duell": r.id, class: "huepfen" });
+          grp.append(sv("circle", { cx: dx, cy: dy, r: 8.5 * s, fill: "rgba(9,18,28,.92)", stroke: st.airlines[r.duell.gegen].farbe, "stroke-width": 1.4 * s }));
+          grp.append(sv("text", { x: dx, y: dy + 3.4 * s, "font-size": 9.5 * s, "text-anchor": "middle", text: "⚔️" }));
+          karte.schilder.append(grp);
+        }
+        const t = L.trendVon(st, r.a, r.b);
+        if (t) {
+          const [tx, ty] = punktAuf(r.a, r.b, 0.32);
+          if (frei(tx, ty, 12 * s, 12 * s)) karte.schilder.append(sv("text", { x: tx, y: ty + 3.5 * s, "font-size": 10 * s, "text-anchor": "middle", class: "trendpfeil", fill: t > 0 ? "#4ADE80" : "#F87171", "stroke-width": 2.4 * s, text: t === 2 ? "🔥" : t > 0 ? "▲" : "▼" }));
+        }
+      }
+    }
     // Geplante Linie im Editor.
     if (ui.editor && ui.editor.start && ui.editor.ziel) {
       linieSv(karte.routen, ui.editor.start, ui.editor.ziel, { stroke: "#F2C14E", "stroke-width": 3 * s, "stroke-dasharray": `${6 * s} ${4 * s}`, "stroke-linecap": "round" });
@@ -364,6 +383,9 @@
       }
       const eigen = p && (p.slots[c.id] || 0) > 0;
       if (p && (hubs.has(c.id) || p.basis === c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 3.2 * s, fill: "none", stroke: "#F2C14E", "stroke-width": 1.6 * s }));
+      if (p && L.ausgebaut(p, c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 6 * s, fill: "none", stroke: "#F2C14E", "stroke-width": 1.2 * s }));
+      const ct = st && !ui.heimat ? L.stadtTrend(st, c.id) : 0;
+      if (ct && z > 0.6) g.append(sv("text", { x: x + r * 0.6, y: y - r - 1.5 * s, "font-size": 8 * s, class: "trendpfeil", fill: ct > 0 ? "#4ADE80" : "#F87171", "stroke-width": 2 * s, text: ct > 0 ? "▲" : "▼" }));
       if (fokus === c.id || (ui.editor && ui.editor.ziel === c.id)) g.append(sv("circle", { cx: x, cy: y, r: r + 7 * s, fill: "none", stroke: "#fff", "stroke-width": 1.6 * s, class: "puls" }));
       const fuell = eigen ? p.farbe : c.k === 3 ? "#EAF2F8" : c.k === 2 ? "#C5D6E2" : "#93A9B8";
       g.append(sv("circle", { cx: x, cy: y, r, fill: fuell, class: "stadt-punkt", "stroke-width": 1.2 * s }));
@@ -382,15 +404,16 @@
   }
 
   // Gelegenheiten als Symbol an der Stadt, mit ablaufendem Ring.
-  const GEL_ICON = { slot: "🎟️", gebraucht: "🛩️", messe: "🎪", auktion: "🔨" };
-  function gelegenheitOrt(g) { return g.stadt || (g.art === "gebraucht" ? ich().basis : null); }
+  const GEL_ICON = { slot: "🎟️", gebraucht: "🛩️", messe: "🎪", auktion: "🔨", plan: "📣", versteigerung: "🏛️", aufkauf: "🤝", streik: "✊", sturm: "⛈️", kerosin: "⛽" };
+  const gelIcon = (g) => GEL_ICON[g.art === "wahl" ? g.typ : g.art];
+  function gelegenheitOrt(g) { return g.stadt || (g.art === "gebraucht" || g.art === "wahl" ? ich().basis : null); }
   function symboleZeichnen() {
     if (!karte || !st) return;
     karte.symbole.replaceChildren();
     const s = 1 / ui.kamera.z;
     for (const g of st.gelegenheiten) {
       const ort = gelegenheitOrt(g);
-      if (!ort || !GEL_ICON[g.art]) continue;
+      if (!ort || !gelIcon(g)) continue;
       const [x, y] = stadtXY[ort];
       const cx = x + 12 * s, cy = y - 14 * s, r = 9 * s;
       const grp = sv("g", { "data-gel": g.id, class: g.info ? "" : "huepfen" });
@@ -398,7 +421,7 @@
       const umfang = 2 * Math.PI * (r + 2 * s);
       const rest = Math.max(0, (g.bis - st.zeit) / g.dauer);
       grp.append(sv("circle", { cx, cy, r: r + 2 * s, fill: "none", stroke: "#F2C14E", "stroke-width": 2 * s, "stroke-dasharray": `${umfang * rest} ${umfang}`, transform: `rotate(-90 ${cx} ${cy})`, class: "uhrring" }));
-      grp.append(sv("text", { x: cx, y: cy + 3.5 * s, "font-size": 10 * s, "text-anchor": "middle", text: GEL_ICON[g.art] }));
+      grp.append(sv("text", { x: cx, y: cy + 3.5 * s, "font-size": 10 * s, "text-anchor": "middle", text: gelIcon(g) }));
       karte.symbole.append(grp);
     }
   }
@@ -512,7 +535,8 @@
     hud.tempo.textContent = ["❚❚", "▶", "▶▶", "▶▶▶"][TEMPI.indexOf(ui.tempo)];
     hud.tempo.classList.toggle("pause", ui.tempo === 0);
     const pl = L.platz(st);
-    hud.platz.replaceChildren(el("span", { class: "stufen-bild" }, [3, 1, 2].map((i) => el("i", { class: i === pl ? "an" : "", style: { height: (i === 1 ? 14 : i === 2 ? 10 : 7) + "px" } }))), el("b", { text: pl + "." }));
+    hud.platz.replaceChildren(el("span", { class: "stufen-bild" }, [3, 1, 2].map((i) => el("i", { class: i === pl ? "an" : "", style: { height: (i === 1 ? 14 : i === 2 ? 10 : 7) + "px" } }))), el("b", { text: pl + "." }),
+      st.rennen ? el("span", { class: "abzeichen rennen-abzeichen", text: "🏁" }) : null);
     const frei = L.freieFlugzeuge(p).length;
     hud.frei.textContent = frei; hud.frei.style.display = frei ? "" : "none";
     const au = Object.values(p.auftraege || {}).filter(Boolean);
@@ -589,7 +613,7 @@
   function tafelNeu() {
     if (ui.editor) { editorZeichnen(); return; }
     if (ui.tafel === "stadt") zeigeStadt(ui.stadt);
-    else if (ui.tafel === "route") { if (ich().routen.some((r) => r.id === ui.route)) zeigeRoute(ui.route); else tafelZu(); }
+    else if (ui.tafel === "route") { if (ich().routen.some((r) => r.id === ui.route)) (tafelEl && tafelEl.querySelector(".vergleich") ? zeigeDuell : zeigeRoute)(ui.route); else tafelZu(); }
     else if (ui.tafel === "flotte") zeigeFlotte();
     else if (ui.tafel === "rang") zeigeRang();
     else if (ui.tafel === "bericht") zeigeBericht();
@@ -615,16 +639,23 @@
     if (c.t === "sonne") saisonText = sai.sonne > 1.2 ? "☀️ Sommer: viele Urlauber!" : sai.sonne < 0.8 ? "🌧️ Nebensaison: wenig Urlauber" : "☀️ Urlaubsziel, im Sommer gefragt";
     if (c.t === "schnee") saisonText = sai.schnee > 1.2 ? "⛷️ Winter: Skiurlauber!" : "⛷️ Im Winter gefragt";
     const messe = st.messen.find((m) => m.stadt === id);
-    tafel("stadt", c.name, KLASSE[c.k] + " · " + L.KONTINENTE[c.r] + (hub ? " · dein Drehkreuz" : p.basis === id ? " · deine Heimat" : ""),
+    const trend = L.stadtTrend(st, id);
+    const istAusgebaut = L.ausgebaut(p, id);
+    const ausbauPreis = L.kannAusbauen(st, L.SPIELER, id) ? L.drehkreuzPreis(st, L.SPIELER, id) : 0;
+    tafel("stadt", c.name, KLASSE[c.k] + " · " + L.KONTINENTE[c.r] + (istAusgebaut ? " · ausgebautes Drehkreuz" : hub ? " · dein Drehkreuz" : p.basis === id ? " · deine Heimat" : ""),
       el("div", { class: "symbolzeile" },
         symbol("👥", "Größe", "●".repeat(Math.round(c.g / 2.5)) || "●"),
         symbol("👔", "Geschäft", Math.round(c.w * 100) + " %"),
         symbol("🛬", "Gebühr", geld(L.REGELN.gebuehr[c.k]))),
       saisonText ? el("div", { class: "hinweis", text: saisonText }) : null,
       messe ? el("div", { class: "hinweis", text: `🎪 Messe Tag ${messe.von} bis ${messe.bis}: doppelt so viele Geschäftsreisende.` }) : null,
+      trend ? el("div", { class: "hinweis " + (trend > 0 ? "gruen" : "rot"), text: trend > 0 ? "📈 Wird gerade beliebter: jeden Tag mehr Gäste." : "📉 Verliert gerade Gäste." }) : null,
       el("div", { class: "zeile" }, el("span", { text: "🎟️ Deine Landerechte" }), el("b", { class: "rechts", text: meine ? `${genutzt} von ${meine} genutzt` : "keine" })),
       el("div", { class: "zeile blass mini" }, el("span", { text: c.k === 1 ? "Hier gibt es genug Landerechte." : `Noch ${Math.max(0, frei)} frei` }), el("span", { class: "rechts", text: frei > 0 ? "je " + geld(L.slotPreis(st, id)) : "ausverkauft" })),
       andere.length ? el("div", { class: "chips" }, el("span", { class: "blass mini", text: "Hier fliegen auch:" }), andere.map(chipAirline)) : null,
+      ausbauPreis ? el("div", { class: "ausbau" },
+        el("div", {}, el("b", { text: "🏗️ Zum Drehkreuz ausbauen" }), el("small", { text: "+60 % Umsteiger, Linien hier ziehen mehr Gäste an." })),
+        el("button", { class: "nebenknopf", disabled: p.geld < ausbauPreis, text: geld(ausbauPreis), onclick: () => { L.drehkreuzAusbauen(st, L.SPIELER, id); nachAktion(); meldung("🏗️", c.name + " ist jetzt dein ausgebautes Drehkreuz."); zeigeStadt(id); } })) : null,
       routen.map(routeZeile),
       el("button", { class: "hauptknopf", text: "✏️ Neue Linie ab " + c.name, onclick: () => editorOeffnen({ start: id }) }));
   }
@@ -668,9 +699,36 @@
     tafel("route", L.STADT[r.a].name + " – " + L.STADT[r.b].name, e.km.toLocaleString("de-DE") + " km · " + fs.map((f) => L.TYPEN[f.typ].name).join(", "),
       el("div", { class: "zeile" }, el("span", { class: "gross zahl", style: { color: farbeGewinn(e.gewinn) }, text: kurz(e.gewinn) }), el("span", { class: "blass", text: "pro Tag" })),
       e.zubringer > 1000 ? el("div", { class: "hinweis gruen", text: `🔁 Bringt zusätzlich ${kurz(e.zubringer)} auf deinen Anschlussflügen.` }) : null,
+      (() => { const t = L.trendVon(st, r.a, r.b); return t ? el("div", { class: "hinweis " + (t > 0 ? "gruen" : "rot"), text: t === 2 ? "🔥 Diese Strecke ist gerade in Mode." : t > 0 ? "📈 Die Nachfrage steigt gerade." : "📉 Die Nachfrage sinkt gerade." }) : null; })(),
       sitzplan(e.auslastung),
       geldstapel(e),
+      (L.vergleich(st, rid) || []).length > 1 ? el("button", { class: "nebenknopf", text: "⚔️ Mit den Rivalen vergleichen", onclick: () => zeigeDuell(rid) }) : null,
       el("button", { class: "hauptknopf", text: "✏️ Im Editor bearbeiten", onclick: () => editorOeffnen({ linie: rid }) }));
+  }
+
+  // Zwei (oder mehr) gleiche Linien nebeneinander: Preis, Qualität, Gäste. Bei gleichem Preis gewinnt die bessere Airline.
+  function zeigeDuell(rid) {
+    const p = ich();
+    const r = p.routen.find((x) => x.id === rid);
+    const liste = L.vergleich(st, rid);
+    if (!r || !liste) { tafelZu(); return; }
+    ui.route = rid; ui.stadt = null;
+    const maxG = Math.max(1, ...liste.map((x) => x.gaeste));
+    const spalte = (x) => el("div", { class: "vergleich-spalte" + (x.id === L.SPIELER ? " ich" : ""), style: { "--farbe": x.farbe } },
+      el("b", { class: "v-name", text: x.id === L.SPIELER ? "Du" : x.name }),
+      el("div", { class: "v-wert" }, el("small", { text: "🎫 Preis" }), el("b", { text: Math.round(x.preis) + " €" }), el("span", { class: "v-stufe", text: L.STUFEN[x.stufe].icon })),
+      el("div", { class: "v-wert" }, el("small", { text: "⭐ Qualität" }), el("b", { class: "sterne", text: "★".repeat(x.sterne) + "☆".repeat(5 - x.sterne) })),
+      el("div", { class: "v-wert" }, el("small", { text: "👥 Gäste am Tag" }), el("b", { text: x.gaeste.toLocaleString("de-DE") }),
+        el("div", { class: "v-balken" }, el("i", { style: { width: (x.gaeste / maxG * 100).toFixed(0) + "%" } }))),
+      el("div", { class: "v-wert" }, el("small", { text: "✈ Flugzeuge" }), el("b", { text: String(x.flugzeuge) })));
+    tafel("route", "⚔️ " + L.STADT[r.a].name + " – " + L.STADT[r.b].name, r.duell ? "Preiskampf mit " + st.airlines[r.duell.gegen].name : "Wer fliegt hier besser?",
+      el("div", { class: "vergleich" }, liste.slice(0, 3).map(spalte)),
+      el("div", { class: "blass mini mitte-text", text: "Bei gleichem Preis gewinnt die bessere Qualität. Gutes Essen und Platz kosten dich aber pro Gast." }),
+      el("div", { class: "segment" },
+        el("button", { class: r.stufe === "angreifen" ? "an" : "", onclick: () => { L.duellAntwort(st, rid, "unterbieten"); nachAktion(); zeigeDuell(rid); } }, "⬇ Unterbieten"),
+        el("button", { class: r.stufe === "normal" ? "an" : "", onclick: () => { L.duellAntwort(st, rid, "halten"); nachAktion(); zeigeDuell(rid); } }, "● Preis halten")),
+      el("button", { class: "nebenknopf", text: "🏳️ Linie aufgeben", onclick: () => { L.duellAntwort(st, rid, "aufgeben"); nachAktion(); tafelZu(); } }),
+      el("button", { class: "nebenknopf", text: "◀ Zur Linie", onclick: () => zeigeRoute(rid) }));
   }
 
   function zeigeFlotte() {
@@ -697,7 +755,10 @@
     const liste = L.rangliste(st);
     const max = Math.max(...liste.map((r) => r.wert), 1);
     const meinPlatz = liste.findIndex((x) => x.id === L.SPIELER);
+    const R = st.rennen;
     tafel("rang", "Rangliste der Welt", "gezählt wird der Firmenwert",
+      R ? el("div", { class: "rennen" }, el("b", { text: "🏁 " + R.text }),
+        el("small", { text: `Preis ${R.preis / 1e6} Mio + Pokal · noch ${Math.max(0, R.bis - L.tagVon(st) + 1)} Tage · du: ${Math.min(L.rennenStand(st, L.SPIELER), R.soll)} / ${R.soll}` })) : null,
       liste.map((r, i) => {
         const riv = L.RIVALEN[r.id];
         const spruch = riv ? (i === 0 ? riv.sprueche.gross : meinPlatz < i ? riv.sprueche.verliert : riv.sprueche.gegen) : null;
@@ -705,7 +766,7 @@
           el("span", { class: "nr", text: ["🥇", "🥈", "🥉", "4"][i] }),
           el("div", { class: "gesicht", style: { background: r.farbe } }, riv ? bildEl(CHEF[r.id], riv.chef[0]) : "★"),
           el("div", { class: "mitte" },
-            el("b", { text: r.name + (riv ? " · " + riv.chef : " (du)") }),
+            el("b", { text: r.name + (riv ? " · " + riv.chef : " (du)") + (st.airlines[r.id].pokale ? " " + "🏆".repeat(Math.min(5, st.airlines[r.id].pokale)) : "") }),
             el("span", { class: "blass mini", text: `${geld(r.wert)} · ${r.routen} Linien · ${r.flugzeuge} ✈` }),
             el("div", { class: "spur" }, el("i", { style: { width: (r.wert / max * 100).toFixed(1) + "%", background: r.farbe } })),
             spruch ? el("div", { class: "spruch", text: "„" + spruch + "“" }) : null));
@@ -748,7 +809,9 @@
             el("div", {}, el("small", { text: "🏖️ Urlauber" }), el("b", { text: punkte(pr.gast.urlaub) })),
             el("div", {}, el("small", { text: "👔 Geschäftsleute" }), el("b", { text: punkte(pr.gast.geschaeft) })),
             el("div", {}, el("small", { text: "🎫 Ticketpreis" }), el("b", { text: Math.round(pr.preis * 100) + " %" })),
-            el("div", {}, el("small", { text: "➕ Gebühren" }), el("b", { text: pr.extra ? "+" + pr.extra + " € / Gast" : "keine" }))),
+            el("div", {}, el("small", { text: "➕ Gebühren" }), el("b", { text: pr.extra ? "+" + pr.extra + " € / Gast" : "keine" })),
+            el("div", {}, el("small", { text: "⭐ Qualität" }), el("b", { class: "sterne", text: "★".repeat(pr.sterne) + "☆".repeat(5 - pr.sterne) })),
+            el("div", {}, el("small", { text: "🍽️ Kostet dich" }), el("b", { class: pr.essenKosten > 0 ? "minus" : "", text: pr.essenKosten > 0 ? Math.round(pr.essenKosten) + " € / Gast" : "nichts" }))),
           el("div", { class: "blass mini mitte-text", text: "Schlechter für die Gäste kostet etwas Ruf. Schnellwahl:" }),
           el("div", { class: "knopfreihe" }, Object.entries(L.SERVICE).map(([id, x]) => el("button", { class: "nebenknopf", text: x.icon + " " + x.name.split("-")[0].replace("Klassische Airline", "Klassisch").replace("Billigflieger", "Billig"), onclick: () => { L.vorlageSetzen(st, L.SPIELER, id); nachAktion(); neu(); } })))),
         el("div", { class: "meine-spalte" },
@@ -865,13 +928,44 @@
     else if (g.art === "gebraucht") { bildName = "air-ereignis-gebraucht"; titel = "Gebrauchter " + L.TYPEN[g.typ].name; text = "Fast halber Preis. Steht danach frei in deiner Flotte."; ja = "Kaufen · " + geld(g.preis); }
     else if (g.art === "messe") { bildName = "air-ereignis-messe"; titel = "Messe in " + stadt; text = "Ab Tag " + g.von + " drei Tage lang doppelt so viele Geschäftsreisende."; }
     else if (g.art === "auktion") { titel = "Landerecht in " + stadt + " wird versteigert"; text = "Deine Linie dort war zu leer. Behalten, sonst fällt ein Flugzeug weg."; ja = "Behalten · " + geld(g.preis); }
+    const extra = [];
+    if (g.art === "plan") {
+      const a = st.airlines[g.aid];
+      bildName = "air-ereignis-plan";
+      titel = a.name + " plant " + L.STADT[g.von].name + " – " + stadt;
+      text = `In ${Math.max(1, g.tag - L.tagVon(st))} Tagen geht es los. Fliegst du die Strecke vorher, verzichtet ${a.name}.`;
+      extra.push(el("button", { class: "hauptknopf", text: "✏️ Zuvorkommen", onclick: () => editorOeffnen({ start: g.von, ziel: g.stadt }) }));
+    } else if (g.art === "versteigerung") {
+      bildName = "air-ereignis-versteigerung";
+      titel = "Versteigerung in " + stadt;
+      text = `${L.REGELN.versteigerungStueck} neue Landerechte. Jede Airline bietet einmal verdeckt, das höchste Gebot gewinnt und zahlt. Wer zu viel bietet, hat weniger für Flugzeuge.`;
+      extra.push(el("div", { class: "segment" }, [1, 2, 3].map((n) => el("button", { class: g.gebot === n ? "an" : "", disabled: p.geld < n * g.stufe, onclick: () => { L.bieten(st, g.id, g.gebot === n ? 0 : n); nachAktion(); zeigeGelegenheit(g.id); } }, ["Wenig", "Mittel", "Viel"][n - 1] + " · " + geld(n * g.stufe)))));
+      extra.push(el("div", { class: "blass mini mitte-text", text: g.gebot ? "Dein Gebot steht. Ergebnis, wenn die Uhr abgelaufen ist." : "Noch kein Gebot." }));
+    } else if (g.art === "aufkauf") {
+      const a = st.airlines[g.aid];
+      bildName = "air-ereignis-aufkauf";
+      titel = g.pleite ? a.name + " ist pleite" : a.name + " in der Krise";
+      text = `${g.flugzeuge} Flugzeuge und alle Landerechte von ${a.name}. Die Flugzeuge stehen danach frei in deiner Flotte, ${a.name} fängt neu an.`;
+      ja = "Alles kaufen · " + geld(g.preis);
+    } else if (g.art === "wahl") {
+      const W = {
+        streik: { bild: "air-ereignis-streik", titel: "Streik droht in " + stadt, text: "Das Bodenpersonal will mehr Lohn. Zahlst du nicht, wird vielleicht zwei Tage gestreikt: dann fliegt dort nur die Hälfte.", sicher: "Lohn zahlen · " + geld(g.preis), riskant: "Hart bleiben (50 % Streik)" },
+        sturm: { bild: "air-ereignis-sturm", titel: "Sturm über " + stadt, text: "Streichst du die Flüge, verlierst du einen Tag dort. Fliegst du, geht es meist gut, sonst gibt es Schaden und Ärger.", sicher: "Heute nicht fliegen", riskant: "Trotzdem fliegen (30 % Schaden)" },
+        kerosin: { bild: "air-ereignis-kerosin", titel: "Kerosinpreis wackelt", text: "Für eine Woche den Preis festmachen, oder pokern: vielleicht 20 % billiger, vielleicht 40 % teurer.", sicher: "Preis festmachen · " + geld(g.preis), riskant: "Pokern (50 : 50)" },
+      }[g.typ];
+      bildName = W.bild; titel = W.titel; text = W.text;
+      extra.push(el("button", { class: "hauptknopf", disabled: p.geld < g.preis, text: "🛡️ " + W.sicher, onclick: () => { const t = L.wahlTreffen(st, g.id, true); nachAktion(); tafelZu(); if (t) meldung("✅", t); } }));
+      extra.push(el("button", { class: "nebenknopf", text: "🎲 " + W.riskant, onclick: () => { const t = L.wahlTreffen(st, g.id, false); nachAktion(); tafelZu(); if (t) meldung("🎲", t); } }));
+      extra.push(el("div", { class: "blass mini mitte-text", text: "Wählst du nichts, kommt es wie beim Risiko." }));
+    }
     const stunden = Math.max(0, Math.ceil(g.bis - st.zeit));
-    tafel("gelegenheit", titel, g.info ? null : "Noch " + stunden + " Stunden",
-      el("div", { class: "ereignisbild" }, bildEl(bildName, GEL_ICON[g.art])),
+    tafel("gelegenheit", titel, g.info && g.art !== "plan" ? null : "Noch " + stunden + " Stunden",
+      el("div", { class: "ereignisbild" }, bildEl(bildName, gelIcon(g))),
       el("div", { text }),
       ja ? el("button", { class: "hauptknopf", disabled: p.geld < g.preis, text: ja, onclick: () => { L.gelegenheitAnnehmen(st, g.id); nachAktion(); tafelZu(); } }) : null,
       ja ? el("button", { class: "nebenknopf", text: "Nein danke", onclick: () => { L.gelegenheitAblehnen(st, g.id); nachAktion(); tafelZu(); } }) : null,
-      g.art === "messe" ? el("button", { class: "hauptknopf", text: "✏️ Linie nach " + stadt + " planen", onclick: () => editorOeffnen({ start: ich().basis, ziel: g.stadt }) }) : null);
+      g.art === "messe" ? el("button", { class: "hauptknopf", text: "✏️ Linie nach " + stadt + " planen", onclick: () => editorOeffnen({ start: ich().basis, ziel: g.stadt }) }) : null,
+      extra);
   }
 
   // ---------- Linien-Editor ----------
@@ -1155,8 +1249,16 @@
   // ---------- Regeln nach und nach (Bildkarten) ----------
   const REGELKARTEN = {
     drehkreuz: { bild: "air-regel-drehkreuz", icon: "🔁", titel: "Dein Drehkreuz!", text: "Ab drei Linien steigen Gäste in deiner Stadt um. Kleine Zubringer füllen so deine großen Flugzeuge." },
-    rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Fliegen sie dieselbe Strecke, teilt ihr euch die Gäste. Ihre Linien siehst du gestrichelt, wenn du eine Stadt antippst." },
+    rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Fliegen sie dieselbe Strecke, teilt ihr euch die Gäste. Ihre Linien zeigst du unten links: Kon, Spa und Aur antippen." },
     landerechte: { bild: "air-regel-saison", icon: "🎟️", titel: "Landerechte und Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. Am Ende der Woche verfallen ungenutzte Landerechte, und halb leere Linien müssen ihres neu ersteigern." },
+    plaene: { bild: "air-regel-plaene", icon: "📣", titel: "Rivalen kündigen an", text: "Manchmal verraten die Rivalen ihren nächsten Zug: 📣 auf der Karte. Fliegst du die Strecke vorher, verzichten sie." },
+    duell: { bild: "air-regel-duell", icon: "⚔️", titel: "Preiskampf", text: "Fliegt ein Rivale auf deine Strecke, erscheint ⚔️. Tipp drauf: Ihr steht nebeneinander. Unterbieten, Preis halten oder aufgeben. Bei gleichem Preis gewinnt die bessere Qualität." },
+    trends: { bild: "air-regel-trends", icon: "📈", titel: "Die Nachfrage ändert sich", text: "Städte werden beliebter ▲ oder verlieren Gäste ▼, manche Strecken kommen in Mode 🔥. Die Pfeile siehst du an Städten und Linien." },
+    versteigerung: { bild: "air-regel-versteigerung", icon: "🏛️", titel: "Versteigerung", text: "Am Ende jeder Jahreszeit gibt es irgendwo neue Landerechte. Alle bieten einmal verdeckt, das höchste Gebot gewinnt." },
+    wahl: { bild: "air-regel-wahl", icon: "🎲", titel: "Sicher oder Risiko?", text: "Streik, Sturm oder Kerosin: Du wählst. Sicher kostet sofort, Risiko kann gut ausgehen oder teuer werden." },
+    rennen: { bild: "air-regel-rennen", icon: "🏁", titel: "Das Rennen der Jahreszeit", text: "Jede Jahreszeit ein Rennen gegen die Rivalen. Wer zuerst ans Ziel kommt, bekommt Geld und einen Pokal: +3 % Gäste für immer. Steht in der Rangliste." },
+    ausbau: { bild: "air-regel-ausbau", icon: "🏗️", titel: "Ein zweites Drehkreuz", text: "Eine Stadt mit drei Linien kannst du ausbauen: viel mehr Umsteiger, und deine Linien dort ziehen mehr Gäste. Tipp die Stadt an." },
+    aufkauf: { bild: "air-regel-aufkauf", icon: "🤝", titel: "Rivalen in Not", text: "Rivalen können in die Krise geraten oder pleitegehen. Dann gibt es ihre Flugzeuge und Landerechte günstig, aber nur kurz." },
     gelegenheiten: { bild: "air-ereignis-messe", icon: "🎪", titel: "Gelegenheiten", text: "Ab jetzt tauchen Symbole auf der Karte auf: Messen, freie Landerechte, gebrauchte Flugzeuge. Der gelbe Ring zeigt, wie lange sie noch gelten." },
   };
   function regelnPruefen() {
@@ -1167,6 +1269,14 @@
     else if (tag >= 8 && !einf.gesehen["regel-rivalen"]) id = "rivalen";
     else if (tag >= 15 && !einf.gesehen["regel-landerechte"]) id = "landerechte";
     else if (tag >= L.REGELN.gelegenheitAb && !einf.gesehen["regel-gelegenheiten"]) id = "gelegenheiten";
+    else if (st.gelegenheiten.some((g) => g.art === "plan") && !einf.gesehen["regel-plaene"]) id = "plaene";
+    else if (p.routen.some((r) => r.duell) && !einf.gesehen["regel-duell"]) id = "duell";
+    else if (tag >= L.REGELN.trendAb && !einf.gesehen["regel-trends"]) id = "trends";
+    else if (st.gelegenheiten.some((g) => g.art === "versteigerung") && !einf.gesehen["regel-versteigerung"]) id = "versteigerung";
+    else if (st.gelegenheiten.some((g) => g.art === "wahl") && !einf.gesehen["regel-wahl"]) id = "wahl";
+    else if (st.rennen && !einf.gesehen["regel-rennen"]) id = "rennen";
+    else if (p.routen.length && L.drehkreuze(p).some((c) => L.kannAusbauen(st, L.SPIELER, c)) && !einf.gesehen["regel-ausbau"]) id = "ausbau";
+    else if (st.gelegenheiten.some((g) => g.art === "aufkauf") && !einf.gesehen["regel-aufkauf"]) id = "aufkauf";
     if (id) regelkarte(id);
   }
   function regelkarte(id) {
@@ -1244,9 +1354,13 @@
   function meldungenZeigen() {
     const neu = st.meldungen.splice(0);
     let verzoegerung = 0;
-    for (const m of neu.slice(-3)) {
+    // Wichtiges zuerst, höchstens vier auf einmal.
+    const wichtig = ["duell", "plan", "pleite", "krise", "versteigerungsieg", "rennensieg", "rennen", "ziel", "mahnung", "kredit", "uebernahme"];
+    const auswahl = neu.filter((m) => wichtig.includes(m.art)).concat(neu.filter((m) => !wichtig.includes(m.art))).slice(0, 4);
+    for (const m of auswahl) {
       setTimeout(() => {
-        const e = el("div", { class: "meldung" + (m.art === "ziel" ? " ziel" : "") }, MELDUNG_ICON[m.art] || "📰", el("span", { text: m.text }));
+        const mitBild = /^\p{Extended_Pictographic}/u.test(m.text);   // neue Meldungen bringen ihr Zeichen selbst mit
+        const e = el("div", { class: "meldung" + (m.art === "ziel" ? " ziel" : "") }, mitBild ? null : MELDUNG_ICON[m.art] || "📰", el("span", { text: m.text }));
         feld.append(e);
         setTimeout(() => e.remove(), 4300);
       }, verzoegerung);
@@ -1410,5 +1524,5 @@
   });
 
   // Für Tests im Browser.
-  window.luftlinie = { get st() { return st; }, ui, tempo, zoomAuf: (id) => { kameraPassend(gegend(id)); kameraSetzen(); } };
+  window.luftlinie = { get st() { return st; }, ui, tempo, zeigeGelegenheit, zeigeDuell, zoomAuf: (id) => { kameraPassend(gegend(id)); kameraSetzen(); } };
 })();
