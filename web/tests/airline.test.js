@@ -357,3 +357,9 @@ test("Umbenennen", () => {
   assert.equal(st.airlines.p.name, "Himmelsrand");
   assert.equal(st.airlines.p.farbe, "#F2C14E");
 });
+
+test("Kein Platz 1 am Anfang, wenn alle bei Null stehen", () => {
+  const st = L.neuesSpiel({ seed: 7, basis: "frankfurt" });
+  for (let d = 0; d < 3; d++) L.vorruecken(st, 24);
+  assert.equal(st.platz1, false);
+});
