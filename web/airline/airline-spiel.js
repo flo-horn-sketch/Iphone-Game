@@ -85,8 +85,13 @@
     const pfad = bild(name);
     return pfad ? el("img", { src: pfad, alt: "" }) : ersatz != null ? el("span", { class: "ersatz", text: ersatz }) : null;
   }
-  const TYP_TEXT = { libelle: "Klein und sparsam: für kleine Städte und Zubringer.", falke: "Der Allrounder für Europa.", kranich: "Fliegt über den Atlantik.", albatros: "Der Riese für die ganz langen Strecken." };
-  const TYP_ICON = { libelle: "🛩️", falke: "✈️", kranich: "✈️", albatros: "🛫" };
+  const TYP_TEXT = {
+    libelle: "Sparsamer Propeller für kurze Strecken und Zubringer.", dash8: "Schnellerer Propeller, etwas mehr Plätze.",
+    crj900: "Kleiner Jet für mittlere Städte.", falke: "Der Allrounder für Europa.", a220: "Leise und sparsam, kommt bis über den Atlantik.",
+    b737: "Das Arbeitstier der Billigflieger.", a320: "Der Klassiker für volle Strecken in Europa.", kranich: "Viele Plätze, schafft den Atlantik.",
+    albatros: "Sparsamer Großraumjet für lange Strecken.", a350: "Noch etwas größer, fliegt am weitesten.", b777: "Riesig, für die vollsten Langstrecken.", a380: "Der Doppelstock-Riese für die größten Drehkreuze.",
+  };
+  const TYP_ICON = new Proxy({ libelle: "🛩️", dash8: "🛩️", a380: "🛫", albatros: "🛫", a350: "🛫", b777: "🛫" }, { get: (o, k) => o[k] || "✈️" });
   const CHEF = { k: "air-chef-kontinentia", s: "air-chef-spatzflug", a: "air-chef-aurelia" };
   const KLASSE = { 3: "Weltdrehkreuz", 2: "Großflughafen", 1: "Regionalflughafen" };
   const GRUND = { reichweite: "zu weit", geld: "zu wenig Geld", slots: "keine Landerechte mehr frei", gesperrt: "noch gesperrt", keinFlugzeug: "kein freies Flugzeug" };
@@ -775,7 +780,7 @@
       if (rolle === "analyst") {
         if (!au.bericht.length) teile.push(el("div", { class: "hinweis", text: "Ich habe von hier nichts gefunden, das sich lohnt." }));
         for (const v of au.bericht) {
-          const n = L.TYPEN[v.typ].name.split(" ")[0];
+          const n = L.TYPEN[v.typ].kurz;
           teile.push(el("div", { class: "vorschlag" },
             el("div", { class: "zeile" }, el("b", { text: "→ " + L.STADT[v.ziel].name }), el("span", { class: "rechts plus", text: vonBis(v.gewinn, kurz) })),
             el("div", { class: "chips" },
@@ -1004,9 +1009,9 @@
       sitzplan(e.auslastung),
       el("div", { class: "blass mini", text: "Flugzeuge auf dieser Linie:" }),
       el("div", { class: "flugzeugreihe" },
-        fs.map((f) => el("div", { class: "flugzeug-chip" }, bildEl("air-flugzeug-" + f.typ, TYP_ICON[f.typ]), el("small", { text: L.TYPEN[f.typ].name.split(" ")[0] }))),
+        fs.map((f) => el("div", { class: "flugzeug-chip" }, bildEl("air-flugzeug-" + f.typ, TYP_ICON[f.typ]), el("small", { text: L.TYPEN[f.typ].kurz }))),
         el("button", { class: "flugzeug-chip minus-knopf", text: "−", onclick: () => { L.abziehen(st, L.SPIELER, rid); nachAktion(); editorZeichnen(); }, "aria-label": "Flugzeug abziehen" }),
-        passend.map((typ) => el("button", { class: "flugzeug-chip plus-knopf", onclick: () => { L.fliegen(st, L.SPIELER, r.a, r.b, typ, { nurFrei: true }); L.zielPruefen(st); nachAktion(); editorZeichnen(); } }, "＋", el("small", { text: L.TYPEN[typ].name.split(" ")[0] })))),
+        passend.map((typ) => el("button", { class: "flugzeug-chip plus-knopf", onclick: () => { L.fliegen(st, L.SPIELER, r.a, r.b, typ, { nurFrei: true }); L.zielPruefen(st); nachAktion(); editorZeichnen(); } }, "＋", el("small", { text: L.TYPEN[typ].kurz })))),
       passend.length ? null : el("div", { class: "blass mini", text: e.auslastung > 0.9 ? "Fast voll! Ein weiteres Flugzeug würde sich lohnen: 🛒 Store." : "Kein freies Flugzeug zum Dazunehmen." }),
       el("div", { class: "blass mini", text: "Ticketpreis:" }),
       preisSegment(r.stufe, e.km, (s) => { L.preisStufe(st, L.SPIELER, rid, s); nachAktion(); editorZeichnen(); }),
@@ -1050,6 +1055,7 @@
   // ---------- Flugzeug-Store ----------
   function storeZeigen() {
     const p = ich();
+    ui.storeGruppe = ui.storeGruppe || "regional";
     ui.modal = true;
     if (feld.querySelector(".store")) feld.querySelector(".store").remove();
     const seite = el("div", { class: "seite store" },
@@ -1057,7 +1063,9 @@
         el("h1", { text: "🛒 Flugzeug-Store" }),
         el("span", { class: "store-geld", text: "Dein Geld: " + geld(p.geld) }),
         el("button", { class: "zu", text: "✕", onclick: () => { seite.remove(); ui.modal = false; } })),
-      el("div", { class: "store-reihe" }, Object.entries(L.TYPEN).map(([typ, t]) => {
+      el("div", { class: "segment store-reiter" }, Object.entries(L.GRUPPEN).map(([g, name]) => el("button", { class: ui.storeGruppe === g ? "an" : "", onclick: () => { ui.storeGruppe = g; seite.remove(); storeZeigen(); } }, name,
+        el("small", { text: Object.values(L.TYPEN).filter((t) => t.gruppe === g).length + " Typen" })))),
+      el("div", { class: "store-reihe" }, Object.entries(L.TYPEN).filter(([, t]) => t.gruppe === ui.storeGruppe).map(([typ, t]) => {
         const offen = L.typFrei(st, p, typ);
         const zahl = p.flotte.filter((f) => f.typ === typ).length;
         const leiste = (wert, max) => el("div", { class: "wertleiste" }, el("i", { style: { width: Math.min(100, wert / max * 100) + "%" } }));
@@ -1066,9 +1074,9 @@
           el("b", { class: "store-name", text: t.name }),
           el("div", { class: "blass mini", text: TYP_TEXT[typ] }),
           el("div", { class: "werte" },
-            el("span", { text: "💺" }), leiste(t.sitze, 320), el("small", { text: t.sitze }),
-            el("span", { text: "📏" }), leiste(t.reichweite, 13000), el("small", { text: t.reichweite.toLocaleString("de-DE") + " km" }),
-            el("span", { text: "⛽" }), leiste(t.verbrauch, 8.2), el("small", { text: t.verbrauch < 2 ? "wenig" : t.verbrauch < 5 ? "mittel" : "viel" })),
+            el("span", { text: "💺" }), leiste(Math.sqrt(t.sitze), Math.sqrt(575)), el("small", { text: t.sitze }),
+            el("span", { text: "📏" }), leiste(t.reichweite, 15000), el("small", { text: t.reichweite.toLocaleString("de-DE") + " km" }),
+            el("span", { text: "⛽" }), leiste(t.verbrauch / t.sitze, 0.034), el("small", { text: t.verbrauch / t.sitze < 0.026 ? "sparsam" : t.verbrauch / t.sitze < 0.029 ? "mittel" : "durstig" })),
           offen ? el("button", {
             class: "hauptknopf", disabled: p.geld < t.preis, text: "Kaufen · " + geld(t.preis),
             onclick: () => {
@@ -1076,7 +1084,7 @@
               seite.remove(); ui.modal = false; storeZeigen();
               if (!gesehen("gekauft")) tippZeigen("Gekauft! Jetzt öffne den ✏️ Linien-Editor und gib deinem Flugzeug eine Linie.", hud.linien, "unten", "Okay");
             },
-          }) : el("div", { class: "gesperrt-text", text: t.stufe === 2 ? "ab Firmenwert " + geld(L.REGELN.stufe2Wert) : "ab Firmenwert " + geld(L.REGELN.stufe3Wert) }));
+          }) : el("div", { class: "gesperrt-text", text: "ab Firmenwert " + geld(L.REGELN["stufe" + t.stufe + "Wert"]) }));
       })),
       el("div", { class: "blass mini mitte-text", text: "Tipp: Kleine Flugzeuge für kleine Städte und Zubringer, große für volle Strecken zwischen Großstädten." }));
     feld.append(seite);

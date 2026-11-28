@@ -235,13 +235,27 @@ test("Großer Firmenwert schaltet Kranich und Albatros frei, dann geht es um die
   const p = st.airlines.p;
   assert.ok(!L.typFrei(st, p, "albatros"));
   assert.equal(L.kannFliegen(st, "p", "london", "tokio", "albatros").grund, "gesperrt");
-  p.geld = 5e8;
+  p.geld = 2e8;
   L.vorruecken(st, 24 - (st.zeit % 24));
   assert.equal(st.stufe, 3);
+  assert.ok(!L.typFrei(st, p, "a380"), "A380 erst später");
   assert.ok(L.typFrei(st, p, "albatros"));
   p.slots.london = 3;
   assert.ok(L.fliegen(st, "p", "london", "tokio", "albatros").ok);
-  assert.ok(L.fliegen(st, "p", "london", "newyork", "kranich").ok, "Kranich schafft den Atlantik");
+  assert.ok(L.fliegen(st, "p", "london", "newyork", "kranich").ok, "A321neo schafft den Atlantik");
+  p.geld = 6e8;
+  L.vorruecken(st, 24);
+  assert.equal(st.stufe, 4);
+  assert.ok(L.typFrei(st, p, "a380"));
+});
+
+test("Jeder Flugzeugtyp hat Gruppe, Stufe und echte Eckdaten", () => {
+  for (const [id, t] of Object.entries(L.TYPEN)) {
+    assert.ok(L.GRUPPEN[t.gruppe], id);
+    assert.ok(t.stufe >= 1 && t.stufe <= 4, id);
+    assert.ok(t.sitze >= 50 && t.reichweite >= 1000 && t.preis > 0, id);
+  }
+  assert.ok(Object.keys(L.TYPEN).length >= 10);
 });
 
 test("Probepartie: Rivalen bauen aus, nichts geht kaputt", () => {

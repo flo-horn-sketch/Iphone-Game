@@ -16,7 +16,7 @@ Diese Datei ist der komplette Auftrag. Bitte alles hier lesen und dann die Bilde
 
 ## Stil (vor jeden Prompt setzen)
 
-> Moderne, freundliche Illustration im Stil eines hochwertigen Reiseplakats, leicht gemalt, klare Formen, sanfte Verläufe. Farben: Nachtblau, Himmelblau, warmes Gold, etwas Abendrot. Erfundene Flugzeuge und erfundene Airlines, keine echten Logos, keine echten Flugzeugmodelle nachgebaut, keine Markennamen. Keine Schrift, kein Text, keine Buchstaben, keine Zahlen.
+> Moderne, freundliche Illustration im Stil eines hochwertigen Reiseplakats, leicht gemalt, klare Formen, sanfte Verläufe. Farben: Nachtblau, Himmelblau, warmes Gold, etwas Abendrot. Echte Flugzeugtypen, aber erfundene Airlines: keine Logos, keine Markennamen, keine echten Airline-Lackierungen. Keine Schrift, kein Text, keine Buchstaben, keine Zahlen.
 
 ## Die Bilder (in dieser Reihenfolge)
 
@@ -34,16 +34,24 @@ Diese Datei ist der komplette Auftrag. Bitte alles hier lesen und dann die Bilde
 | `air-service-standard.png` | 1536 × 1024 | Gepflegte Flugzeugkabine einer normalen Linien-Airline: bequeme blaue Sitze, eine Flugbegleiterin reicht Getränke, Geschäftsleute und Familien gemischt. |
 | `air-service-premium.png` | 1536 × 1024 | Luxuriöse Premium-Kabine: breite Ledersessel, die sich zum Bett ausklappen, Champagnerglas, warmes Licht, Holz und Gold, ruhige Eleganz. |
 
-### 3. Die vier Flugzeugtypen (Seitenansicht, schlichter Hintergrund)
+### 3. Die zwölf Flugzeugtypen (echte Typen, Seitenansicht, schlichter Hintergrund)
 
-Die Bilder erscheinen groß im Flugzeug-Store und klein im Linien-Editor. Flugzeug groß und mittig, von der Seite, leicht schräg, schlichter heller Himmel als Hintergrund. Alle in derselben Lackierung: weiß mit goldenem Streifen und nachtblauem Leitwerk, ohne Logo und ohne Schrift.
+Die Bilder erscheinen groß im Flugzeug-Store und klein im Linien-Editor. Flugzeug groß und mittig, von der Seite, leicht schräg, schlichter heller Himmel als Hintergrund. Der Typ soll gut erkennbar sein. Alle in derselben neutralen Lackierung: weiß mit goldenem Streifen und nachtblauem Leitwerk, ohne Logo und ohne Schrift. Die bisherigen Dateinamen bleiben.
 
 | Datei | Größe | Prompt |
 |---|---|---|
-| `air-flugzeug-libelle.png` | 1024 × 1024 | Kleines Regionalflugzeug mit zwei Propellern und hohen Flügeln, etwa 50 Sitze, wirkt flink und leicht. |
-| `air-flugzeug-falke.png` | 1024 × 1024 | Mittelgroßes Kurzstrecken-Düsenflugzeug mit zwei Triebwerken unter den Flügeln, schlank, etwa 130 Sitze. |
-| `air-flugzeug-kranich.png` | 1024 × 1024 | Größeres Mittelstrecken-Düsenflugzeug, langer Rumpf, zwei große Triebwerke, nach oben gebogene Flügelspitzen, etwa 190 Sitze. |
-| `air-flugzeug-albatros.png` | 1024 × 1024 | Großes Langstrecken-Großraumflugzeug mit zwei riesigen Triebwerken und sehr langen Flügeln, majestätisch, etwa 320 Sitze. |
+| `air-flugzeug-libelle.png` | 1024 × 1024 | Eine ATR 72-600: Turboprop-Regionalflugzeug mit hohen Flügeln, zwei Propellertriebwerken und T-Leitwerk. |
+| `air-flugzeug-falke.png` | 1024 × 1024 | Eine Embraer E195-E2: schlanker Regionaljet mit zwei großen Triebwerken unter den Flügeln. |
+| `air-flugzeug-kranich.png` | 1024 × 1024 | Ein Airbus A321neo: langer Schmalrumpf-Jet mit zwei Triebwerken und nach oben gebogenen Flügelspitzen (Sharklets). |
+| `air-flugzeug-albatros.png` | 1024 × 1024 | Eine Boeing 787-9 Dreamliner: Großraumjet mit sehr langen, elegant nach oben gebogenen Flügeln und gezackten Triebwerksverkleidungen. |
+| `air-flugzeug-dash8.png` | 1024 × 1024 | Eine De Havilland Dash 8-400: schlankes Turboprop-Flugzeug mit hohen Flügeln, zwei großen Propellern und T-Leitwerk, länger als eine ATR. |
+| `air-flugzeug-crj900.png` | 1024 × 1024 | Eine Bombardier CRJ900: schmaler Regionaljet mit zwei Triebwerken hinten am Rumpf und T-Leitwerk. |
+| `air-flugzeug-a220.png` | 1024 × 1024 | Ein Airbus A220-300: moderner schlanker Jet mit großen Triebwerken unter den Flügeln und auffällig großen Kabinenfenstern. |
+| `air-flugzeug-b737.png` | 1024 × 1024 | Eine Boeing 737 MAX 8: Schmalrumpf-Jet mit flachen Triebwerken und gespaltenen Flügelspitzen. |
+| `air-flugzeug-a320.png` | 1024 × 1024 | Ein Airbus A320neo: Schmalrumpf-Jet mit großen runden Triebwerken und Sharklets an den Flügelspitzen. |
+| `air-flugzeug-a350.png` | 1024 × 1024 | Ein Airbus A350-900: Großraumjet mit geschwungenen Flügelspitzen und markanten dunklen Cockpitfenstern (wie eine Maske). |
+| `air-flugzeug-b777.png` | 1024 × 1024 | Eine Boeing 777-300ER: sehr langer Großraumjet mit zwei riesigen Triebwerken und sechs Rädern pro Hauptfahrwerk. |
+| `air-flugzeug-a380.png` | 1024 × 1024 | Ein Airbus A380: riesiges Doppelstock-Flugzeug mit vier Triebwerken und zwei durchgehenden Fensterreihen. |
 
 ### 4. Die Chefs der drei Rivalen (Porträts, quadratisch)
 
@@ -73,7 +81,6 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-ereignis-slot.png` | 1536 × 1024 | Eine Start- und Landebahn eines großen Flughafens in der Dämmerung, eine Lücke in einer Reihe wartender Flugzeuge, ein grünes Licht leuchtet auf. |
 | `air-ereignis-gebraucht.png` | 1536 × 1024 | Ein gebrauchtes Passagierflugzeug ohne Lackierung steht in einem großen Hangar, Mechaniker davor, ein Schild ohne Schrift hängt am Bugrad. |
 | `air-ereignis-messe.png` | 1536 × 1024 | Eine riesige moderne Messehalle mit vielen Ständen und Geschäftsleuten mit Koffern, durch die Glasfassade sieht man ein landendes Flugzeug. |
-| `air-ereignis-kerosin.png` | 1536 × 1024 | Ein Tankwagen betankt ein Flugzeug auf dem Vorfeld im Morgenlicht, Schläuche, Hitzeflimmern. |
 | `air-ereignis-uebernahme.png` | 1536 × 1024 | Ein dunkler Besprechungsraum ganz oben in einem Hochhaus, ein Vertrag und ein Füller auf einem langen Tisch, draußen ein Flughafen bei Nacht. Bedrohliche, ernste Stimmung. |
 | `air-ende.png` | 1536 × 1024 | Ein leeres, stilles Vorfeld bei Regen, ein einzelnes geparktes Flugzeug mit abgedeckten Triebwerken, melancholisch. |
 

@@ -40,7 +40,8 @@
     mahnTage: 2,
     letzteChanceTage: 3,
     stufe2Wert: 30000000,    // Firmenwert für den Kranich
-    stufe3Wert: 100000000,   // Firmenwert für den Albatros
+    stufe3Wert: 100000000,   // Firmenwert für die Langstrecken-Jets
+    stufe4Wert: 300000000,   // Firmenwert für den A380
     gelegenheitAb: 22,       // Woche 4: Messen und Gelegenheiten
     dividende: 0.1,          // Anteil am Tagesgewinn, den Rivalen nicht wieder anlegen
   };
@@ -131,12 +132,23 @@
   };
 
   // Erfundene Flugzeugtypen.
+  // Echte Flugzeugtypen mit gerundeten echten Eckdaten (Sitze, Reichweite, Reisegeschwindigkeit).
+  // Preise und Kosten sind fürs Spiel vereinfacht. Die internen Namen (libelle …) bleiben, damit Spielstände passen.
   const TYPEN = {
-    libelle: { name: "Libelle 50", sitze: 50, kmh: 480, reichweite: 1400, preis: 600000, verbrauch: 1.6, groesse: 0.45, crew: 2500, stufe: 1 },
-    falke: { name: "Falke 130", sitze: 130, kmh: 790, reichweite: 3300, preis: 1400000, verbrauch: 3.6, groesse: 1.0, crew: 5500, stufe: 1 },
-    kranich: { name: "Kranich 190", sitze: 190, kmh: 820, reichweite: 6200, preis: 2400000, verbrauch: 4.9, groesse: 1.35, crew: 7500, stufe: 2 },
-    albatros: { name: "Albatros 320", sitze: 320, kmh: 900, reichweite: 13000, preis: 5500000, verbrauch: 8.2, groesse: 2.1, crew: 13000, stufe: 3 },
+    libelle: { name: "ATR 72", kurz: "ATR 72", gruppe: "propeller", sitze: 70, kmh: 510, reichweite: 1500, preis: 600000, verbrauch: 2.0, groesse: 0.5, crew: 2800, stufe: 1 },
+    dash8: { name: "Dash 8-400", kurz: "Dash 8", gruppe: "propeller", sitze: 78, kmh: 660, reichweite: 2000, preis: 750000, verbrauch: 2.4, groesse: 0.55, crew: 3000, stufe: 1 },
+    crj900: { name: "Bombardier CRJ900", kurz: "CRJ900", gruppe: "regional", sitze: 90, kmh: 830, reichweite: 2900, preis: 900000, verbrauch: 2.8, groesse: 0.7, crew: 3800, stufe: 1 },
+    falke: { name: "Embraer E195", kurz: "E195", gruppe: "regional", sitze: 132, kmh: 830, reichweite: 4800, preis: 1400000, verbrauch: 3.6, groesse: 1.0, crew: 5500, stufe: 1 },
+    a220: { name: "Airbus A220-300", kurz: "A220", gruppe: "regional", sitze: 140, kmh: 830, reichweite: 6300, preis: 1700000, verbrauch: 3.5, groesse: 1.05, crew: 5800, stufe: 2 },
+    b737: { name: "Boeing 737 MAX 8", kurz: "737 MAX", gruppe: "mittel", sitze: 178, kmh: 840, reichweite: 6500, preis: 2100000, verbrauch: 4.6, groesse: 1.25, crew: 7000, stufe: 2 },
+    a320: { name: "Airbus A320neo", kurz: "A320", gruppe: "mittel", sitze: 180, kmh: 840, reichweite: 6300, preis: 2150000, verbrauch: 4.5, groesse: 1.25, crew: 7000, stufe: 2 },
+    kranich: { name: "Airbus A321neo", kurz: "A321", gruppe: "mittel", sitze: 200, kmh: 840, reichweite: 7400, preis: 2400000, verbrauch: 5.0, groesse: 1.35, crew: 7500, stufe: 2 },
+    albatros: { name: "Boeing 787-9", kurz: "787", gruppe: "lang", sitze: 290, kmh: 900, reichweite: 14000, preis: 5500000, verbrauch: 7.6, groesse: 2.0, crew: 12000, stufe: 3 },
+    a350: { name: "Airbus A350-900", kurz: "A350", gruppe: "lang", sitze: 315, kmh: 910, reichweite: 15000, preis: 6200000, verbrauch: 8.0, groesse: 2.1, crew: 13000, stufe: 3 },
+    b777: { name: "Boeing 777-300ER", kurz: "777", gruppe: "lang", sitze: 396, kmh: 900, reichweite: 13600, preis: 7500000, verbrauch: 10.6, groesse: 2.6, crew: 15500, stufe: 3 },
+    a380: { name: "Airbus A380", kurz: "A380", gruppe: "lang", sitze: 575, kmh: 900, reichweite: 15000, preis: 12000000, verbrauch: 16.5, groesse: 3.6, crew: 22000, stufe: 4 },
   };
+  const GRUPPEN = { propeller: "Propeller", regional: "Regionaljets", mittel: "Mittelstrecke", lang: "Langstrecke" };
 
   // Städte: g = Größe (Nachfrage), w = Anteil Geschäftsreisende, k = Flughafenklasse
   // (3 Weltdrehkreuz, 2 Großflughafen, 1 Regionalflughafen), t = sonne/schnee.
@@ -1186,12 +1198,13 @@
     for (const aid of st.reihenfolge) {
       const a = st.airlines[aid];
       const wert = firmenwert(st, aid);
-      const stufe = wert >= REGELN.stufe3Wert ? 3 : wert >= REGELN.stufe2Wert ? 2 : 1;
+      const stufe = wert >= REGELN.stufe4Wert ? 4 : wert >= REGELN.stufe3Wert ? 3 : wert >= REGELN.stufe2Wert ? 2 : 1;
       if (stufe > (a.stufe || 1)) {
         a.stufe = stufe;
         if (aid === SPIELER) {
           st.stufe = stufe;
-          melden(st, { art: "stufe", text: stufe === 2 ? "Deine Airline ist gewachsen: Der Kranich 190 ist jetzt im Store, er schafft den Atlantik." : "Jetzt gibt es den Albatros 320: Er fliegt um die halbe Welt.", typ: stufe === 2 ? "kranich" : "albatros" });
+          const neu = Object.keys(TYPEN).filter((t) => TYPEN[t].stufe === stufe);
+          melden(st, { art: "stufe", text: "Neu im Store: " + neu.map((t) => TYPEN[t].name).join(", ") + (stufe === 2 ? ". Damit geht es über den Atlantik!" : stufe === 3 ? ". Damit fliegst du um die halbe Welt!" : "."), typ: neu[0] });
         }
       }
     }
@@ -1211,11 +1224,11 @@
     { id: "flotte5", text: "Baue eine Flotte aus 5 Flugzeugen", ist: (st, p) => p.flotte.length, soll: 5, belohnung: 500000 },
     { id: "wert10", text: "Firmenwert 10 Mio", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 10, belohnung: 1000000, mio: true },
     { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st) => (platz(st) <= 3 ? 1 : 0), soll: 1, belohnung: 1000000 },
-    { id: "wert30", text: "Firmenwert 30 Mio: der Kranich schafft den Atlantik", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 30, belohnung: 2000000, mio: true },
+    { id: "wert30", text: "Firmenwert 30 Mio: der A321neo schafft den Atlantik", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 30, belohnung: 2000000, mio: true },
     { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st) => (platz(st) <= 2 ? 1 : 0), soll: 1, belohnung: 2000000 },
     { id: "kontinent", text: "Fliege auf einen anderen Kontinent", ist: (st, p) => p.routen.filter((r) => STADT[r.a].r !== STADT[r.b].r).length, soll: 1, belohnung: 3000000 },
     { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st) => (platz(st) === 1 ? 1 : 0), soll: 1, belohnung: 5000000 },
-    { id: "wert100", text: "Firmenwert 100 Mio: der Albatros", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 100, belohnung: 5000000, mio: true },
+    { id: "wert100", text: "Firmenwert 100 Mio: die Boeing 787", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 100, belohnung: 5000000, mio: true },
     { id: "kontinente4", text: "Fliege auf vier Kontinente", ist: (st, p) => new Set(p.routen.flatMap((r) => [STADT[r.a].r, STADT[r.b].r])).size, soll: 4, belohnung: 8000000 },
   ];
   // Danach endlos: Firmenwert verdoppeln.
@@ -1244,11 +1257,11 @@
 
   // ---------- Rivalen (und Bot für Probepartien) ----------
   const STIL = {
-    platzhirsch: { reserve: 300000, amortisation: 36, klasse: { 1: 0.7, 2: 1, 3: 1.3 }, proTag: 3, typen: ["falke", "kranich", "albatros"] },
-    billig: { reserve: 200000, amortisation: 34, klasse: { 1: 1.4, 2: 1, 3: 0.6 }, proTag: 3, typen: ["falke", "kranich", "libelle"] },
-    premium: { reserve: 300000, amortisation: 34, klasse: { 1: 0.6, 2: 1.1, 3: 1.2 }, proTag: 3, typen: ["falke", "kranich", "albatros"] },
+    platzhirsch: { reserve: 300000, amortisation: 36, klasse: { 1: 0.7, 2: 1, 3: 1.3 }, proTag: 3, typen: ["falke", "a320", "kranich", "albatros", "b777"] },
+    billig: { reserve: 200000, amortisation: 34, klasse: { 1: 1.4, 2: 1, 3: 0.6 }, proTag: 3, typen: ["falke", "b737", "kranich", "libelle", "crj900"] },
+    premium: { reserve: 300000, amortisation: 34, klasse: { 1: 0.6, 2: 1.1, 3: 1.2 }, proTag: 3, typen: ["falke", "a220", "kranich", "albatros", "a350"] },
     ruhig: { reserve: 0, amortisation: 0, klasse: { 1: 1, 2: 1, 3: 1 }, proTag: 0, typen: [] },   // für Tests: tut nichts
-    bot: { reserve: 300000, amortisation: 40, klasse: { 1: 1, 2: 1, 3: 1 }, proTag: 3, typen: ["libelle", "falke", "kranich", "albatros"] },
+    bot: { reserve: 300000, amortisation: 40, klasse: { 1: 1, 2: 1, 3: 1 }, proTag: 3, typen: ["libelle", "dash8", "falke", "a320", "kranich", "albatros", "b777"] },
   };
 
   function kiTag(st, aid) {
@@ -1326,7 +1339,7 @@
   }
 
   return {
-    SPIELER, REGELN, SERVICE, STUFEN, TYPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
+    SPIELER, REGELN, SERVICE, STUFEN, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
     KLASSEN, KLASSEN_START, klassenVon, klassenSetzen, besteKlassen,
     neuesSpiel, laden, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     flugzeugeAuf, freieFlugzeuge, slotsBelegt, slotsFrei, slotPreis, slotsGenutzt, slotsUebrig, typFrei, routeVon,
