@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="de">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="luftlinie-version" content="__VERSION__">
 <title>Luftlinie</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -415,12 +416,19 @@ button:disabled { opacity: .4; cursor: default; }
 @keyframes drehen { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 @media (orientation: portrait) and (max-width: 700px) { #drehen { display: grid; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01s !important; transition: none !important; } }
+
+/* Kein Seitenzoom wie im Browser: nur die Karte zoomt selbst. */
+html, body { touch-action: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* Hinweis auf eine neue Version, oben mittig. */
+.update { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 10px;
+  background: #F2C14E; color: #0B1622; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 6px 6px 6px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+.update button { font: inherit; border: 0; border-radius: 999px; background: #0B1622; color: #F2C14E; padding: 6px 12px; cursor: pointer; }
 </style>
 
 <div id="rahmen"><div id="feld"></div></div>
 <div id="drehen" role="status"><div class="telefon"></div><div>Dreh dein iPhone quer</div></div>
 
-<script src="airline-karte.js?v=2" charset="utf-8"></script>
-<script src="airline-logik.js?v=2" charset="utf-8"></script>
-<script src="airline-spiel.js?v=2" charset="utf-8"></script>
+<script src="airline-karte.js?v=__VERSION__" charset="utf-8"></script>
+<script src="airline-logik.js?v=__VERSION__" charset="utf-8"></script>
+<script src="airline-spiel.js?v=__VERSION__" charset="utf-8"></script>
 </html>

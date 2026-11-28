@@ -1342,6 +1342,28 @@
   window.addEventListener("pagehide", speichern);
   skalieren();
 
+  // Kein Seitenzoom wie im Browser (Zwei-Finger, Doppeltipp, Strg+Rad). Die Karte zoomt weiter über ihre eigenen Gesten.
+  for (const art of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(art, (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("touchmove", (e) => { if (e.touches.length > 1 || e.scale && e.scale !== 1) e.preventDefault(); }, { passive: false });
+  document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+  window.addEventListener("wheel", (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
+  // Neue Version: regelmäßig nachsehen, auf Knopfdruck laden.
+  const VERSION = (document.querySelector('meta[name="luftlinie-version"]') || {}).content || "";
+  let updateEl = null;
+  function updatePruefen() {
+    if (!VERSION || VERSION.startsWith("__") || updateEl) return;
+    fetch("../version.json?t=" + Date.now(), { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((v) => {
+      if (!v || !v.version || v.version === VERSION || updateEl) return;
+      updateEl = el("div", { class: "update" }, el("span", { text: "🔄 Neue Version da" }),
+        el("button", { text: "Jetzt laden", onclick: () => { speichern(); location.replace(location.pathname + "?u=" + encodeURIComponent(v.version)); } }));
+      document.body.appendChild(updateEl);
+    });
+  }
+  setTimeout(updatePruefen, 3000);
+  setInterval(updatePruefen, 120000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) updatePruefen(); });
+
   fetch("../grafiken/vorhanden.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
     for (const n of liste) dateien.add(n);
     const alt = lesen(SPEICHER, null);
