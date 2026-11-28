@@ -2230,7 +2230,8 @@
         el("span", { class: "anleitung-text", text }))))));
   }
 
-  fetch("../grafiken/vorhanden.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
+  // Erst wenn alle Grafiken offline da sind (airline-laden.js), geht es los.
+  (window.luftlinieBereit || Promise.resolve()).then(() => fetch("../grafiken/vorhanden.json", { cache: "no-cache" })).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
     for (const n of liste) dateien.add(n);
     if (!alsAppGestartet()) { anleitungZeigen(); return; }
     const alt = lesen(SPEICHER, null);

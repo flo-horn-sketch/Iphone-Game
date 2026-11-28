@@ -36,6 +36,8 @@ jobs:
           VERSION="${GITHUB_SHA::12}"
           sed -i "s/__VERSION__/$VERSION/g" _site/airline/index.html
           printf '{"version": "%s"}\n' "$VERSION" > _site/version.json
+          # Liste aller Dateien mit Prüfsumme: Die App lädt beim Start nur Neues oder Geändertes und speichert es offline.
+          python3 .github/scripts/dateiliste.py _site "$VERSION"
       - name: GitHub-Pages-Paket hochladen
         uses: actions/upload-pages-artifact@v4
         with:
@@ -78,6 +80,7 @@ jobs:
                   assert f'airline-spiel.js?v={rev[:12]}' in get("airline/").decode(), "Luftlinie nicht auf der neuen Version"
                   assert json.loads(get("version.json"))["version"] == rev[:12], "version.json passt nicht"
                   names = set(json.loads(get("grafiken/vorhanden.json?v=3")))
+                  assert json.loads(get("dateien.json"))["version"] == rev[:12], "dateien.json passt nicht"
                   print(f"Pages liefert Luftlinie mit {len(names)} registrierten Grafiken.")
                   break
               except Exception as exc:
