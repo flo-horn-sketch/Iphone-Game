@@ -9,6 +9,7 @@
   const K = window.AirKarte;
   const SPEICHER = "luftlinie-v2";
   const EINFUEHRUNG = "luftlinie-einfuehrung-v2";
+  const RIVALEN_AN = "luftlinie-rivalen";
   const FELD_B = 844, FELD_H = 390;
   const SEK_PRO_STUNDE = 2.5;          // ein Tag dauert eine Minute
   const SVG = "http://www.w3.org/2000/svg";
@@ -99,6 +100,7 @@
   // ---------- Zustand ----------
   let st = null;
   const ui = {
+    rivalen: lesen(RIVALEN_AN, false),   // Rivalen-Linien auf der Karte
     skala: 1, tempo: 0, kamera: { x: 0, y: 0, z: 1 }, zMin: 0.5,
     tafel: null, stadt: null, route: null,
     editor: null,          // { start, ziel, linie, typ, stufe }
@@ -279,12 +281,15 @@
     const tag = st ? L.tagVon(st) : 1;
     const sai = L.saison(tag);
     const fokus = ui.editor ? ui.editor.start : ui.stadt;
-    // Rivalen nur rund um die gewählte Stadt.
-    if (st && fokus) {
+    // Rivalen: alle Linien dünn in ihrer Farbe, wenn der Schalter an ist. Sonst nur rund um die gewählte Stadt.
+    if (st && (fokus || ui.rivalen)) {
       for (const aid of ["k", "s", "a"]) {
         const a = st.airlines[aid];
         for (const r of a.routen) {
-          if (r.a !== fokus && r.b !== fokus) continue;
+          if (r.a !== fokus && r.b !== fokus) {
+            if (ui.rivalen) linieSv(karte.fremd, r.a, r.b, { stroke: a.farbe, "stroke-width": 1.2 * s, "stroke-opacity": 0.55, "stroke-linecap": "round" });
+            continue;
+          }
           linieSv(karte.fremd, r.a, r.b, { stroke: a.farbe, "stroke-width": 1.4 * s, "stroke-opacity": 0.7, "stroke-dasharray": `${4 * s} ${3 * s}` });
         }
       }
@@ -454,8 +459,18 @@
     oben.append(hud.geldK, hud.uhr, hud.tempo, el("div", { class: "luecke" }), hud.bericht, hud.platz, hud.store, hud.linien, hud.menue);
     hud.ziel = el("button", { class: "zielleiste", onclick: zielAntippen });
     hud.warn = el("div");
-    feld.append(oben, hud.ziel, hud.warn);
+    // Schalter unten links: Rivalen-Linien auf der Karte zeigen oder ausblenden.
+    hud.rivalen = el("button", { class: "rivalenknopf", onclick: () => { ui.rivalen = !ui.rivalen; schreiben(RIVALEN_AN, ui.rivalen); rivalenKnopf(); karteZeichnen(); }, "aria-label": "Rivalen zeigen" });
+    feld.append(oben, hud.ziel, hud.warn, hud.rivalen);
+    rivalenKnopf();
     hudAktualisieren();
+  }
+
+  function rivalenKnopf() {
+    if (!hud.rivalen || !st) return;
+    hud.rivalen.classList.toggle("an", !!ui.rivalen);
+    hud.rivalen.replaceChildren(el("span", { text: ui.rivalen ? "Rivalen" : "Rivalen zeigen" }),
+      ...["k", "s", "a"].map((aid) => el("i", { style: { background: st.airlines[aid].farbe }, title: st.airlines[aid].name })));
   }
 
   function hudAktualisieren() {
