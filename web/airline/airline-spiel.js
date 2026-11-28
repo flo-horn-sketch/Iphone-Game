@@ -932,7 +932,8 @@
     const eigeneTafel = L.hatTafel(p, id);
     const meine = L.slotsIn(p, id).slice().sort((x, y) => x.h - y.h);
     const freiH = eigeneTafel ? [] : L.freieStunden(st, id);
-    const voll = L.slotZahl(st, id), max = L.REGELN.slotMax[c.k];
+    const fremdN = eigeneTafel ? 0 : L.fremdeStunden(st, id).length;
+    const voll = L.slotZahl(st, id) + fremdN, max = L.REGELN.slotMax[c.k];
     const fremd = ["k", "s", "a"].flatMap((aid) => st.airlines[aid].slots.filter((s) => s.stadt === id && !s.heim).map((s) => ({ aid, s }))).sort((x, y) => x.s.h - y.s.h);
     const heimVon = ["k", "s", "a"].find((aid) => L.hatTafel(st.airlines[aid], id));
     const zeileSlot = (s) => { const z = slotStatus(p, s); return el("div", { class: "slotzeile " + z.art }, el("b", { text: uhr(s.h) }), el("span", { text: z.text })); };
@@ -952,8 +953,8 @@
       heimVon ? el("div", { class: "blass mini", text: "Heimat von " + st.airlines[heimVon].name + ". Alle anderen brauchen hier einen der wenigen freien Slots." }) : null,
       meine.filter((s) => !s.heim).map(zeileSlot),
       eigeneTafel ? null : el("div", { class: "slotlage" },
-        el("div", { class: "auslastung" }, el("i", { style: { width: Math.min(100, voll / max * 100).toFixed(0) + "%", background: voll >= max ? "#F87171" : voll >= max * 0.75 ? "#FACC15" : "#7FC4E8" } })),
-        el("span", { class: "blass mini", text: voll >= max ? "Voll: alle " + max + " Slots vergeben. Nur noch per Angebot an einen Rivalen." : voll + " von " + max + " Slots vergeben. " + freiH.length + " Uhrzeiten frei, Gebot ab " + geld(Math.min(...freiH.map((h) => L.slotGrundpreis(id, h)))) + ". Gebucht wird beim Planen." })),
+        el("div", { class: "auslastung" }, el("i", { style: { width: Math.min(100, voll / max * 100).toFixed(0) + "%", background: !freiH.length ? "#F87171" : voll >= max * 0.75 ? "#FACC15" : "#7FC4E8" } })),
+        el("span", { class: "blass mini", text: !freiH.length ? "Voll: Alle Slots sind vergeben. Nur noch per Angebot an einen Rivalen." : voll + " von " + max + " Slots vergeben" + (fremdN ? " (" + fremdN + " an andere Airlines, meist morgens und abends)" : "") + ". " + freiH.length + " Uhrzeiten frei, Gebot ab " + geld(Math.min(...freiH.map((h) => L.slotGrundpreis(id, h)))) + ". Gebucht wird beim Planen." })),
       fremd.length ? el("div", { class: "blass mini", text: "Belegt von Rivalen (antippen: Angebot machen):" }) : null,
       fremd.length ? el("div", { class: "chips" }, fremd.map(({ aid, s }) => el("button", { class: "chip slotchip", onclick: () => zeigeHandel(s.id) }, el("span", { class: "punkt", style: { background: st.airlines[aid].farbe } }), uhr(s.h)))) : null,
       ausbauPreis ? el("div", { class: "ausbau" },
@@ -1070,8 +1071,10 @@
       fuss);
     const seite = el("div", { class: "seite ergebnis-seite slot-fenster auktion-seite" }, karte);
     feld.append(seite);
-    // Ein Rivale überlegt kurz (1 bis 2,5 Sekunden), ob er höher geht.
-    const kiPlanen = () => { kiZeit = performance.now() + 1000 + Math.random() * 1500; };
+    // Ein Rivale überlegt kurz, ob er höher geht: Profis antworten schnell, Anfänger zögern.
+    // Manchmal kommt ein Gebot erst in der letzten Sekunde, wie bei einem Menschen, der lange mit sich ringt.
+    const denk = { leicht: [1400, 2000], mittel: [1000, 1600], schwer: [700, 1100] }[st.gegner] || [1000, 1600];
+    const kiPlanen = () => { kiZeit = performance.now() + (Math.random() < 0.15 ? 3900 + Math.random() * 700 : denk[0] + Math.random() * denk[1]); };
     function neu() { frist = performance.now() + dauer; kiPlanen(); zeichnen(); }
     function zeichnen() {
       const B = st.auktion || fertigErg;
@@ -1923,8 +1926,10 @@
     const nachH = (x, y) => x.h - y.h;
     // Slots: deine eigenen, freie Stunden (beim Eröffnen wird darauf geboten) und belegte Stunden der Rivalen (antippen: Angebot machen).
     const enden1 = L.enden(st, p, a).sort(nachH), enden2 = L.enden(st, p, b).sort(nachH);
-    const belegtIn = (ort) => (L.hatTafel(p, ort) ? [] : ["k", "s", "a"].filter((aid) => st.airlines[aid] && !st.airlines[aid].konkurs)
-      .flatMap((aid) => st.airlines[aid].slots.filter((x) => x.stadt === ort && !x.heim).map((x) => ({ art: "rivale", aid, id: x.id, h: x.h, preis: 0 }))));
+    const belegtIn = (ort) => { const r = belegtRoh(ort); return r.filter((e) => e.art !== "fremd" || !r.some((x) => x.art === "rivale" && Math.abs(x.h - e.h) < 0.5)); };
+    const belegtRoh = (ort) => (L.hatTafel(p, ort) ? [] : ["k", "s", "a"].filter((aid) => st.airlines[aid] && !st.airlines[aid].konkurs)
+      .flatMap((aid) => st.airlines[aid].slots.filter((x) => x.stadt === ort && !x.heim).map((x) => ({ art: "rivale", aid, id: x.id, h: x.h, preis: 0 })))
+      .concat(L.fremdeStunden(st, ort).map((h) => ({ art: "fremd", h, preis: 0 }))));
     const handeln = (sid, ende) => handelFenster(sid, (ok) => {
       if (!ok) return;
       const sl = p.slots.find((x) => x.id === sid);
@@ -1942,11 +1947,11 @@
     if (!typen.length) { leer("Diese Strecke ist für deine Flugzeuge noch zu weit. Größere Typen gibt es, wenn deine Airline mehr wert ist."); return; }
     for (const [liste, ort, ende] of [[enden1, a, "e1"], [enden2, b, "e2"]]) {
       if (liste.length) continue;
-      const riv = belegtIn(ort);
+      const riv = belegtIn(ort).filter((e) => e.art === "rivale");
       if (L.hatTafel(p, ort)) leer("In " + L.STADT[ort].name + " sind alle deine Slots schon verplant.", ort);
       else leer(L.STADT[ort].name + " ist voll: Alle " + L.REGELN.slotMax[L.STADT[ort].k] + " Slots sind vergeben." + (riv.length ? " Tippe einen an und mach seinem Besitzer ein Angebot." : ""), ort,
         riv.length ? el("div", { class: "kachelgitter" }, riv.sort(nachH).map((e) => el("button", { class: "slotkachel klein rivale " + L.zeitArt(e.h), onclick: () => handeln(e.id, ende) },
-          el("b", { text: uhr(e.h) }), el("span", {}, el("i", { class: "punkt", style: { background: st.airlines[e.aid].farbe } }), "🤝 belegt")))) : null);
+          el("b", { text: uhr(e.h) }), el("span", {}, el("i", { class: "punkt", style: { background: st.airlines[e.aid].farbe } }), "belegt")))) : null);
       return;
     }
     // Vorbelegung: die beste Kombination, am liebsten mit einem Flugzeug, das schon da ist.
@@ -2005,9 +2010,11 @@
     const w = (L.STADT[a].w + L.STADT[b].w) / 2;
     const besteZeit = (liste) => (analyst && liste.length > 1 ? liste.slice().sort((x, y) => L.zeitGuete(y.h, w) - L.zeitGuete(x.h, w))[0] : null);
     // Kachelarten: dein Slot (grün), frei (Preis = Startgebot), belegt von einem Rivalen (Farbpunkt, antippen: Angebot machen).
-    const kachel = (e, stadt, gewaehlt, aus, grund, tipp, wenn, belegt) => e.art === "rivale"
+    const kachel = (e, stadt, gewaehlt, aus, grund, tipp, wenn, belegt) => e.art === "fremd"
+      ? el("button", { class: "slotkachel klein fremd", disabled: true }, el("b", { text: uhr(e.h) }), el("span", { text: "vergeben" }))
+      : e.art === "rivale"
       ? el("button", { class: "slotkachel klein rivale " + L.zeitArt(e.h), onclick: wenn },
-        el("b", { text: uhr(e.h) }), el("span", { title: st.airlines[e.aid].name }, el("i", { class: "punkt", style: { background: st.airlines[e.aid].farbe } }), "🤝 belegt"))
+        el("b", { text: uhr(e.h) }), el("span", { title: st.airlines[e.aid].name }, el("i", { class: "punkt", style: { background: st.airlines[e.aid].farbe } }), "belegt"))
       : el("button", { class: "slotkachel klein " + L.zeitArt(e.h) + (e.art === "slot" ? " mein" : "") + (e.art === "frei" ? " frei" : "") + (gewaehlt ? " an" : "") + (aus ? " aus" : "") + (belegt && !aus ? " belegt" : ""), disabled: aus, onclick: wenn },
         el("b", { text: uhr(e.h) + (tipp ? " ✨" : "") }),
         el("span", { text: aus ? grund : belegt ? "keine Zeit" : e.art === "slot" ? "dein Slot" : e.art === "frei" ? "ab " + geld(e.preis) : e.preis ? geld(e.preis) : "geschenkt" }));
@@ -2020,7 +2027,7 @@
     const tipp2 = besteZeit(passend2);
     // Alle Stunden in einem Gitter: eigene, freie und die der Rivalen, nach Uhrzeit.
     const gitter = (liste, ort, ende, mach) => el("div", { class: "kachelgitter" },
-      liste.concat(belegtIn(ort)).sort(nachH).map((e) => (e.art === "rivale" ? kachel(e, ort, false, false, "", false, () => handeln(e.id, ende)) : mach(e))));
+      liste.concat(belegtIn(ort)).sort(nachH).map((e) => (e.art === "rivale" || e.art === "fremd" ? kachel(e, ort, false, false, "", false, () => handeln(e.id, ende)) : mach(e))));
     const freiGewaehlt = F.e1.art === "frei" || F.e2.art === "frei";
     const spalte1 = el("div", { class: "flug-spalte" },
       el("b", { text: "1. Hinflug: Wann ab " + L.STADT[a].name + "?" }),
@@ -2033,7 +2040,7 @@
         const z = L.zeiten(p, a, b, typ || typen[0], F.e1.h, e.h);
         return kachel(e, b, endeKey(e) === endeKey(F.e2), !z.passt, e.h < z.an + z.wende ? "zu früh" : "zu spät", tipp2 === e, () => { F.e2 = e; flugSeite(a, b); }, !hatZeit(F.e1.h, e.h));
       }),
-      freiGewaehlt ? el("span", { class: "blass mini", text: "Gestrichelt: frei, du bietest ab dem Preis. 🤝: belegt, mach ein Angebot." }) : null,
+      freiGewaehlt ? el("span", { class: "blass mini", text: "Gestrichelt: frei, du bietest ab dem Preis. Mit Farbpunkt: gehört einem Rivalen, antippen für ein Angebot. Grau: andere Airlines." }) : null,
       el("span", { class: "blass mini", text: "Das Flugzeug braucht nach der Landung " + Math.round(zRef.wende * 60) + " Minuten am Boden." }),
       zRef.passt ? el("span", { class: "flug-zeit", text: "Ab " + L.STADT[b].name + " " + uhr(zRef.rueck) + (zRef.rueck >= 24 ? " am nächsten Tag" : "") + ", an " + L.STADT[a].name + " " + uhr(zRef.heim) + "." + (zRef.tage > 1 ? " Fliegt jeden zweiten Tag." : "") })
         : el("span", { class: "flug-zeit rot", text: "Diese Zeiten passen nicht zusammen: Wähle einen späteren Rückflug oder einen früheren Hinflug." }));
@@ -2061,7 +2068,7 @@
       test.ok && schau ? el("span", { class: "kauf-zahl", text: (ratF ? "✨ Bringt etwa " + kurz(ratF.gewinn[0]) + " bis " + kurz(ratF.gewinn[1]).replace("+", "") : "Grob geschätzt " + kurz(grob(schau.delta)[0]) + " bis " + kurz(grob(schau.delta)[1]).replace("+", "")) + " am Tag" }) : null,
       test.ok && test.kosten.gesamt ? el("span", { class: "blass mini mitte-text", text: [test.kosten.flugzeug ? "Flugzeug " + geld(test.kosten.flugzeug) : null, test.kosten.slots ? (freiGewaehlt ? "Slots ab " : "Slots ") + geld(test.kosten.slots) : null, "danach bleiben dir " + geld(p.geld - test.kosten.gesamt)].filter(Boolean).join(" · ") }) : null,
       el("button", { class: "hauptknopf gross-knopf", disabled: !test.ok,
-        text: !test.ok ? (GRUND[test.grund] || "geht nicht") + (test.grund === "geld" && test.kosten ? " (" + geld(test.kosten.gesamt) + ")" : "") : (freiGewaehlt ? "🎟️ Bieten und " + (neuLinie ? "eröffnen" : "hinzufügen") : neuLinie ? "Linie eröffnen" : "Flug hinzufügen") + (test.kosten.gesamt ? " · " + (freiGewaehlt ? "ab " : "") + geld(test.kosten.gesamt) : ""),
+        text: !test.ok ? (GRUND[test.grund] || "geht nicht") + (test.grund === "geld" && test.kosten ? " (" + geld(test.kosten.gesamt) + ")" : "") : (freiGewaehlt ? "Bieten und " + (neuLinie ? "eröffnen" : "hinzufügen") : neuLinie ? "Linie eröffnen" : "Flug hinzufügen") + (test.kosten.gesamt ? " · " + (freiGewaehlt ? "ab " : "") + geld(test.kosten.gesamt) : ""),
         onclick: () => {
           // Freie Slots erst ersteigern (Ziel zuerst). Verlierst du, bleibt die Planung offen; Gewonnenes ist dein Slot.
           const offen = [["e2", b], ["e1", a]].find(([k]) => F[k].art === "frei");

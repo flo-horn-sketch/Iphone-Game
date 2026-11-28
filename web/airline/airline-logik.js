@@ -26,11 +26,12 @@
     heimGeschenk: 2,         // so viele Slots auf der Heimat-Tafel sind am Anfang geschenkt
     slotMax: { 1: 8, 2: 14, 3: 20 },              // so viele Slots gibt ein Flughafen höchstens an fremde Airlines
     slotTakt: { 1: 6, 2: 4, 3: 3 },               // alle so viele Tage gibt ein Flughafen einen neuen Slot frei
-    slotSchonTage: 3,
-    kiBlick: 14,
+    slotSchonTage: 3,        // ein frisch erworbener Slot ist so lange vor "nutzen oder verlieren" sicher
+    kiBlick: 14,             // so viele fremde Städte schaut sich ein Rivale täglich neu an
     bietSchritt: 0.1,        // beim Bieten geht es in Schritten von 10 % des Grundpreises (mindestens 10.000) nach oben
     bietSekunden: 5,         // so lange haben die anderen Zeit, ein Gebot zu überbieten
-    rueckgabeAnteil: 0.5,    // gibt man einen ungenutzten Slot zurück, kommt so viel vom Grundpreis zurück             // so viele fremde Städte schaut sich ein Rivale täglich neu an        // ein frisch erworbener Slot ist so lange vor "nutzen oder verlieren" sicher
+    rueckgabeAnteil: 0.5,    // gibt man einen ungenutzten Slot zurück, kommt so viel vom Grundpreis zurück
+    fremdBelegt: { 1: 2, 2: 6, 3: 10 },   // so viele Stunden belegen andere Airlines (nicht im Spiel), je nach Größe des Flughafens
     reisende: 220,           // Reisende pro Tag an einem Flughafen = reisende × Größe²
     daheim: 0.5,             // wie leicht ein Gast lieber gar nicht fliegt, wenn keine Zeit passt
     handelSperre: 2,         // nach einem Nein redet der Rivale so viele Tage nicht mehr über diesen Slot
@@ -775,10 +776,22 @@
   }
   // Freie Slots an einem fremden Flughafen: jede volle Stunde von 5 bis 23 Uhr, die noch keine fremde Airline hat,
   // solange der Flughafen seine Obergrenze nicht erreicht hat. (Die Tafeln der Heimat-Airlines zählen extra.)
+  // Große Flughäfen sind voller: Dort fliegen schon viele andere Airlines (nicht im Spiel), und zwar am liebsten
+  // zu den begehrten Zeiten. Diese Stunden sind weg, für alle. Fest für die ganze Partie.
+  function fremdeStunden(st, stadt) {
+    const c = STADT[stadt];
+    if (!c) return [];
+    const n = REGELN.fremdBelegt[c.k] || 0;
+    if (!n) return [];
+    const hash = (t) => { let h = (st.saat | 0) ^ 0x9e3779b9; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); h ^= h >>> 13; h = Math.imul(h, 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+    const gewicht = { begehrt: 2.2, ruhig: 1, schwach: 0.35 };
+    return HEIM_STUNDEN.map((h) => ({ h, w: hash("fremd" + stadt + h) * gewicht[zeitArt(h)] })).sort((x, y) => y.w - x.w).slice(0, n).map((x) => x.h).sort((x, y) => x - y);
+  }
   function freieStunden(st, stadt) {
     const c = STADT[stadt];
-    if (!c || slotZahl(st, stadt) >= REGELN.slotMax[c.k]) return [];
-    const belegt = [];
+    const fremd = fremdeStunden(st, stadt);
+    if (!c || slotZahl(st, stadt) + fremd.length >= REGELN.slotMax[c.k]) return [];
+    const belegt = fremd.slice();
     for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt && !s.heim) belegt.push(s.h);
     return HEIM_STUNDEN.filter((h) => !belegt.some((b) => Math.abs(b - h) < 0.5));
   }
@@ -812,12 +825,23 @@
     return true;
   }
   // Will ein Rivale höher gehen? Der mit dem höchsten Limit zuerst. Gibt zurück, wer geboten hat.
+  // Menschlich: Kurz vor seiner Grenze steigt mancher früher aus (Anfänger öfter), und wen du gerade überboten hast,
+  // der legt mit Ärger im Bauch auch mal einen Schritt drauf ("jetzt erst recht"), einmal pro Versteigerung.
   function auktionKi(st) {
     const A = st.auktion;
     if (!A) return null;
     const n = A.stand + A.schritt;
-    const wer = Object.entries(A.limits).filter(([k, l]) => k !== A.fuehrt && l >= n && st.airlines[k].geld >= n).sort((x, y) => y[1] - x[1])[0];
+    A.raus = A.raus || {}; A.trotz = A.trotz || {};
+    const letzte = A.gebote[A.gebote.length - 1], vorletzte = A.gebote[A.gebote.length - 2];
+    if (letzte && vorletzte && letzte.aid === SPIELER && vorletzte.aid !== SPIELER && !A.trotz[vorletzte.aid] && A.limits[vorletzte.aid] != null && !st.probe) {
+      const k = vorletzte.aid, K = koennen(st, k), kf = kopf(st.airlines[k]);
+      A.trotz[k] = true;
+      if (zufall(st) < K.reagiert * 0.3 + Math.min(2, kf.groll) * 0.15) A.limits[k] += A.schritt;
+    }
+    const wer = Object.entries(A.limits).filter(([k, l]) => k !== A.fuehrt && !A.raus[k] && l >= n && st.airlines[k].geld >= n).sort((x, y) => y[1] - x[1])[0];
     if (!wer) return null;
+    const K = koennen(st, wer[0]);
+    if (!st.probe && n > wer[1] * 0.8 && zufall(st) < (1 - K.bietLust) * 0.35) { A.raus[wer[0]] = true; return auktionKi(st); }
     auktionBieten(st, wer[0]);
     return wer[0];
   }
@@ -833,6 +857,10 @@
     sieger.slots.push(slot);
     const mit = [...new Set(A.gebote.map((g) => g.aid))];
     if (mit.length > 1) sieger.geboten = (sieger.geboten || 0) + 1;
+    // Zählt mit, wie oft gebucht und wie oft wirklich geboten wurde (für die Statistik und zum Abstimmen).
+    const zs = st.auktionsZahl || (st.auktionsZahl = { gebucht: 0, umkaempft: 0, aufschlag: 0 });
+    zs.gebucht++; if (mit.length > 1) { zs.umkaempft++; zs.aufschlag += preis / A.gp - 1; }
+    if (st.auktionsLog) st.auktionsLog.push({ stadt: A.stadt, h: A.h, k: STADT[A.stadt].k, art: zeitArt(A.h), starter: A.starter, sieger: A.fuehrt, mit, gp: A.gp, preis, tag: tagVon(st) });
     if (mit.includes(SPIELER) && mit.length > 1) {
       if (A.fuehrt === SPIELER) for (const k of mit) if (k !== SPIELER) aergern(st, k, 1, `${st.airlines[k].name} ärgert sich: Du hast den Slot in ${STADT[A.stadt].name} weggeschnappt.`);
     }
@@ -2504,12 +2532,19 @@
       const K = koennen(st, aid), kf = kopf(a);
       const n = slotNutzen(st, aid, s.stadt, s.h, s.id);
       if (!n) continue;
-      const wert = n.gewinn * 25 * glaube(st, aid, "slot" + s.stadt);      // was die Airline glaubt, dass der Slot wert ist
+      // Was die Airline glaubt, dass der Slot wert ist. Begehrte Zeiten und große Flughäfen schätzt sie höher ein:
+      // Dort kommt man später kaum noch hin (andere Airlines belegen viel), also lieber jetzt zugreifen.
+      const knapp = (zeitArt(s.h) === "begehrt" ? 1.35 : 1) * (1 + 0.15 * (STADT[s.stadt].k - 1));
+      const wert = n.gewinn * 25 * knapp * glaube(st, aid, "slot" + s.stadt);
       if (wert < gp || zufall(st) > K.bietLust) continue;
-      const lust = a.stil === "platzhirsch" && STADT[s.stadt].k >= 2 ? 1.3 : a.stil === "billig" && STADT[s.stadt].k === 1 ? 1.2 : 1;
+      // Morgens und abends will jeder fliegen: Um diese Zeiten streiten sich alle (Florian: gute Zeiten klar wertvoller).
+      const lust = (a.stil === "platzhirsch" && STADT[s.stadt].k >= 2 ? 1.3 : a.stil === "billig" && STADT[s.stadt].k === 1 ? 1.2 : 1) * (zeitArt(s.h) === "begehrt" ? 1.3 : 1);
       // Wo du schon sitzt, will dich ein aufmerksamer Rivale nicht noch stärker werden lassen. Mit Ärger im Bauch erst recht.
-      const duDort = st.airlines[SPIELER].slots.some((x) => x.stadt === s.stadt) ? 1 : 0;
-      const trotz = 1 + K.reagiert * (0.15 * duDort + 0.2 * Math.min(2, kf.groll));
+      // Läuft eine deiner Linien dort gut, hält er noch mehr dagegen: Er will dir den Markt nicht überlassen.
+      const sp = st.airlines[SPIELER];
+      const duDort = sp.slots.some((x) => x.stadt === s.stadt) ? 1 : 0;
+      const duGut = sp.routen.some((r) => (r.a === s.stadt || r.b === s.stadt) && (r.auslastung || 0) >= 0.7) ? 1 : 0;
+      const trotz = 1 + K.reagiert * (0.15 * duDort + 0.2 * duGut + 0.2 * Math.min(2, kf.groll));
       gebote[aid] = Math.max(gp, runde10k(Math.min(wert, gp * (1 + zufall(st) * 0.9) * lust * trotz, a.geld * 0.3)));
     }
     return gebote;
@@ -3252,7 +3287,7 @@
     GESCHLECHTER, AUSSEHEN, aussehenFuer, managerPruefen, managerSetzen, anrede,
     neuesSpiel, laden, istAlterStand, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen, freieStunden, slotBuchen, ratBuchung, slotZurueckgeben, auktionStart, auktionBieten, auktionKi, auktionEnde, auktionAuto, fragenAn, bietSchritt,
-    slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,
+    slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, fremdeStunden, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,
     flugzeugeAuf, freieFlugzeuge, fluegeVon, fluegeAuf, typFrei, routeVon, flugFinden, flugAnlegen, flugStreichen,
     kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ASSISTENTEN, ANALYSTEN: ASSISTENTEN, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruestenGeht, umruesten,
     drehkreuze, rechnung, berechnen, reisende, probe, schaetzen, vorruecken, position, anziehung,

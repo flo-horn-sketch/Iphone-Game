@@ -3,6 +3,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const L = require("../airline/airline-logik.js");
 const K = require("../airline/airline-karte.js");
+// Die meisten Tests rechnen mit festen Uhrzeiten: Ohne die Hintergrund-Airlines, die große Flughäfen füllen.
+// Der Test "Große Flughäfen sind voller" schaltet sie gezielt ein.
+const FREMD = Object.assign({}, L.REGELN.fremdBelegt);
+L.REGELN.fremdBelegt = { 1: 0, 2: 0, 3: 0 };
 
 function leer(opt) {
   // Spiel mit Rivalen, die nichts tun, damit Zahlen gut vergleichbar sind.
@@ -809,4 +813,22 @@ test("Rivalen bieten untereinander, und ein Rivale fliegt erst, wenn er den Slot
     // Höchstens eine Frage am Tag.
     assert.equal(L.slotBuchen(st2, "k", "rom", 17).ok, true);
   } finally { L.fragenAn(false); }
+});
+
+test("Große Flughäfen sind voller: andere Airlines belegen dort vor allem die begehrten Zeiten", () => {
+  L.REGELN.fremdBelegt = FREMD;
+  try {
+    const st = leer();
+    const gross = L.ALLE.filter((c) => c.k === 3 && !L.hatTafel(st.airlines.p, c.id)), klein = L.ALLE.filter((c) => c.k === 1);
+    const frei = (liste) => liste.reduce((n, c) => n + L.freieStunden(st, c.id).length, 0) / liste.length;
+    assert.ok(frei(gross) < frei(klein) - 5, "groß " + frei(gross) + ", klein " + frei(klein));
+    // Begehrte Zeiten sind an großen Flughäfen meist schon weg.
+    let begehrtFrei = 0, begehrtAlle = 0;
+    for (const c of gross) for (const h of [6, 7, 8, 9, 17, 18, 19, 20]) { begehrtAlle++; if (L.freieStunden(st, c.id).includes(h)) begehrtFrei++; }
+    assert.ok(begehrtFrei / begehrtAlle < 0.5, "begehrt frei " + begehrtFrei + "/" + begehrtAlle);
+    // Fest für die ganze Partie.
+    const vorher = L.fremdeStunden(st, gross[0].id).join(",");
+    L.vorruecken(st, 24 * 5);
+    assert.equal(L.fremdeStunden(st, gross[0].id).join(","), vorher);
+  } finally { L.REGELN.fremdBelegt = { 1: 0, 2: 0, 3: 0 }; }
 });
