@@ -70,6 +70,16 @@ button:disabled { opacity: .4; cursor: default; }
 .oben > * { pointer-events: auto; }
 .kachel { background: var(--tafel); border: 1px solid var(--linie); border-radius: 12px; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 .rundknopf { width: 38px; justify-content: center; padding: 0; font-size: 17px; text-decoration: none; color: var(--text); }
+.tonknopf.aus { opacity: .55; }
+.tonfenster { position: absolute; top: calc(48px + var(--st)); right: calc(50px + var(--sr)); z-index: 8; width: 220px; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 5px;
+  display: flex; flex-direction: column; gap: 2px; box-shadow: 0 8px 26px rgba(0,0,0,.5); animation: rein .2s ease-out; }
+.ton-zeile { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 9px; font-weight: 600; font-size: 13px; text-align: left; }
+.ton-zeile .gross-icon { width: 24px; text-align: center; }
+.ton-zeile > span:nth-child(2) { flex: 1; }
+.ton-zeile .schieber { width: 38px; height: 22px; border-radius: 11px; background: rgba(255,255,255,.18); position: relative; transition: background .15s; }
+.ton-zeile .schieber i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+.ton-zeile.an .schieber { background: #3FB950; }
+.ton-zeile.an .schieber i { left: 18px; }
 .geld { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; min-width: 120px; }
 .geld b { font-size: 17px; line-height: 1.05; }
 .geld small { font-size: 10px; color: var(--blass); }
@@ -242,7 +252,8 @@ button:disabled { opacity: .4; cursor: default; }
 
 /* Menü */
 .menue { position: absolute; top: calc(48px + var(--st)); right: calc(6px + var(--sr)); z-index: 8; width: 210px; background: var(--tafel); border: 1px solid var(--linie); border-radius: 14px; padding: 5px;
-  display: flex; flex-direction: column; gap: 2px; box-shadow: 0 8px 26px rgba(0,0,0,.5); animation: rein .2s ease-out; }
+  display: flex; flex-direction: column; gap: 2px; box-shadow: 0 8px 26px rgba(0,0,0,.5); animation: rein .2s ease-out;
+  max-height: calc(100% - 56px - var(--st) - var(--sb)); overflow-y: auto; }
 .menue-punkt { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; font-weight: 600; font-size: 13px; text-align: left; }
 .menue-punkt:active { background: rgba(255,255,255,.08); }
 .menue-punkt .gross-icon { width: 24px; text-align: center; }
@@ -573,6 +584,7 @@ body.anleitung-an > :not(.anleitung) { display: none !important; }
 <div id="rahmen"><div id="feld"></div></div>
 <div id="drehen" role="status"><div class="telefon"></div><div>Dreh dein iPhone quer</div></div>
 
+<script src="airline-ton.js?v=__VERSION__" charset="utf-8"></script>
 <script src="airline-karte.js?v=__VERSION__" charset="utf-8"></script>
 <script src="airline-logik.js?v=__VERSION__" charset="utf-8"></script>
 <script src="airline-spiel.js?v=__VERSION__" charset="utf-8"></script>

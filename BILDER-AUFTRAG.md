@@ -232,6 +232,9 @@ Wichtig: PNG mit **durchsichtigem Hintergrund**, quadratisch 256 × 256. Das Spi
 | `ico-werbung.png` | 256 × 256 | Fernseher mit Stern auf dem Bildschirm |
 | `ico-teilen.png` | 256 × 256 | Teilen-Symbol wie in Safari: Quadrat mit Pfeil nach oben |
 | `ico-homescreen.png` | 256 × 256 | Handy mit einem Plus-Zeichen auf dem Bildschirm |
+| `ico-ton-an.png` | 256 × 256 | Lautsprecher mit zwei Schallwellen |
+| `ico-ton-aus.png` | 256 × 256 | Lautsprecher, daneben ein kleines Kreuz statt Schallwellen |
+| `ico-musik.png` | 256 × 256 | Zwei verbundene Musiknoten |
 
 ## Kontrolle
 
