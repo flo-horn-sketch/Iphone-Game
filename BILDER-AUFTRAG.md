@@ -73,6 +73,9 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-assistent-mia.png` | 1024 × 1024 | Mia Kaya, Analystin Anfang dreißig, Brille, dunkle Haare im Zopf, ruhiger aufmerksamer Blick, Blazer über T-Shirt. |
 | `air-assistent-kern.png` | 1024 × 1024 | Dr. Helga Kern, erfahrene Analystin um die sechzig, kurze graue Haare, Lesebrille auf der Nase, skeptisch hochgezogene Augenbraue, eleganter Rollkragen. |
 | `air-assistent-paul.png` | 1024 × 1024 | Paul Wendt, Preis-Experte um die vierzig, Bart, Hemd mit hochgekrempelten Ärmeln, verschmitztes Lächeln, Taschenrechner in der Brusttasche. |
+| `air-assistent-jonas.png` | 1024 × 1024 | Jonas Ritter, Controller Anfang zwanzig, Praktikant, zu großes Sakko, etwas verlegenes Lächeln, Kugelschreiber hinter dem Ohr. |
+| `air-assistent-lena.png` | 1024 × 1024 | Lena Vogt, Controllerin Mitte dreißig, blonder Kurzhaarschnitt, klarer freundlicher Blick, dunkelblaue Bluse, Ordner unter dem Arm. |
+| `air-assistent-ines.png` | 1024 × 1024 | Ines Falk, erfahrene Controllerin um die fünfzig, graue Strähne im dunklen Haar, schmale Brille, leichtes wissendes Lächeln, Perlenohrringe. |
 
 ### 5. Ereignisse (breit)
 
@@ -118,6 +121,11 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-regel-meine.png` | 1024 × 1024 | Ein gemütliches Chefbüro mit Fenster zum Vorfeld, auf dem Tisch ein Flugzeugmodell, ein Tablett mit Essen und ein Koffer, warmes Licht. |
 | `air-regel-assistenten.png` | 1024 × 1024 | Zwei Mitarbeitende beugen sich mit Lupe und Notizblock über eine große Weltkarte voller Fluglinien, konzentrierte Stimmung. |
 | `air-regel-rangliste.png` | 1024 × 1024 | Ein Siegertreppchen auf einem Rollfeld, auf den drei Stufen stehen Flugzeugmodelle in Grün, Rot und Violett, darüber Konfetti. |
+| `air-regel-verwaltung.png` | 1024 × 1024 | Ein Büro voller Aktenstapel, Telefone und Bildschirme, im Fenster dahinter ein Flughafen mit vielen Flugzeugen, leicht überfordert wirkende Stimmung mit Augenzwinkern. |
+| `air-regel-ruf.png` | 1024 × 1024 | Zufriedene Reisende steigen lächelnd aus einem Flugzeug, über ihnen leuchten fünf goldene Sterne am Abendhimmel. |
+| `air-regel-controlling.png` | 1024 × 1024 | Eine Controllerin zeigt auf einen großen Bildschirm mit einer Landkarte, eine Linie leuchtet orange mit einem Ausrufezeichen-Symbol, ruhige konzentrierte Stimmung. |
+| `air-regel-statistik.png` | 1024 × 1024 | Ein Tablet auf einem Schreibtisch zeigt bunte Balken in Grün, Gelb und Rot, daneben eine Kaffeetasse und ein kleines Flugzeugmodell. |
+| `air-regel-spaet.png` | 1024 × 1024 | Ein einzelnes großes, glänzendes Flugzeug wird in einem hellen Hangar sorgfältig poliert, statt vieler kleiner – Qualität statt Masse, goldenes Licht. |
 | `air-regel-pleite.png` | 1024 × 1024 | Ein Flugzeug steht im Regen vor einem Bankgebäude, darüber ein großes Warndreieck aus Licht, ernste, aber nicht düstere Stimmung. |
 
 ### 7. App-Symbol (für den Home-Bildschirm)
@@ -218,6 +226,10 @@ Wichtig: PNG mit **durchsichtigem Hintergrund**, quadratisch 256 × 256. Das Spi
 | `ico-pleite.png` | 256 × 256 | Explosion / Knall |
 | `ico-regeln.png` | 256 × 256 | aufgeschlagenes Buch |
 | `ico-heimat.png` | 256 × 256 | kleines Haus |
+| `ico-hinweis.png` | 256 × 256 | dickes Ausrufezeichen in einem orangen Kreis |
+| `ico-statistik.png` | 256 × 256 | Balkendiagramm mit drei Balken |
+| `ico-verwaltung.png` | 256 × 256 | Bürogebäude |
+| `ico-werbung.png` | 256 × 256 | Fernseher mit Stern auf dem Bildschirm |
 
 ## Kontrolle
 

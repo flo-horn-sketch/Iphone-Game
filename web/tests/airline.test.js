@@ -466,3 +466,37 @@ test("Lange Partie mit allen neuen Ereignissen läuft ohne Fehler", () => {
   for (const a of ["versteigerung", "rennen", "plan"]) assert.ok(arten.has(a), a);
   assert.ok(!st.ende);
 });
+
+test("Spätes Spiel: Verwaltung, Werbung, Umrüsten, Controlling, späte Ziele", () => {
+  const st = L.neuesSpiel({ seed: 5, basis: "frankfurt" });
+  const p = st.airlines.p;
+  assert.equal(L.verwaltungKosten(p, 8), 0);
+  assert.ok(L.verwaltungKosten(p, 20) > 2 * L.verwaltungKosten(p, 14));   // wächst schneller als die Zahl der Linien
+  p.geld = 5e7;
+  p.ruf = 70;
+  assert.ok(L.werbung(st, "p").ok);
+  assert.equal(p.ruf, 76);
+  // Umrüsten: ATR auf einer Linie wird zu einem größeren Typ
+  L.kaufen(st, "p", "libelle");
+  const r = L.fliegen(st, "p", "frankfurt", "stuttgart", "libelle", { nurFrei: true }).route;
+  const geldVor = p.geld;
+  assert.ok(L.umruesten(st, "p", r.id, "falke").ok);
+  assert.equal(L.flugzeugeAuf(p, r.id)[0].typ, "falke");
+  assert.ok(p.geld < geldVor && p.flotte.length === 1);
+  assert.ok(!L.umruesten(st, "p", r.id, "libelle").ok);       // kleiner geht nicht
+  // Controlling: Bericht nur mit Assistent
+  p.stil = "bot";
+  for (let d = 1; d <= 14; d++) { L.kiTag(st, "p"); L.vorruecken(st, 24); }
+  assert.ok(!p.wochenbericht);
+  L.einstellen(st, "p", "controller", "ines");
+  for (let d = 1; d <= 7; d++) L.vorruecken(st, 24);
+  assert.ok(p.wochenbericht && p.wochenbericht.schwach.length >= 1);
+  assert.ok(Array.isArray(p.hinweise) && p.hinweise.length <= 3);
+  // Späte Ziele wechseln sich mit Firmenwert ab
+  st.ziel = L.ZIELE.length;
+  assert.match(L.zielStand(st).text, /rote Linie/);
+  st.ziel = L.ZIELE.length + 1;
+  assert.match(L.zielStand(st).text, /Firmenwert/);
+  st.ziel = L.ZIELE.length + 2;
+  assert.equal(L.zielStand(st).einheit, "%");
+});

@@ -29,7 +29,11 @@
     startGeld: 2500000,
     startSlots: 2,
     rufStart: 50,
-    rufMax: 90,
+    rufMax: 100,
+    rufNatur: 70,            // bis hierhin wächst der Ruf von selbst; darüber nur mit Werbung, und er sinkt langsam wieder
+    werbungRuf: 6, werbungAnteil: 0.02, werbungMin: 500000,   // Werbekampagne: +6 Ruf für 2 % vom Firmenwert (mind. 0,5 Mio)
+    verwaltungFrei: 8, verwaltung: 3500, verwaltungExp: 1.5,  // ab der 9. Linie kostet jede Linie Verwaltung, und zwar immer mehr
+    umruestenAnteil: 0.6,    // beim Umrüsten bekommt man so viel vom Preis des alten Flugzeugs zurück
     rufVerschlechtern: 4,    // so viel Ruf kostet es, wenn ein Grundsatz für die Gäste schlechter wird (pro Komfortpunkt)
     auftragStunden: 8,       // so lange braucht ein Assistent für einen Bericht
     saisonTage: 7,           // eine Jahreszeit dauert eine Woche, ein Jahr 28 Tage
@@ -791,6 +795,7 @@
     const summe = {};
     for (const aid of st.reihenfolge) summe[aid] = 0;
     for (const e of Object.values(routen)) summe[e.airline] += e.gewinn;
+    for (const aid of st.reihenfolge) summe[aid] -= verwaltungKosten(st.airlines[aid]);
     return { routen, summe, tag };
   }
 
@@ -871,7 +876,13 @@
   const PREISPROFIS = {
     paul: { name: "Paul Wendt", bild: "air-assistent-paul", sterne: 2, gehalt: 3000, macke: 1.0, mackeText: "mag Experimente", streuung: 0.3 },
   };
-  const ROLLEN = { analyst: ANALYSTEN, preis: PREISPROFIS };
+  // Controlling: liefert jeden Sonntag (Ende der Jahreszeit) einen Wochenbericht mit den schwächsten Linien.
+  const CONTROLLER = {
+    jonas: { name: "Jonas Ritter", bild: "air-assistent-jonas", sterne: 1, gehalt: 2000, macke: 1.0, mackeText: "übersieht manches", streuung: 0.45 },
+    lena: { name: "Lena Vogt", bild: "air-assistent-lena", sterne: 2, gehalt: 4500, macke: 1.0, mackeText: "zuverlässig", streuung: 0.2 },
+    ines: { name: "Ines Falk", bild: "air-assistent-ines", sterne: 3, gehalt: 9000, macke: 1.0, mackeText: "findet fast alles", streuung: 0.08 },
+  };
+  const ROLLEN = { analyst: ANALYSTEN, preis: PREISPROFIS, controller: CONTROLLER };
   function assistent(a, rolle) {
     const id = a.assistenten && a.assistenten[rolle];
     return id ? Object.assign({ id }, ROLLEN[rolle][id]) : null;
@@ -977,6 +988,72 @@
       else au.bericht = preisBericht(st, SPIELER, wer);
       melden(st, { art: "bericht", text: wer.name + ": Mein Bericht ist fertig!", rolle });
     }
+  }
+  // Wochenbericht: Woche gegen Vorwoche, beste Linie, die drei schwächsten Linien mit je einem Vorschlag.
+  function wochenbericht(st, aid, wer) {
+    const a = st.airlines[aid];
+    const rg = rechnung(st);
+    const v = a.verlauf;
+    const summe = (xs) => xs.reduce((s2, x) => s2 + x, 0);
+    const linien = a.routen.filter((r) => rg.routen[r.id]).map((r) => ({ r, e: rg.routen[r.id], wert: rg.routen[r.id].gewinn + (rg.routen[r.id].zubringer || 0) }));
+    linien.sort((x, y) => x.wert - y.wert);
+    const beste = linien.length ? linien[linien.length - 1] : null;
+    const schwach = linien.slice(0, Math.min(3, Math.max(0, linien.length - 1))).map(({ r, e, wert }) => {
+      const ideen = [];
+      for (const stufe of Object.keys(STUFEN)) if (stufe !== r.stufe) ideen.push({ art: "preis", stufe, f: (k) => preisStufe(k, aid, r.id, stufe) });
+      const bk = besteKlassen(st, aid, r.id);
+      if (bk) ideen.push({ art: "sitze", business: bk.business, first: bk.first, f: (k) => klassenSetzen(k, aid, r.id, bk.business, bk.first) });
+      if (flugzeugeAuf(a, r.id).length > 1) ideen.push({ art: "abziehen", f: (k) => abziehen(k, aid, r.id) });
+      else if (wert < 0) ideen.push({ art: "schliessen", f: (k) => routeSchliessen(k, aid, r.id) });
+      let best = null;
+      for (const idee of ideen) {
+        const pr = probe(st, aid, idee.f);
+        if (!pr) continue;
+        const schaetzung = pr.delta * wer.macke + (rauschen(st, wer.streuung) - 1) * Math.max(5000, Math.abs(e.gewinn) * 0.3);
+        if (!best || schaetzung > best.schaetzung) best = { ...idee, schaetzung };
+      }
+      const aktion = best && best.schaetzung > 2000 ? { art: best.art, stufe: best.stufe, business: best.business, first: best.first } : null;
+      return { id: r.id, a: r.a, b: r.b, gewinn: Math.round(wert), auslastung: e.auslastung, aktion, plus: aktion ? spanne(best.schaetzung, wer.streuung) : null };
+    });
+    return {
+      tag: tagVon(st), woche: Math.round(summe(v.slice(-7))), vorwoche: v.length > 7 ? Math.round(summe(v.slice(-14, -7))) : null,
+      beste: beste ? { id: beste.r.id, a: beste.r.a, b: beste.r.b, gewinn: Math.round(beste.wert) } : null, schwach,
+    };
+  }
+  // Missstände: Was stimmt an den Linien gerade nicht? Wenige, gebündelte Hinweise, die schlimmsten zuerst.
+  function missstaende(st, aid, max) {
+    const a = st.airlines[aid];
+    const rg = rechnung(st);
+    const tag = tagVon(st);
+    const liste = [];
+    for (const r of a.routen) {
+      const e = rg.routen[r.id];
+      if (!e || tag - (r.seit || 0) < 2) continue;
+      const n = flugzeugeAuf(a, r.id).length;
+      let h = null;
+      if (r.duell) h = { art: "duell", schwere: 4, text: "Ein Rivale fliegt hier billiger.", vorschlag: "vergleich" };
+      else if ((r.minus || 0) >= 3) h = { art: "verlust", schwere: 5, text: "Macht seit " + r.minus + " Tagen Verlust.", vorschlag: n > 1 ? "abziehen" : "schliessen" };
+      else if (e.auslastung < 0.45) h = { art: "leer", schwere: 3, text: "Mehr als die Hälfte der Plätze bleibt leer.", vorschlag: r.stufe !== "angreifen" ? "billiger" : n > 1 ? "abziehen" : "schliessen" };
+      else if (e.bedarf > e.sitzePlaetze * 1.3) h = { art: "voll", schwere: 2, text: "Viel mehr Gäste als Plätze.", vorschlag: "groesser" };
+      else if (trendVon(st, r.a, r.b) < 0 && e.auslastung < 0.7) h = { art: "trend", schwere: 1, text: "Die Nachfrage sinkt gerade.", vorschlag: r.stufe !== "angreifen" ? "billiger" : null };
+      if (h) liste.push({ id: r.id, a: r.a, b: r.b, ...h, schwere: h.schwere + Math.min(2, Math.abs(e.wert) / 50000) * (e.wert < 0 ? 1 : 0) });
+    }
+    liste.sort((x, y) => y.schwere - x.schwere);
+    return liste.slice(0, max);
+  }
+  function wochenVorschlagUebernehmen(st, i) {
+    const a = st.airlines[SPIELER];
+    const w = a.wochenbericht;
+    const x = w && w.schwach[i];
+    if (!x || !x.aktion || x.erledigt || !a.routen.some((r) => r.id === x.id)) return false;
+    const k = x.aktion;
+    if (k.art === "preis") preisStufe(st, SPIELER, x.id, k.stufe);
+    else if (k.art === "sitze") klassenSetzen(st, SPIELER, x.id, k.business, k.first);
+    else if (k.art === "abziehen") abziehen(st, SPIELER, x.id);
+    else if (k.art === "schliessen") routeSchliessen(st, SPIELER, x.id);
+    x.erledigt = true;
+    geaendert(st);
+    return true;
   }
   function preisVorschlagUebernehmen(st, rid) {
     const a = st.airlines[SPIELER];
@@ -1085,13 +1162,19 @@
         r.auslastung = r.auslastung == null ? e.auslastung : r.auslastung * 0.6 + e.auslastung * 0.4;
         r.minus = e.wert < 0 ? (r.minus || 0) + 1 : 0;
       }
-      a.ruf = Math.min(REGELN.rufMax, a.ruf + (a.ruf < 70 ? 1.5 : 0.5));
+      if (a.ruf < REGELN.rufNatur) a.ruf = Math.min(REGELN.rufNatur, a.ruf + 1.5);
+      else a.ruf = Math.max(REGELN.rufNatur, a.ruf - 0.3);
+      const verw = verwaltungKosten(a);
+      if (verw) { a.geld -= verw; a.heute = (a.heute || 0) - verw; }
       const lohn = gehaelter(a);
       if (lohn) { a.geld -= lohn; a.heute = (a.heute || 0) - lohn; }
       // Rivalen schütten einen Teil des Gewinns an ihre Eigentümer aus. Sonst ziehen sie davon.
       if (aid !== SPIELER && a.heute > 0) a.geld -= a.heute * REGELN.dividende;
       a.verlauf.push(Math.round(a.heute || 0));
       if (a.verlauf.length > 14) a.verlauf.shift();
+      a.rufVerlauf = a.rufVerlauf || [];
+      a.rufVerlauf.push(Math.round(a.ruf));
+      if (a.rufVerlauf.length > 14) a.rufVerlauf.shift();
       a.heute = 0;
     }
     st.letzterTag = {
@@ -1101,6 +1184,18 @@
         return { id: r.id, a: r.a, b: r.b, gewinn: Math.round(e.gewinn), zubringer: Math.round(e.zubringer), auslastung: e.auslastung };
       }).sort((x, y) => y.gewinn - x.gewinn),
     };
+    // Controlling: täglich ein Blick auf Missstände, sonntags der Wochenbericht.
+    const ctrl = assistent(p, "controller");
+    if (ctrl) {
+      const alt = new Set((p.hinweise || []).map((h) => h.id + h.art));
+      p.hinweise = missstaende(st, SPIELER, ctrl.sterne);
+      const neu = p.hinweise.filter((h) => !alt.has(h.id + h.art));
+      if (neu.length) melden(st, { art: "hinweis", text: "❗ " + ctrl.name + ": " + (neu.length === 1 ? STADT[neu[0].a].name + " – " + STADT[neu[0].b].name + ": " + neu[0].text : neu.length + " Linien brauchen deine Aufmerksamkeit.") });
+    } else p.hinweise = [];
+    if (ctrl && tag % REGELN.saisonTage === 0 && p.routen.length) {
+      p.wochenbericht = wochenbericht(st, SPIELER, ctrl);
+      melden(st, { art: "bericht", text: "📋 " + ctrl.name + ": Dein Wochenbericht ist da!", rolle: "controller" });
+    }
     // Pleite-Stufen.
     pleitePruefen(st);
     if (st.ende) return;
@@ -1275,6 +1370,41 @@
     for (const [stadt, n] of Object.entries(a.slots)) s += n * REGELN.slotPreis[STADT[stadt].k] * 0.5;
     return s;
   }
+  // Verwaltung: die ersten Linien sind frei, danach kostet jede weitere mehr (Büro, Planung, Personal).
+  function verwaltungKosten(a, n) {
+    const x = Math.max(0, (n == null ? a.routen.length : n) - REGELN.verwaltungFrei);
+    return x ? Math.round(REGELN.verwaltung * x ** REGELN.verwaltungExp) : 0;
+  }
+  // Werbekampagne: kauft Ruf über die natürliche Grenze hinaus.
+  function werbungPreis(st, aid) { return Math.max(REGELN.werbungMin, Math.round(firmenwert(st, aid) * REGELN.werbungAnteil / 50000) * 50000); }
+  function werbung(st, aid) {
+    const a = st.airlines[aid];
+    const preis = werbungPreis(st, aid);
+    if (a.geld < preis || a.ruf >= REGELN.rufMax) return { ok: false };
+    a.geld -= preis;
+    a.ruf = Math.min(REGELN.rufMax, a.ruf + REGELN.werbungRuf);
+    geaendert(st);
+    return { ok: true, preis };
+  }
+  // Umrüsten: ein Flugzeug der Linie gegen einen größeren Typ tauschen. Das alte wird verkauft.
+  function umruestenKosten(st, aid, rid, typ) {
+    const a = st.airlines[aid];
+    const fs = flugzeugeAuf(a, rid);
+    if (!fs.length) return null;
+    const alt = fs.slice().sort((x, y) => TYPEN[x.typ].sitze - TYPEN[y.typ].sitze)[0];
+    return { alt, preis: Math.max(0, TYPEN[typ].preis - Math.round(TYPEN[alt.typ].preis * REGELN.umruestenAnteil)) };
+  }
+  function umruesten(st, aid, rid, typ) {
+    const a = st.airlines[aid];
+    const r = a.routen.find((x) => x.id === rid);
+    if (!r || !TYPEN[typ] || !typFrei(st, a, typ) || entfernung(r.a, r.b) > TYPEN[typ].reichweite) return { ok: false };
+    const k = umruestenKosten(st, aid, rid, typ);
+    if (!k || TYPEN[typ].sitze <= TYPEN[k.alt.typ].sitze || a.geld < k.preis) return { ok: false };
+    a.geld -= k.preis;
+    k.alt.typ = typ;
+    geaendert(st);
+    return { ok: true, preis: k.preis };
+  }
   function firmenwert(st, aid) {
     const a = st.airlines[aid];
     const verlauf = a.verlauf.slice(-7);
@@ -1334,14 +1464,30 @@
   // Danach endlos: Firmenwert verdoppeln.
   function zielAktuell(st) {
     if (st.ziel < ZIELE.length) return ZIELE[st.ziel];
-    const stufe = st.ziel - ZIELE.length;
+    const i = st.ziel - ZIELE.length;
+    // Im späten Spiel wechseln sich Firmenwert und Optimier-Ziele ab: lieber gut als viel.
+    if (i % 2 === 0) return spaetesZiel(i / 2);
+    const stufe = (i - 1) / 2;
     const soll = 200 * 2 ** stufe;
     return { id: "wert" + soll, text: `Firmenwert ${soll} Mio`, ist: (s) => Math.round(firmenwert(s, SPIELER) / 1e5) / 10, soll, belohnung: soll * 50000, mio: true };
+  }
+  function linienWerte(st, p) {
+    const rg = rechnung(st);
+    return p.routen.map((r) => rg.routen[r.id]).filter(Boolean);
+  }
+  function spaetesZiel(j) {
+    const stufe = Math.floor(j / 4);
+    const art = j % 4;
+    if (art === 0) return { id: "rot" + j, text: "Keine rote Linie mehr: alle Linien im Plus", ist: (st, p) => (p.routen.length && linienWerte(st, p).every((e) => e.wert > 0) ? 1 : 0), soll: 1, belohnung: 4000000 * (stufe + 1) };
+    if (art === 1) { const soll = Math.min(95, 80 + 5 * stufe); return { id: "auslastung" + j, text: `Volle Flieger: im Schnitt ${soll} % Auslastung`, ist: (st, p) => { const w = linienWerte(st, p); return w.length ? Math.round(w.reduce((s2, e) => s2 + Math.min(1, e.auslastung), 0) / w.length * 100) : 0; }, soll, belohnung: 5000000 * (stufe + 1), einheit: "%" }; }
+    if (art === 2) { const soll = Math.min(100, 80 + 5 * stufe); return { id: "ruf" + j, text: `Bester Ruf: ⭐ ${soll} erreichen`, ist: (st, p) => Math.round(p.ruf), soll, belohnung: 5000000 * (stufe + 1) }; }
+    const soll = 100 * 2 ** stufe;
+    return { id: "proLinie" + j, text: `Starke Linien: im Schnitt ${soll} Tsd Gewinn pro Linie am Tag`, ist: (st, p) => { const w = linienWerte(st, p); return w.length ? Math.round(w.reduce((s2, e) => s2 + e.wert, 0) / w.length / 1000) : 0; }, soll, belohnung: 6000000 * (stufe + 1) };
   }
   function zielStand(st) {
     const z = zielAktuell(st);
     const p = st.airlines[SPIELER];
-    return { id: z.id, text: z.text, ist: Math.min(z.ist(st, p), z.soll), soll: z.soll, belohnung: z.belohnung, mio: !!z.mio, nr: st.ziel + 1 };
+    return { id: z.id, text: z.text, ist: Math.min(z.ist(st, p), z.soll), soll: z.soll, belohnung: z.belohnung, mio: !!z.mio, einheit: z.einheit || "", nr: st.ziel + 1 };
   }
   function zielPruefen(st) {
     const p = st.airlines[SPIELER];
@@ -1443,6 +1589,7 @@
     for (const typ of typen) flugzeugPreis[typ] = freieFlugzeuge(a).some((f) => f.typ === typ) ? 0 : TYPEN[typ].preis;
     const budget = a.geld - reserve;
     const maxWeite = Math.max(0, ...typen.map((t) => TYPEN[t].reichweite));
+    const verwZusatz = verwaltungKosten(a, a.routen.length + 1) - verwaltungKosten(a);   // eine neue Linie kostet auch Verwaltung
     for (const x of orte) {
       const sx = slotVon(x);
       if (sx.fehlt) continue;
@@ -1458,6 +1605,7 @@
           const k = { gesamt: flugzeugPreis[typ] + sx.preis + sy.preis };
           if (k.gesamt > budget) continue;
           const sch = schaetzen(st, aid, x, y, typ);
+          if (verwZusatz && !routeVon(a, x, y)) sch.gewinn -= verwZusatz;
           if (sch.gewinn <= 0 || sch.auslastung < 0.45) continue;
           const vorliebe = stil.klasse[STADT[y].k] * (a.stil === "premium" ? 0.6 + (STADT[x].w + STADT[y].w) : 1) * (x === a.basis ? 1.15 : 1);
           const tage = (k.gesamt + 1) / sch.gewinn;
@@ -1759,7 +1907,7 @@
     KLASSEN, KLASSEN_START, klassenVon, klassenSetzen, besteKlassen,
     neuesSpiel, laden, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     flugzeugeAuf, freieFlugzeuge, slotsBelegt, slotsFrei, slotPreis, slotsGenutzt, slotsUebrig, typFrei, routeVon,
-    kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, kaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen,
+    kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, kaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, CONTROLLER, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruesten,
     umlauf, drehkreuze, rechnung, berechnen, probe, schaetzen, vorruecken, position, anziehung,
     gelegenheitAnnehmen, gelegenheitAblehnen, uebernahmeAnnehmen, uebernahmeAblehnen, tilgen,
     firmenwert, rangliste, platz, kiTag, kiAusbauen, tagesAbschluss, zielStand, zielPruefen, ZIELE,
