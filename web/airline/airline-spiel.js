@@ -2093,7 +2093,7 @@
       seite.replaceChildren();
       seite.append(...[
         bild("air-start") ? el("img", { class: "bg", src: bild("air-start"), alt: "" }) : null,
-        el("h1", {}, "Luftlinie", el("small", { text: "Alle starten bei Null. Wer wird die größte Airline der Welt?" })),
+        el("h1", {}, "Airlines", el("small", { text: "Alle starten bei Null. Wer wird die größte Airline der Welt?" })),
         el("div", { class: "start-punkte" },
           el("span", { text: "🛒 Erstes Flugzeug kaufen" }), el("span", { text: "✏️ Linien planen" }), el("span", { text: "🏆 Die Rivalen überholen" })),
         el("button", { class: "hauptknopf", text: "Airline gründen ▶", onclick: heimatWaehlen })].filter(Boolean));
@@ -2209,21 +2209,21 @@
     const schritte = ios ? [
       ["📤", "Tippe unten auf „Teilen“"],
       ["📲", "Wähle „Zum Home-Bildschirm“"],
-      [null, "Tippe auf „Hinzufügen“ und starte Luftlinie über das neue Symbol"],
+      [null, "Tippe auf „Hinzufügen“ und starte Airlines über das neue Symbol"],
     ] : android ? [
       ["⋮", "Tippe oben rechts auf das Menü"],
       ["📲", "Wähle „App installieren“ oder „Zum Startbildschirm“"],
-      [null, "Starte Luftlinie über das neue Symbol"],
+      [null, "Starte Airlines über das neue Symbol"],
     ] : [
       ["📲", "Öffne diese Seite auf deinem iPhone in Safari"],
       ["📤", "Tippe auf „Teilen“ und dann „Zum Home-Bildschirm“"],
-      [null, "Starte Luftlinie über das neue Symbol"],
+      [null, "Starte Airlines über das neue Symbol"],
     ];
     document.body.classList.add("anleitung-an");
     document.body.append(el("div", { class: "anleitung" },
       el("img", { class: "anleitung-logo", src: "../app-icon-180.png", alt: "" }),
-      el("h1", { text: "Luftlinie installieren" }),
-      el("p", { text: "Luftlinie läuft nur als App auf deinem Home-Bildschirm. So geht's:" }),
+      el("h1", { text: "Airlines installieren" }),
+      el("p", { text: "Airlines läuft nur als App auf deinem Home-Bildschirm. So geht's:" }),
       el("ol", {}, schritte.map(([ic, text], i) => el("li", {},
         el("span", { class: "nr", text: String(i + 1) }),
         ic ? el("span", { class: "anleitung-ic", text: ic }) : el("img", { class: "anleitung-ic klein-logo", src: "../app-icon-180.png", alt: "" }),

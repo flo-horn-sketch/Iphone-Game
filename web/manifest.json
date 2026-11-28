@@ -1,6 +1,6 @@
 {
-  "name": "Luftlinie",
-  "short_name": "Luftlinie",
+  "name": "Airlines",
+  "short_name": "Airlines",
   "start_url": "airline/",
   "scope": "./",
   "display": "fullscreen",

@@ -54,7 +54,7 @@
     document.head.appendChild(css);
     schirm = document.createElement("div");
     schirm.className = "laden";
-    schirm.innerHTML = '<img src="../app-icon-180.png" alt=""><h1>Luftlinie wird vorbereitet</h1><div class="leiste"><i></i></div><div class="zeile">Prüfe Grafiken …</div><div class="knoepfe"></div>';
+    schirm.innerHTML = '<img src="../app-icon-180.png" alt=""><h1>Airlines wird vorbereitet</h1><div class="leiste"><i></i></div><div class="zeile">Prüfe Grafiken …</div><div class="knoepfe"></div>';
     document.body.appendChild(schirm);
     titel = schirm.querySelector("h1"); balken = schirm.querySelector(".leiste i"); zeile = schirm.querySelector(".zeile"); knoepfe = schirm.querySelector(".knoepfe");
   }
@@ -71,7 +71,7 @@
     titel.textContent = "Keine Verbindung";
     zeile.textContent = text;
     knoepfe.innerHTML = "";
-    knopf("Nochmal versuchen", false, () => { knoepfe.innerHTML = ""; titel.textContent = "Luftlinie wird vorbereitet"; pruefen(); });
+    knopf("Nochmal versuchen", false, () => { knoepfe.innerHTML = ""; titel.textContent = "Airlines wird vorbereitet"; pruefen(); });
     if (mitSpielen) knopf("Trotzdem spielen", true, () => { weg(); fertig(); });
   }
 
@@ -96,7 +96,7 @@
       // Ohne Netz: starten, wenn der letzte Stand vollständig ist.
       const fehlt = Object.keys(stand.hashes).filter((p) => !vorhanden.has(adresse(p)));
       if (stand.version && !fehlt.length) { weg(); fertig(); return; }
-      problem(stand.version ? `Es fehlen noch ${fehlt.length} Dateien. Dafür braucht Luftlinie einmal Internet.` : "Beim ersten Start braucht Luftlinie einmal Internet, um alle Grafiken zu laden.", !!stand.version);
+      problem(stand.version ? `Es fehlen noch ${fehlt.length} Dateien. Dafür braucht Airlines einmal Internet.` : "Beim ersten Start braucht Airlines einmal Internet, um alle Grafiken zu laden.", !!stand.version);
       return;
     }
 
@@ -109,7 +109,7 @@
       balken.style.width = (gesamt ? Math.round(geladen / gesamt * 100) : 100) + "%";
       zeile.textContent = `${stueck} von ${zuLaden.length} Dateien · ${mb(geladen)} von ${mb(gesamt)} MB`;
     };
-    if (zuLaden.length) { zeigen(); titel.textContent = stand.version ? "Neue Grafiken werden geladen" : "Luftlinie wird geladen"; anzeigen(); }
+    if (zuLaden.length) { zeigen(); titel.textContent = stand.version ? "Neue Grafiken werden geladen" : "Airlines wird geladen"; anzeigen(); }
 
     async function holen(d) {
       for (let versuch = 0; versuch < 3; versuch++) {
