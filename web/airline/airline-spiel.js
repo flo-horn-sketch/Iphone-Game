@@ -447,6 +447,16 @@
       else if ((c.t === "sonne" && sai.sonne > 1.2) || (c.t === "sued" && sai.sued > 1.2) || (c.t === "tropen" && sai.tropen > 1.2)) zeichen = "☀️";
       else if (c.t === "schnee" && sai.schnee > 1.2) zeichen = "⛷️";
       if (zeichen && !ui.heimat && z > 0.7) g.append(svIcon(zeichen, x - r - 4.5 * s, y - r - 4 * s, 9 * s));
+      // Landerechte knapp: kleines Schild unter der Stadt (🎟 und wie viele noch frei sind).
+      const fr = st && !ui.heimat && (z > 0.6 || eigen) ? L.slotsFrei(st, c.id) : 99;
+      if (fr <= 2) {
+        const farbeS = fr <= 0 ? "#F87171" : "#FB923C", by = y + r + 8 * s;
+        const schild = sv("g", { class: "slot-schild" });
+        schild.append(sv("rect", { x: x - 11.5 * s, y: by - 5.5 * s, width: 23 * s, height: 11 * s, rx: 5.5 * s, fill: "rgba(8,16,24,.85)", stroke: farbeS, "stroke-width": 0.8 * s }));
+        schild.append(svIcon("🎟️", x - 5 * s, by, 8 * s));
+        schild.append(sv("text", { x: x + 5.5 * s, y: by + 3.2 * s, "font-size": 9 * s, "font-weight": 800, "text-anchor": "middle", fill: farbeS, text: String(Math.max(0, fr)) }));
+        g.append(schild);
+      }
       karte.staedte.append(g);
     }
     symboleZeichnen();
@@ -700,7 +710,7 @@
       messe ? el("div", { class: "hinweis", text: `🎪 Messe Tag ${messe.von} bis ${messe.bis}: doppelt so viele Geschäftsreisende.` }) : null,
       trend ? el("div", { class: "hinweis " + (trend > 0 ? "gruen" : "rot"), text: trend > 0 ? "📈 Wird gerade beliebter: jeden Tag mehr Gäste." : "📉 Verliert gerade Gäste." }) : null,
       el("div", { class: "zeile" }, el("span", { text: "🎟️ Deine Landerechte" }), el("b", { class: "rechts", text: meine ? `${genutzt} von ${meine} genutzt` : "keine" })),
-      el("div", { class: "zeile blass mini" }, el("span", { text: c.k === 1 ? "Hier gibt es genug Landerechte." : `Noch ${Math.max(0, frei)} frei` }), el("span", { class: "rechts", text: frei > 0 ? "je " + geld(L.slotPreis(st, id)) : "ausverkauft" })),
+      el("div", { class: "zeile blass mini" }, el("span", { text: frei > 0 ? `🎟️ Noch ${frei} Landerechte frei` : "🎟️ Alle Landerechte vergeben" }), el("span", { class: "rechts", text: frei > 0 ? "je " + geld(L.slotPreis(st, id)) : "ausverkauft" })),
       andere.length ? el("div", { class: "chips" }, el("span", { class: "blass mini", text: "Hier fliegen auch:" }), andere.map(chipAirline)) : null,
       ausbauPreis ? el("div", { class: "ausbau" },
         el("div", {}, el("b", { text: "🏗️ Zum Drehkreuz ausbauen" }), el("small", { text: "+60 % Umsteiger, Linien hier ziehen mehr Gäste an." })),
@@ -1313,7 +1323,7 @@
     pleite: { bild: "air-regel-pleite", icon: "⚠️", titel: "Achtung, Minus!", text: "Ist dein Konto im Minus, mahnt die 🏦 Bank. Drei Stufen: Mahnung, Kredit, dann will dich ein Rivale kaufen. Schließe rote Linien oder verkaufe ein Flugzeug." },
     drehkreuz: { bild: "air-regel-drehkreuz", icon: "🔁", titel: "Dein Drehkreuz!", text: "Ab drei Linien steigen Gäste in deiner Stadt um. Kleine Zubringer füllen so deine großen Flugzeuge." },
     rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Fliegen sie dieselbe Strecke, teilt ihr euch die Gäste. Ihre Linien zeigst du unten links: Kon, Spa und Aur antippen." },
-    landerechte: { bild: "air-regel-saison", icon: "🎟️", titel: "Landerechte und Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. Am Ende der Woche verfallen ungenutzte Landerechte, und halb leere Linien müssen ihres neu ersteigern." },
+    landerechte: { bild: "air-regel-saison", icon: "🎟️", titel: "Landerechte und Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. Jeder Flughafen hat nur wenige freie Landerechte, beliebte Ziele sind schnell weg: 🎟️ unter einer Stadt zeigt, wie viele noch frei sind. Am Ende der Woche verfallen ungenutzte." },
     plaene: { bild: "air-regel-plaene", icon: "📣", titel: "Rivalen kündigen an", text: "Manchmal verraten die Rivalen ihren nächsten Zug: 📣 auf der Karte. Fliegst du die Strecke vorher, verzichten sie." },
     duell: { bild: "air-regel-duell", icon: "⚔️", titel: "Preiskampf", text: "Fliegt ein Rivale auf deine Strecke, erscheint ⚔️. Tipp drauf: Ihr steht nebeneinander. Unterbieten, Preis halten oder aufgeben. Bei gleichem Preis gewinnt die bessere Qualität." },
     trends: { bild: "air-regel-trends", icon: "📈", titel: "Die Nachfrage ändert sich", text: "Städte werden beliebter ▲ oder verlieren Gäste ▼, manche Strecken kommen in Mode 🔥. Die Pfeile siehst du an Städten und Linien." },
