@@ -129,6 +129,25 @@ Werden klein und rund im Menü „Meine Airline“ gezeigt. Gesicht groß und mi
 | `air-assistent-lena.png` | 1024 × 1024 | Lena Vogt, Controllerin Mitte dreißig, blonder Kurzhaarschnitt, klarer freundlicher Blick, dunkelblaue Bluse, Ordner unter dem Arm. |
 | `air-assistent-ines.png` | 1024 × 1024 | Ines Falk, erfahrene Controllerin um die fünfzig, graue Strähne im dunklen Haar, schmale Brille, leichtes wissendes Lächeln, Perlenohrringe. |
 
+### 4c. Du als Manager (Porträts, quadratisch, neu)
+
+Beim Start wählt man sein Aussehen aus sechs Gesichtern (bei „Divers“ aus allen zwölf). Werden rund gezeigt: groß auf der Profil-Seite, klein oben links neben dem Geld und in der Rangliste. Gesicht groß und mittig, Kopf und Schultern, freundlich und selbstbewusst, Business-Kleidung, schlichter nachtblauer Hintergrund mit leichtem goldenem Licht. Erfundene Personen, alle im selben Stil und gleich groß im Bild, damit sie nebeneinander passen.
+
+| Datei | Größe | Prompt |
+|---|---|---|
+| `mgr-frau-1.png` | 1024 × 1024 | Managerin Mitte dreißig, schulterlange braune Haare, warmes Lächeln, dunkelblauer Blazer. |
+| `mgr-frau-2.png` | 1024 × 1024 | Managerin Ende zwanzig, blonder Pferdeschwanz, wacher Blick, weiße Bluse mit goldener Kette. |
+| `mgr-frau-3.png` | 1024 × 1024 | Managerin um die vierzig, dunkle Haut, kurze Locken, entschlossenes Lächeln, roter Blazer. |
+| `mgr-frau-4.png` | 1024 × 1024 | Managerin um die fünfzig, silbergrauer Bob, schmale Brille, eleganter grauer Hosenanzug. |
+| `mgr-frau-5.png` | 1024 × 1024 | Managerin Anfang dreißig, ostasiatisch, glatte schwarze Haare, ruhiger kluger Blick, dunkelgrüner Blazer. |
+| `mgr-frau-6.png` | 1024 × 1024 | Managerin Mitte vierzig, rote Haare hochgesteckt, Sommersprossen, verschmitztes Lächeln, Seidenschal. |
+| `mgr-mann-1.png` | 1024 × 1024 | Manager Mitte dreißig, kurze braune Haare, Dreitagebart, offenes Lächeln, dunkelblauer Anzug ohne Krawatte. |
+| `mgr-mann-2.png` | 1024 × 1024 | Manager um die vierzig, dunkle Haut, Glatze, gepflegter Bart, selbstsicheres Lächeln, grauer Anzug mit goldener Krawatte. |
+| `mgr-mann-3.png` | 1024 × 1024 | Manager Ende zwanzig, blonde Haare zur Seite gekämmt, glatt rasiert, ehrgeiziger Blick, hellblaues Hemd mit Weste. |
+| `mgr-mann-4.png` | 1024 × 1024 | Manager um die sechzig, graue Haare, Brille, erfahrenes gelassenes Lächeln, dunkler Anzug mit Einstecktuch. |
+| `mgr-mann-5.png` | 1024 × 1024 | Manager Anfang dreißig, südländisch, dunkle lockige Haare, breites Lächeln, Sakko über Rollkragenpullover. |
+| `mgr-mann-6.png` | 1024 × 1024 | Manager Mitte vierzig, südasiatisch, kurze schwarze Haare, gepflegter Schnurrbart, ruhiger Blick, dunkelgrüner Anzug. |
+
 ### 5. Ereignisse (breit)
 
 | Datei | Größe | Prompt |
