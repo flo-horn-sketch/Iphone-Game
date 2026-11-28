@@ -113,7 +113,7 @@
     "💶": "preis", "🪙": "muenze", "🏦": "bank", "🍽": "essen", "🥂": "premium", "🧳": "koffer", "💺": "sitz", "📏": "reichweite",
     "👩": "crew", "🔁": "umsteiger", "🔄": "neu", "⭐": "stern", "★": "stern", "☆": "stern-leer", "🏳": "aufgeben", "🏗": "ausbau",
     "🔎": "lupe", "🔬": "gruendlich", "⚡": "schnell", "➕": "extra", "🛡": "sicher", "🎲": "risiko", "✅": "ok", "✨": "beste",
-    "🔒": "schloss", "⚠": "warnung", "🌍": "welt", "🗓": "kalender", "📰": "zeitung", "💥": "pleite", "📖": "regeln", "🏠": "heimat", "❗": "hinweis", "📊": "statistik", "🏢": "verwaltung", "📺": "werbung",
+    "🔒": "schloss", "⚠": "warnung", "🌍": "welt", "🗓": "kalender", "📰": "zeitung", "💥": "pleite", "📖": "regeln", "🏠": "heimat", "❗": "hinweis", "📊": "statistik", "🏢": "verwaltung", "📺": "werbung", "📤": "teilen", "📲": "homescreen",
   };
   const ICON_RE = new RegExp("(" + Object.keys(ICONS).join("|") + ")[\\uFE0F\\u200D\\u2708]*", "gu");
   function icon(zeichen) {
@@ -1930,8 +1930,44 @@
     if (alt) alt.replaceWith(alt.cloneNode(true));
   }
 
+  // Spielen nur als App vom Home-Bildschirm (Florians Wunsch). Im Browser kommt eine Anleitung.
+  function alsAppGestartet() {
+    if (window.navigator.standalone === true) return true;
+    if (window.matchMedia && (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches)) return true;
+    try { if (localStorage.getItem("luftlinie-entwickler") === "1") return true; } catch (e) {}
+    return false;
+  }
+  function anleitungZeigen() {
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua);
+    const schritte = ios ? [
+      ["📤", "Tippe unten auf „Teilen“"],
+      ["📲", "Wähle „Zum Home-Bildschirm“"],
+      [null, "Tippe auf „Hinzufügen“ und starte Luftlinie über das neue Symbol"],
+    ] : android ? [
+      ["⋮", "Tippe oben rechts auf das Menü"],
+      ["📲", "Wähle „App installieren“ oder „Zum Startbildschirm“"],
+      [null, "Starte Luftlinie über das neue Symbol"],
+    ] : [
+      ["📲", "Öffne diese Seite auf deinem iPhone in Safari"],
+      ["📤", "Tippe auf „Teilen“ und dann „Zum Home-Bildschirm“"],
+      [null, "Starte Luftlinie über das neue Symbol"],
+    ];
+    document.body.classList.add("anleitung-an");
+    document.body.append(el("div", { class: "anleitung" },
+      el("img", { class: "anleitung-logo", src: "../app-icon-180.png", alt: "" }),
+      el("h1", { text: "Luftlinie installieren" }),
+      el("p", { text: "Luftlinie läuft nur als App auf deinem Home-Bildschirm. So geht's:" }),
+      el("ol", {}, schritte.map(([ic, text], i) => el("li", {},
+        el("span", { class: "nr", text: String(i + 1) }),
+        ic ? el("span", { class: "anleitung-ic", text: ic }) : el("img", { class: "anleitung-ic klein-logo", src: "../app-icon-180.png", alt: "" }),
+        el("span", { class: "anleitung-text", text }))))));
+  }
+
   fetch("../grafiken/vorhanden.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
     for (const n of liste) dateien.add(n);
+    if (!alsAppGestartet()) { anleitungZeigen(); return; }
     const alt = lesen(SPEICHER, null);
     st = alt ? L.laden(alt) : null;
     if (st && !st.ende) spielStarten();
