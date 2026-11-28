@@ -329,6 +329,14 @@
   const HEIMAT = ["london", "paris", "frankfurt", "amsterdam", "madrid", "istanbul", "muenchen", "berlin", "rom", "wien",
     "newyork", "losangeles", "chicago", "atlanta", "mexiko", "saopaulo", "dubai", "delhi", "mumbai", "bangkok", "singapur", "hongkong", "peking", "shanghai", "tokio", "seoul", "sydney"];
 
+  // Wie leicht der Start ist (gemessen: wie viele lohnende Linien man am ersten Tag bezahlen kann).
+  const SCHWIERIGKEIT = {
+    london: "leicht", paris: "leicht", frankfurt: "leicht", amsterdam: "leicht", madrid: "leicht", istanbul: "leicht", muenchen: "leicht", berlin: "leicht", rom: "leicht", wien: "leicht",
+    newyork: "mittel", losangeles: "mittel", chicago: "mittel", atlanta: "mittel", mexiko: "mittel", dubai: "mittel", delhi: "mittel", mumbai: "mittel", bangkok: "mittel",
+    singapur: "mittel", hongkong: "mittel", peking: "mittel", shanghai: "mittel", tokio: "mittel", seoul: "mittel",
+    saopaulo: "schwer", sydney: "schwer",
+  };
+
   // ---------- Zufall (mit Startwert, damit Partien nachspielbar sind) ----------
   function zufall(st) {
     st.rng = (st.rng + 0x6d2b79f5) | 0;
@@ -864,6 +872,56 @@
     const g = (REGELN.gebuehr[STADT[x].k] + REGELN.gebuehr[STADT[y].k]) / 2;
     const kosten = u.legs * (km * t.verbrauch * st.kerosin + g * t.groesse) * sv.betrieb + t.crew + 2 * flieg * sv.kosten;
     return { gewinn: 2 * flieg * preis - kosten, auslastung: flieg / sitze, pax: 2 * flieg };
+  }
+
+  // Drei Vorschläge für die erste Linie: günstig, gut fürs Drehkreuz, große Chance.
+  function angebote(st, aid) {
+    const a = st.airlines[aid];
+    const x = a.basis;
+    const kand = [];
+    for (const c of ALLE) {
+      if (c.id === x || routeVon(a, x, c.id)) continue;
+      let best = null;
+      for (const typ of Object.keys(TYPEN)) {
+        const t = kannFliegen(st, aid, x, c.id, typ);
+        if (!t.ok) continue;
+        const g = schaetzen(st, aid, x, c.id, typ).gewinn;
+        if (g <= 0) continue;
+        const o = { ziel: c.id, typ, gesamt: t.kosten.gesamt, gewinn: g, k: c.k };
+        if (!best || g / Math.sqrt(o.gesamt) > best.gewinn / Math.sqrt(best.gesamt)) best = o;
+      }
+      if (best) kand.push(best);
+    }
+    if (!kand.length) return [];
+    const raus = new Set();
+    const nimm = (liste, art, grund) => {
+      const o = liste.find((v) => !raus.has(v.ziel));
+      if (!o) return null;
+      raus.add(o.ziel);
+      const w = o.gewinn * 7;
+      const streu = art === "chance" ? 0.45 : 0.25;
+      return Object.assign({}, o, { art, grund: grund(o), von: Math.round(w * (1 - streu) / 1e4) * 1e4, bis: Math.round(w * (1 + streu) / 1e4) * 1e4 });
+    };
+    const erg = [];
+    erg.push(nimm([...kand].sort((p, q) => p.gesamt - q.gesamt || q.gewinn - p.gewinn), "guenstig",
+      (o) => "Wenig Geld nötig, viel Reserve."));
+    erg.push(nimm(kand.filter((o) => o.k >= 2).sort((p, q) => STADT[q.ziel].k - STADT[p.ziel].k || q.gewinn - p.gewinn), "drehkreuz",
+      (o) => "Große Stadt: später viele Umsteiger."));
+    // Chance: stärkster Typ zum lohnendsten Ziel, ruhig teurer
+    const stark = [];
+    for (const o of kand) {
+      let b = o;
+      for (const typ of Object.keys(TYPEN)) {
+        const t = kannFliegen(st, aid, x, o.ziel, typ);
+        if (!t.ok) continue;
+        const g = schaetzen(st, aid, x, o.ziel, typ).gewinn;
+        if (g > b.gewinn) b = { ziel: o.ziel, typ, gesamt: t.kosten.gesamt, gewinn: g, k: o.k };
+      }
+      stark.push(b);
+    }
+    erg.push(nimm(stark.sort((p, q) => q.gewinn - p.gewinn), "chance",
+      (o) => "Viel Gewinn, braucht aber " + Math.round(o.gesamt / Math.max(1, a.geld) * 100) + " % deines Geldes."));
+    return erg.filter(Boolean);
   }
 
   // ---------- Assistenten ----------
@@ -1447,7 +1505,7 @@
   // ---------- Ziele: immer genau eins, mit Belohnung ----------
   const heimRouten = (p) => p.routen.filter((r) => r.a === p.basis || r.b === p.basis).length;
   const ZIELE = [
-    { id: "kaufen", text: "Kaufe dein erstes Flugzeug im Store", ist: (st, p) => p.flotte.length, soll: 1, belohnung: 0 },
+    { id: "kaufen", text: "Starte deine erste Linie: Tippe hier", ist: (st, p) => p.flotte.length, soll: 1, belohnung: 0 },
     { id: "route", text: "Eröffne deine erste Linie im ✏️ Editor", ist: (st, p) => p.routen.length, soll: 1, belohnung: 0 },
     { id: "gewinn", text: "Mach einen Tag mit Gewinn", ist: (st, p) => (p.verlauf.some((v) => v > 0) ? 1 : 0), soll: 1, belohnung: 200000 },
     { id: "drehkreuz", text: "Drei Linien ab deiner Heimat: dein Drehkreuz", ist: (st, p) => heimRouten(p), soll: 3, belohnung: 500000 },
@@ -1762,9 +1820,12 @@
   function rennenStand(st, aid) {
     const R = st.rennen, a = st.airlines[aid];
     if (!R) return 0;
-    if (R.art === "verbinde") return a.routen.some((r) => new Set([STADT[r.a].r, STADT[r.b].r]).size === 2 && [R.r1, R.r2].includes(STADT[r.a].r) && [R.r1, R.r2].includes(STADT[r.b].r)) ? 1 : 0;
-    if (R.art === "flotte") return a.flotte.length;
-    if (R.art === "stadt") return a.routen.filter((r) => r.a === R.stadt || r.b === R.stadt).length;
+    // Es zählen nur Linien, die gerade fliegen und Gewinn machen. Herumstehende Flugzeuge helfen nicht.
+    const rg = rechnung(st);
+    const imPlus = a.routen.filter((r) => { const e = rg.routen[r.id]; return e && e.flugzeuge > 0 && e.gewinn + (e.zubringer || 0) > 0; });
+    if (R.art === "verbinde") return imPlus.some((r) => new Set([STADT[r.a].r, STADT[r.b].r]).size === 2 && [R.r1, R.r2].includes(STADT[r.a].r) && [R.r1, R.r2].includes(STADT[r.b].r)) ? 1 : 0;
+    if (R.art === "plus" || R.art === "flotte") return imPlus.length;
+    if (R.art === "stadt") return imPlus.filter((r) => r.a === R.stadt || r.b === R.stadt).length;
     return 0;
   }
   function rennenStarten(st, tag) {
@@ -1772,8 +1833,8 @@
     const arten = [];
     const offen = PAARE.find(([x, y]) => !alle.some((a) => a.routen.some((r) => { const s1 = STADT[r.a].r, s2 = STADT[r.b].r; return (s1 === x && s2 === y) || (s1 === y && s2 === x); })));
     if (offen) arten.push({ art: "verbinde", r1: offen[0], r2: offen[1], soll: 1, text: `Wer verbindet zuerst ${KONTINENTE[offen[0]]} mit ${KONTINENTE[offen[1]]}?` });
-    const fl = Math.max(...alle.map((a) => a.flotte.length)) + 5;
-    arten.push({ art: "flotte", soll: fl, text: `Wer hat zuerst ${fl} Flugzeuge?` });
+    const fl = Math.max(...st.reihenfolge.map((id) => { const a = st.airlines[id]; return a.routen.length; })) + 3;
+    arten.push({ art: "plus", soll: fl, text: `Wer hat zuerst ${fl} Linien im Plus?` });
     const p = st.airlines[SPIELER];
     const gross = ALLE.filter((c) => c.k === 3 && c.id !== p.basis && !alle.some((a) => a.routen.filter((r) => r.a === c.id || r.b === c.id).length >= 3))
       .sort((x, y) => entfernung(p.basis, x.id) - entfernung(p.basis, y.id))[0];
@@ -1903,7 +1964,7 @@
   }
 
   return {
-    SPIELER, REGELN, SERVICE, STUFEN, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
+    SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
     KLASSEN, KLASSEN_START, klassenVon, klassenSetzen, besteKlassen,
     neuesSpiel, laden, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
     flugzeugeAuf, freieFlugzeuge, slotsBelegt, slotsFrei, slotPreis, slotsGenutzt, slotsUebrig, typFrei, routeVon,

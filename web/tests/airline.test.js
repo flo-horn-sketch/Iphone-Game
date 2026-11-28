@@ -500,3 +500,25 @@ test("Spätes Spiel: Verwaltung, Werbung, Umrüsten, Controlling, späte Ziele",
   st.ziel = L.ZIELE.length + 2;
   assert.equal(L.zielStand(st).einheit, "%");
 });
+
+test("Start: drei Vorschläge, Schwierigkeit, Rennen zählt nur Linien im Plus", () => {
+  for (const basis of L.HEIMAT) assert.ok(["leicht", "mittel", "schwer"].includes(L.SCHWIERIGKEIT[basis]), basis);
+  const st = L.neuesSpiel({ seed: 3, basis: "frankfurt" });
+  const an = L.angebote(st, "p");
+  assert.equal(an.length, 3);
+  assert.deepEqual(an.map((o) => o.art), ["guenstig", "drehkreuz", "chance"]);
+  assert.equal(new Set(an.map((o) => o.ziel)).size, 3);
+  for (const o of an) {
+    assert.ok(o.gesamt <= st.airlines.p.geld && o.von > 0 && o.bis > o.von && o.grund);
+    const t = L.kannFliegen(st, "p", "frankfurt", o.ziel, o.typ);
+    assert.ok(t.ok, o.ziel);
+  }
+  assert.ok(an[0].gesamt <= Math.min(an[1].gesamt, an[2].gesamt));
+  // Kaufen und eröffnen in einem Schritt
+  const r = L.fliegen(st, "p", "frankfurt", an[0].ziel, an[0].typ);
+  assert.ok(r.ok && st.airlines.p.flotte.length === 1);
+  // Rennen: herumstehende Flugzeuge zählen nicht
+  L.kaufen(st, "p", "falke"); L.kaufen(st, "p", "falke");
+  st.rennen = { art: "plus", soll: 2 };
+  assert.ok(L.rennenStand(st, "p") <= 1);
+});
