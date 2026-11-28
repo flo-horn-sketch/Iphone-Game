@@ -421,11 +421,22 @@
     return g && g.anrede && teile.length > 1 ? g.anrede + " " + teile[teile.length - 1] : g && g.anrede ? g.anrede + " " + m.name : m.name;
   }
 
+  // Wer an einem Flughafen startet, führt die Airline, die dort in echt zu Hause ist (Florian, 2026-11-28).
+  // Berlin und Hamburg haben kein echtes Drehkreuz: Dort steht die Airline mit der größten Basis.
+  const HEIM_AIRLINE = {
+    london: { name: "British Airways", kurz: "BA" }, paris: { name: "Air France", kurz: "AF" }, frankfurt: { name: "Lufthansa", kurz: "LH" },
+    amsterdam: { name: "KLM", kurz: "KL" }, madrid: { name: "Iberia", kurz: "IB" }, istanbul: { name: "Turkish Airlines", kurz: "TK" },
+    muenchen: { name: "Air Dolomiti", kurz: "EN" }, rom: { name: "ITA Airways", kurz: "AZ" }, barcelona: { name: "Vueling", kurz: "VY" },
+    zuerich: { name: "Swiss", kurz: "LX" }, wien: { name: "Austrian", kurz: "OS" }, kopenhagen: { name: "SAS", kurz: "SK" },
+    dublin: { name: "Aer Lingus", kurz: "EI" }, lissabon: { name: "TAP Air Portugal", kurz: "TP" }, mailand: { name: "Neos", kurz: "NO" },
+    bruessel: { name: "Brussels Airlines", kurz: "SN" }, stockholm: { name: "BRA", kurz: "TF" }, athen: { name: "Aegean", kurz: "A3" },
+    berlin: { name: "easyJet", kurz: "U2" }, warschau: { name: "LOT", kurz: "LO" }, oslo: { name: "Norwegian", kurz: "DY" },
+    hamburg: { name: "Eurowings", kurz: "EW" }, helsinki: { name: "Finnair", kurz: "AY" },
+  };
+  const heimAirline = (stadt) => HEIM_AIRLINE[stadt] || null;
+  // Gestartet wird nur in Europa (Florian, 2026-11-28). Der Rest der Welt ist Ziel, nicht Heimat.
   const HEIMAT = ["london", "paris", "frankfurt", "amsterdam", "madrid", "istanbul", "muenchen", "berlin", "rom", "wien",
-    "newyork", "losangeles", "chicago", "atlanta", "mexiko", "saopaulo", "dubai", "delhi", "mumbai", "bangkok", "singapur", "hongkong", "peking", "shanghai", "tokio", "seoul", "sydney",
-    "dublin", "lissabon", "kopenhagen", "athen", "helsinki", "warschau", "hamburg", "toronto", "miami", "denver", "seattle", "houston",
-    "buenosaires", "bogota", "lima", "kairo", "johannesburg", "lagos", "nairobi", "addisabeba", "doha", "riad",
-    "osaka", "manila", "kualalumpur", "jakarta", "melbourne", "perth", "auckland", "brisbane"];
+    "dublin", "lissabon", "kopenhagen", "athen", "helsinki", "warschau", "hamburg"];
 
   // Wie leicht der Start ist: gemessen in Probepartien (Firmenwert nach 30 Tagen, 5 Partien je Stadt).
   // Entscheidend sind Ziele in der Nähe und wie dicht die Rivalen sitzen. Neu messen, wenn sich Städte ändern.
@@ -565,18 +576,23 @@
     st.saat = st.rng;
     st.manager = managerPruefen(opt.manager);
     const basis = opt.basis || "frankfurt";
-    const name = opt.name || NAMEN[0];
+    const echt = heimAirline(basis);
+    const name = opt.name || { name: echt ? echt.name : NAMEN[0].name, farbe: NAMEN[0].farbe };
     // Alle starten bei Null: kein Flugzeug, keine Linie, nur Startgeld und zwei geschenkte Slots auf der eigenen Tafel.
     const p = neueAirline(SPIELER, { name: name.name, farbe: name.farbe, service: opt.service || "standard", basis, geld: REGELN.startGeld });
+    if (echt && !opt.name) p.kurz = echt.kurz;
     st.airlines[SPIELER] = p;
-    // Die Rivalen sitzen in der Nähe: der Platzhirsch im nächsten Weltdrehkreuz, die anderen in Großstädten.
+    // Auch die Rivalen starten in Europa und sitzen in der Nähe: der Platzhirsch im nächsten Weltdrehkreuz, die anderen in Großstädten.
     const vergeben = new Set([basis]);
-    const nah = (filter) => ALLE.filter((c) => !vergeben.has(c.id) && filter(c)).sort((x, y) => entfernung(basis, x.id) - entfernung(basis, y.id))[0].id;
+    const nah = (filter) => ALLE.filter((c) => !vergeben.has(c.id) && c.r === "europa" && filter(c)).sort((x, y) => entfernung(basis, x.id) - entfernung(basis, y.id))[0].id;
     const WAHL = { k: (c) => c.k === 3, s: (c) => c.k === 2, a: (c) => c.k >= 2 && c.w >= 0.45 };
     for (const [id, r] of Object.entries(RIVALEN)) {
       const b = nah(WAHL[id]);
       vergeben.add(b);
-      const a = neueAirline(id, { name: r.name, farbe: r.farbe, service: r.service, basis: b, stil: r.stil, geld: REGELN.startGeld });
+      // Auch die Rivalen heißen wie die echte Airline ihres Flughafens. Chef, Stil und Sprüche bleiben erfunden.
+      const e = heimAirline(b);
+      const a = neueAirline(id, { name: e ? e.name : r.name, farbe: r.farbe, service: r.service, basis: b, stil: r.stil, geld: REGELN.startGeld });
+      if (e) a.kurz = e.kurz;
       st.airlines[id] = a;
     }
     // An jedem Flughafen liegt am Anfang genau ein freier Slot für alle zusammen. Wer zuerst kommt, bekommt ihn.
@@ -1394,7 +1410,7 @@
   function umbenennen(st, aid, name, farbe) {
     const a = st.airlines[aid];
     const n = String(name || "").trim().slice(0, 18);
-    if (n) a.name = n;
+    if (n && n !== a.name) { a.name = n; delete a.kurz; }
     if (farbe) a.farbe = farbe;
     return true;
   }
@@ -1746,7 +1762,7 @@
       pl.stufe = 3; pl.tage = 0;
       const k = staerksterRivale(st);
       st.uebernahme = { von: k, preis: Math.max(500000, Math.round(firmenwert(st, SPIELER) * 0.5)) };
-      melden(st, { art: "uebernahme", text: RIVALEN[k].name + " will dich übernehmen.", von: k });
+      melden(st, { art: "uebernahme", text: st.airlines[k].name + " will dich übernehmen.", von: k });
     } else if (pl.stufe === 3 && pl.tage >= REGELN.letzteChanceTage) {
       st.ende = { grund: "pleite", tag: tagVon(st) };
     }
@@ -3019,7 +3035,7 @@
   const istAlterStand = (json) => { try { const st = typeof json === "string" ? JSON.parse(json) : json; return !!st && st.version !== 3; } catch (e) { return false; } };
 
   return {
-    SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
+    SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, HEIM_AIRLINE, heimAirline, STIL,
     KLASSEN, KLASSEN_MAX, klassenVon, kabineGrenzen, kabineStandard, kabineSetzen, umbauPreis, inWerkstatt, besteKabine,
     GESCHLECHTER, AUSSEHEN, aussehenFuer, managerPruefen, managerSetzen, anrede,
     neuesSpiel, laden, istAlterStand, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,

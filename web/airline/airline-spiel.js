@@ -542,8 +542,10 @@
       const muss = fokus === c.id || (ui.editor && ui.editor.ziel === c.id) || (ui.tafel === "angebote" && ui.angebote && ui.angebote.some((o) => o.ziel === c.id));
       if (zeigeName && (muss || frei(x + r + 2.5 * s + nameB / 2, y, nameB, 9 * s))) {
         karte.namen.append(sv("text", { x: x + r + 2.5 * s, y: y + 3.2 * s, class: "stadt-name", "font-size": (c.k === 3 ? 10.5 : 9) * s, "stroke-width": 2.6 * s, text: c.name }));
+        // Startwahl: unter der Stadt steht die Airline, die du dort führst, in der Farbe des Starts (leicht, mittel).
         const sw = ui.heimat && L.SCHWIERIGKEIT[c.id];
-        if (sw && z > 0.9) karte.namen.append(sv("text", { x: x + r + 2.5 * s, y: y + 12 * s, class: "stadt-name", "font-size": 7.5 * s, "stroke-width": 2.2 * s, fill: SCHWER_FARBE[sw], text: sw }));
+        const heim = ui.heimat && L.heimAirline(c.id);
+        if (heim) karte.namen.append(sv("text", { x: x + r + 2.5 * s, y: y + 12 * s, class: "stadt-name", "font-size": 7.5 * s, "stroke-width": 2.2 * s, fill: SCHWER_FARBE[sw] || "#EAF2F8", text: heim.name }));
       }
       let zeichen = null;
       if (messen.has(c.id)) zeichen = "🎪";
@@ -717,7 +719,7 @@
         const a = st.airlines[aid];
         return el("button", { class: "rivale-punkt" + (ui.rivalen[aid] ? " an" : ""), style: { "--farbe": a.farbe }, "aria-label": a.name + " zeigen", title: a.name,
           onclick: () => { ui.rivalen = { ...ui.rivalen, [aid]: !ui.rivalen[aid] }; schreiben(RIVALEN_AN, ui.rivalen); rivalenKnopf(); karteZeichnen(); } },
-          el("i"), a.name.slice(0, 3));
+          el("i"), a.kurz || a.name.slice(0, 3));
       }));
   }
 
@@ -2121,7 +2123,7 @@
     verlieren: { bild: "air-regel-verlieren", icon: "⚠️", titel: "Nutzen oder verlieren", text: "Am Ende jeder Jahreszeit gehen Slots an fremden Flughäfen zurück, wenn kein Flug darauf liegt. Zwei Tage vorher wirst du gewarnt. Slots zu Hause bleiben immer deine." },
     saison: { bild: "air-regel-saison", icon: "🗓️", titel: "Jahreszeiten", text: "Jede Woche ist eine Jahreszeit: Im Sommer wollen alle ans Meer, im Winter in die Berge. ☀️ und ⛷️ an einer Stadt zeigen, wo gerade Hochsaison ist." },
     drehkreuz: { bild: "air-regel-drehkreuz", icon: "🔁", titel: "Dein Drehkreuz!", text: "Ab drei Linien steigen Gäste in deiner Stadt um. Kleine Zubringer füllen so deine großen Flugzeuge." },
-    rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Sie spielen nach denselben Regeln wie du, mit demselben Startgeld und denselben Prämien. Sie machen Fehler, und sie merken sich, wenn du ihnen einen Slot wegschnappst oder ihre Strecke fliegst: Dann bieten sie höher und fliegen dir nach. Ihre Laune steht in der Rangliste. Ihre Linien zeigst du unten links: Kon, Spa und Aur antippen." },
+    rivalen: { bild: "air-regel-rivalen", icon: "⚔️", titel: "Die Konkurrenz", text: "Drei Airlines wollen denselben Himmel. Sie spielen nach denselben Regeln wie du, mit demselben Startgeld und denselben Prämien. Sie machen Fehler, und sie merken sich, wenn du ihnen einen Slot wegschnappst oder ihre Strecke fliegst: Dann bieten sie höher und fliegen dir nach. Ihre Laune steht in der Rangliste. Ihre Linien zeigst du unten links: die drei Kürzel antippen." },
     rangliste: { bild: "air-regel-rangliste", icon: "🏆", titel: "Die Rangliste", text: "Gezählt wird, was deine Airline wert ist: Geld, Flugzeuge, Slots und Gewinn. Wer wird die Nummer eins?" },
     handel: { bild: "air-regel-handel", icon: "🤝", titel: "Slots kaufen und tauschen", text: "Tippe am Flughafen den Slot eines Rivalen an und mach ein Angebot mit dem Rad. Die Antwort kommt sofort. Du kannst auch einen eigenen freien Slot dazugeben. Nach einem Nein ist zwei Tage Pause. Manchmal fragen Rivalen auch dich: 💬." },
     kabine: { bild: "air-regel-kabine", icon: "💺", titel: "Die Kabine", text: "Economy, Business und First gehören zum Flugzeug. Du legst sie beim Kauf fest. Später umbauen kostet Geld und einen Tag Werkstatt: An dem Tag fliegt das Flugzeug nicht." },
@@ -2350,7 +2352,7 @@
       bild("air-ereignis-uebernahme") ? el("img", { class: "bg", src: bild("air-ereignis-uebernahme"), alt: "" }) : null,
       el("div", { class: "rang", style: { width: "420px" } },
         el("div", { class: "gesicht", style: { background: st.airlines[u.von].farbe, width: "60px", height: "60px" } }, bildEl(CHEF[u.von], riv.chef[0])),
-        el("div", { class: "mitte" }, el("b", { style: { fontSize: "16px" }, text: riv.chef + " von " + riv.name }),
+        el("div", { class: "mitte" }, el("b", { style: { fontSize: "16px" }, text: riv.chef + " von " + st.airlines[u.von].name }),
           el("div", { class: "spruch", style: { fontSize: "13px" }, text: `„${st.manager ? L.anrede(st.manager) + ", Ihre" : "Ihre"} Airline ist am Ende. Ich zahle Ihnen ${geld(u.preis)}, und Ihre Flugzeuge fliegen ab morgen für mich.“` }))),
       el("div", { class: "blass", text: "Ablehnen heißt: Du hast drei Tage, um das Konto ins Plus zu bringen. Sonst ist die Airline pleite." }),
       el("div", { class: "knopfreihe", style: { width: "420px" } },
@@ -2363,7 +2365,7 @@
     try { localStorage.removeItem(SPEICHER); } catch (e) { /* egal */ }
     ui.modal = false;
     const p = ich(), e = st.ende;
-    const titel = e.grund === "verkauft" ? "Verkauft an " + L.RIVALEN[e.von].name : "Pleite";
+    const titel = e.grund === "verkauft" ? "Verkauft an " + st.airlines[e.von].name : "Pleite";
     feld.append(el("div", { class: "seite" },
       bild("air-ende") ? el("img", { class: "bg", src: bild("air-ende"), alt: "" }) : null,
       el("h1", {}, titel, el("small", { text: (st.manager ? st.manager.name + " und " : "") + p.name + (st.manager ? " haben " : " hat ") + (e.tag - 1) + " Tage durchgehalten. Bester Platz: " + (st.bestPlatz || L.platz(st)) + "." })),
@@ -2460,21 +2462,24 @@
   function heimatWaehlen() {
     feld.replaceChildren();
     ui.heimat = true;
-    kameraPassend();
+    { // Gestartet wird in Europa: Die Karte zeigt gleich den passenden Ausschnitt.
+      const xs = L.HEIMAT.map((id) => stadtXY[id][0]), ys = L.HEIMAT.map((id) => stadtXY[id][1]);
+      kameraPassend({ x0: Math.min(...xs) - 40, x1: Math.max(...xs) + 40, y0: Math.min(...ys) - 95, y1: Math.max(...ys) + 24 });
+    }
     karteBauen();
-    feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Tippe auf eine leuchtende Stadt. Wischen und mit zwei Fingern zoomen geht auch." }),
-      el("div", { class: "legende" }, Object.entries(SCHWER_FARBE).map(([k, f]) => el("span", {}, el("i", { style: { background: f } }), { leicht: "leichter Start", mittel: "mittel", schwer: "schwerer Start" }[k])))),
+    feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Tippe auf eine leuchtende Stadt in Europa. Du führst die Airline, die dort zu Hause ist." }),
+      el("div", { class: "legende" }, Object.entries(SCHWER_FARBE).filter(([k]) => L.HEIMAT.some((id) => L.SCHWIERIGKEIT[id] === k)).map(([k, f]) => el("span", {}, el("i", { style: { background: f } }), { leicht: "leichter Start", mittel: "mittel", schwer: "schwerer Start" }[k])))),
       el("button", { class: "kachel rundknopf", onclick: () => { ui.heimat = false; feld.replaceChildren(); karte = null; profilSeite(heimatWaehlen, startSeite, "Weiter ▶"); }, style: { position: "absolute", left: "6px", top: "6px", height: "38px", zIndex: 9 }, "aria-label": "Zurück", text: "◀" }));
   }
 
   function heimatGewaehlt(id) {
     ui.heimat = false;
-    st = L.neuesSpiel({ basis: id, service: "standard", name: L.NAMEN[0], gegner: gegnerWahl, manager: lesen(MANAGER_KEY, null) });
+    st = L.neuesSpiel({ basis: id, service: "standard", gegner: gegnerWahl, manager: lesen(MANAGER_KEY, null) });
     einf = { gesehen: {} };
     schreiben(EINFUEHRUNG, einf);
     spielStarten();
     angeboteZeigen();
-    tippZeigen("Willkommen" + (st.manager ? ", " + L.anrede(st.manager) : "") + "! Alle Airlines starten bei Null. Hier sind drei Vorschläge für deine erste Linie: Tippe einen an. Dann wählst du nur noch die Uhrzeiten, das Flugzeug kaufst du gleich mit.", tafelEl, "links", "Los geht's");
+    tippZeigen("Willkommen" + (st.manager ? ", " + L.anrede(st.manager) : "") + " bei " + st.airlines[L.SPIELER].name + "! Alle Airlines starten bei Null. Hier sind drei Vorschläge für deine erste Linie: Tippe einen an. Dann wählst du nur noch die Uhrzeiten, das Flugzeug kaufst du gleich mit.", tafelEl, "links", "Los geht's");
   }
 
   function spielStarten() {
