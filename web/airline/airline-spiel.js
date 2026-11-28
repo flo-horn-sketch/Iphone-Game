@@ -194,21 +194,48 @@
   kameraPassend();
 
   let karte = null;
+  // Das Land einmal auf den Kartenrand zuschneiden (statt clip-path, siehe unten).
+  let landCache = null;
+  function landZugeschnitten() {
+    if (landCache) return landCache;
+    const teile = [];
+    for (const stueck of K.land.split(/(?=M)/)) {
+      let pts = (stueck.match(/-?\d+(?:\.\d+)?/g) || []).map(Number).reduce((a, v, i, arr) => (i % 2 ? a : a.concat([[v, arr[i + 1]]])), []);
+      for (const [innen, schnitt] of [
+        [(p) => p[0] >= 0, (a, b) => [0, a[1] + (b[1] - a[1]) * (0 - a[0]) / (b[0] - a[0])]],
+        [(p) => p[0] <= K.B, (a, b) => [K.B, a[1] + (b[1] - a[1]) * (K.B - a[0]) / (b[0] - a[0])]],
+        [(p) => p[1] >= 0, (a, b) => [a[0] + (b[0] - a[0]) * (0 - a[1]) / (b[1] - a[1]), 0]],
+        [(p) => p[1] <= K.H, (a, b) => [a[0] + (b[0] - a[0]) * (K.H - a[1]) / (b[1] - a[1]), K.H]],
+      ]) {
+        const neu = [];
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[(i + pts.length - 1) % pts.length], b = pts[i];
+          if (innen(b)) { if (!innen(a)) neu.push(schnitt(a, b)); neu.push(b); }
+          else if (innen(a)) neu.push(schnitt(a, b));
+        }
+        pts = neu;
+        if (!pts.length) break;
+      }
+      if (pts.length > 2) teile.push("M" + pts.map((q) => Math.round(q[0] * 10) / 10 + " " + Math.round(q[1] * 10) / 10).join("L") + "Z");
+    }
+    landCache = teile.join("");
+    return landCache;
+  }
+
   function karteBauen() {
     const svg = sv("svg", { id: "karte", viewBox: `0 0 ${FELD_B} ${FELD_H}` });
     const defs = sv("defs");
     const verlauf = sv("radialGradient", { id: "meerlicht", cx: "50%", cy: "35%", r: "75%" });
     verlauf.append(sv("stop", { offset: "0%", "stop-color": "#173A55" }), sv("stop", { offset: "100%", "stop-color": "#0A1828" }));
-    const clip = sv("clipPath", { id: "kartenrand" });
-    clip.append(sv("rect", { x: 0, y: 0, width: K.B, height: K.H }));
-    defs.append(verlauf, clip);
+    defs.append(verlauf);
     svg.append(defs, sv("rect", { x: 0, y: 0, width: FELD_B, height: FELD_H, fill: "url(#meerlicht)" }));
     const g = sv("g");
-    const landG = sv("g", { "clip-path": "url(#kartenrand)" });
+    // Ohne clip-path: Safari verliert den Verweis nach dem Wiederöffnen der Homescreen-App, dann fehlt das Land.
+    const landG = sv("g", { class: "landschaft" });
     const netz = sv("g", { class: "netz" });
     for (let x = 0; x <= K.B; x += 50) netz.append(sv("line", { x1: x, y1: 0, x2: x, y2: K.H }));
     for (let y = 0; y <= K.H; y += 50) netz.append(sv("line", { x1: 0, y1: y, x2: K.B, y2: y }));
-    landG.append(netz, sv("path", { class: "land", d: K.land }), sv("path", { class: "grenze", d: K.grenzen }));
+    landG.append(netz, sv("path", { class: "land", d: landZugeschnitten() }), sv("path", { class: "grenze", d: K.grenzen }));
     g.append(landG);
     const fremd = sv("g"), routen = sv("g"), staedte = sv("g"), namen = sv("g"), schilder = sv("g"), flieger = sv("g"), symbole = sv("g"), effekte = sv("g");
     g.append(fremd, routen, flieger, staedte, namen, schilder, symbole, effekte);
@@ -1888,7 +1915,14 @@
   }
   setTimeout(updatePruefen, 3000);
   setInterval(updatePruefen, 120000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) updatePruefen(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { updatePruefen(); landNeuZeichnen(); } });
+  window.addEventListener("pageshow", (e) => { if (e.persisted) landNeuZeichnen(); });
+  // Safari zeichnet große Pfade nach dem Zurückkehren manchmal nicht neu: das Land einmal frisch einsetzen.
+  function landNeuZeichnen() {
+    if (!karte) return;
+    const alt = karte.svg.querySelector(".landschaft");
+    if (alt) alt.replaceWith(alt.cloneNode(true));
+  }
 
   fetch("../grafiken/vorhanden.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []).then((liste) => {
     for (const n of liste) dateien.add(n);
