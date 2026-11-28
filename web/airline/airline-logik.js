@@ -15,19 +15,26 @@
   // Alle Stellschrauben an einem Ort, damit das Balancing leicht fällt.
   const REGELN = {
     betriebsStunden: 20,     // so lange am Tag wird geflogen
-    nachfrage: 7.5,          // Fluggäste pro Richtung und Tag = nachfrage × Größe A × Größe B
+    nachfrage: 9,            // Fluggäste pro Richtung und Tag = nachfrage × Größe A × Größe B
     grundpreis: 85,          // Ticket = grundpreis + proKm × Entfernung
     proKm: 0.11,
     gebuehr: { 1: 700, 2: 2200, 3: 4800 },       // pro Landung, mal Flugzeuggröße
-    slotPreis: { 1: 40000, 2: 200000, 3: 500000 },
-    slotPlaetze: { 1: 8, 2: 7, 3: 6 },            // so viele Slots sind je Flughafen für alle zusammen noch frei (den Rest haben die großen Airlines der Welt)
-    heimatPlaetze: 6,        // in der eigenen Heimat hat jede Airline bis zu 6 Landerechte extra, die anderen nichts wegnehmen
-    slotAufschlag: 1.5,      // Slots werden teurer, je weniger frei sind
+    slotPreis: { 1: 40000, 2: 120000, 3: 300000 },        // Grundpreis eines Slots an einem fremden Flughafen (ruhige Zeit)
+    zeitPreis: { begehrt: 1.5, ruhig: 1, schwach: 0.5 },   // morgens und abends teurer, nachts billiger
+    heimPreis: { begehrt: 90000, ruhig: 60000, schwach: 30000 },   // Slot auf der eigenen Tafel
+    heimFaktor: { 1: 1, 2: 1.5, 3: 2.5 },
+    heimGeschenk: 2,         // so viele Slots auf der Heimat-Tafel sind am Anfang geschenkt
+    slotMax: { 1: 8, 2: 14, 3: 20 },              // so viele Slots gibt ein Flughafen höchstens an fremde Airlines
+    slotTakt: { 1: 6, 2: 4, 3: 3 },               // alle so viele Tage gibt ein Flughafen einen neuen Slot frei
+    slotSchonTage: 3,        // ein frisch erworbener Slot ist so lange vor "nutzen oder verlieren" sicher
+    reisende: 220,           // Reisende pro Tag an einem Flughafen = reisende × Größe²
+    daheim: 0.5,             // wie leicht ein Gast lieber gar nicht fliegt, wenn keine Zeit passt
+    handelSperre: 2,         // nach einem Nein redet der Rivale so viele Tage nicht mehr über diesen Slot
+    handelAb: 12,            // ab hier machen Rivalen Angebote für deine Slots
     drehkreuzAb: 3,          // ab so vielen eigenen Routen steigen in einer Stadt Leute um
     umsteigerAnteil: 0.32,
     umwegMax: 1.6,           // Umsteigen nur, wenn der Umweg nicht zu groß ist
     startGeld: 2500000,
-    startSlots: 2,
     rufStart: 50,
     rufMax: 100,
     rufNatur: 70,            // bis hierhin wächst der Ruf von selbst; darüber nur mit Werbung, und er sinkt langsam wieder
@@ -37,16 +44,14 @@
     rufVerschlechtern: 4,    // so viel Ruf kostet es, wenn ein Grundsatz für die Gäste schlechter wird (pro Komfortpunkt)
     auftragStunden: 8,       // so lange braucht ein Assistent für einen Bericht
     saisonTage: 7,           // eine Jahreszeit dauert eine Woche, ein Jahr 28 Tage
-    slotGutAb: 0.5,          // ab dieser Auslastung behält man Slots nach der Saison
-    ersteSlotPruefung: 21,   // Woche 3: Landerechte und Jahreszeiten zählen
     rivalenAb: 1,            // Rivalen fliegen von Anfang an (vorgestellt werden sie in Woche 2)
     verkaufAnteil: 0.6,      // ein Flugzeug bringt beim Verkauf so viel vom Neupreis
     kreditZins: 0.012,       // pro Tag
     mahnTage: 2,
     letzteChanceTage: 3,
-    stufe2Wert: 30000000,    // Firmenwert für den Kranich
-    stufe3Wert: 100000000,   // Firmenwert für die Langstrecken-Jets
-    stufe4Wert: 300000000,   // Firmenwert für den A380
+    stufe2Wert: 10000000,    // Firmenwert für den Kranich
+    stufe3Wert: 35000000,    // Firmenwert für die Langstrecken-Jets
+    stufe4Wert: 100000000,   // Firmenwert für den A380
     gelegenheitAb: 22,       // Woche 4: Messen und Gelegenheiten
     dividende: 0,            // Anteil am Tagesgewinn, den Rivalen nicht wieder anlegen
     mitteBonus: 0.45,        // Zuschlag an Gästen für eine ausgewogene, klassische Airline
@@ -57,12 +62,11 @@
     trendAb: 14,             // ab hier ändert sich die Nachfrage über die Zeit
     wahlAb: 24,              // ab hier Ereignisse mit zwei Wahlen
     rennenAb: 29,            // ab hier jede Jahreszeit ein Rennen
-    rennenPreis: 3000000,
+    rennenPreis: 1000000,
     aufkaufAb: 30,           // ab hier können Rivalen in die Krise geraten
     drehkreuzPreis: { 1: 1500000, 2: 4000000, 3: 8000000 },
     ausbauUmsteiger: 1.6,    // ein ausgebautes Drehkreuz bringt so viel mehr Umsteiger
     ausbauGaeste: 1.1,       // und Linien dort ziehen etwas mehr Gäste an
-    versteigerungStueck: 3,  // so viele neue Landerechte gibt es bei der Versteigerung
   };
 
   // Drei Servicelinien. Jede hat eine eigene Stärke.
@@ -71,26 +75,26 @@
   // komfort: mehr = Geschäftsleute zahlen mehr, weniger = Urlauber kommen wegen des Preises.
   const GRUNDSAETZE = {
     sitz: { name: "Sitzabstand", icon: "💺", optionen: {
-      eng: { name: "Eng", text: "30 % mehr Sitze", komfort: -1, sitze: 1.3 },
-      normal: { name: "Normal", text: "", komfort: 0, sitze: 1 },
-      bequem: { name: "Bequem", text: "20 % weniger Sitze", komfort: 1, sitze: 0.8, wende: 0.2 } } },
+      eng: { name: "Eng", text: "30 % mehr Sitze", fakt: "30 % mehr Sitze in jedem Flugzeug. Gäste finden es unbequem.", komfort: -1, sitze: 1.3 },
+      normal: { name: "Normal", text: "", fakt: "So viele Sitze, wie der Hersteller vorsieht.", komfort: 0, sitze: 1 },
+      bequem: { name: "Bequem", text: "20 % weniger Sitze", fakt: "20 % weniger Sitze in jedem Flugzeug. Gäste zahlen dafür mehr.", komfort: 1, sitze: 0.8 } } },
     essen: { name: "Essen an Bord", icon: "🍽️", optionen: {
-      keins: { name: "Keins", text: "spart Kosten", komfort: -1, kosten: 0 },
-      snack: { name: "Snack", text: "", komfort: 0, kosten: 7 },
-      menue: { name: "Menü", text: "", komfort: 0.8, kosten: 10 },
-      gourmet: { name: "Gourmet", text: "teuer, beeindruckt", komfort: 1.6, kosten: 13 } } },
+      keins: { name: "Keins", text: "spart Kosten", fakt: "Kostet dich nichts. Gäste sind weniger zufrieden.", komfort: -1, kosten: 0 },
+      snack: { name: "Snack", text: "", fakt: "Kostet dich 7 € pro Gast.", komfort: 0, kosten: 7 },
+      menue: { name: "Menü", text: "", fakt: "Kostet dich 10 € pro Gast. Gäste sind zufriedener.", komfort: 0.8, kosten: 10 },
+      gourmet: { name: "Gourmet", text: "teuer, beeindruckt", fakt: "Kostet dich 13 € pro Gast. Geschäftsleute lieben es.", komfort: 1.6, kosten: 13 } } },
     essenZahlen: { name: "Essen bezahlen", icon: "💶", optionen: {
-      inklusive: { name: "Im Preis", text: "", komfort: 0 },
-      aufpreis: { name: "Aufpreis", text: "Gäste zahlen selbst", komfort: -0.5, essenAnteil: 0.2 } } },
+      inklusive: { name: "Im Preis", text: "", fakt: "Du zahlst das Essen für alle Gäste.", komfort: 0 },
+      aufpreis: { name: "Aufpreis", text: "Gäste zahlen selbst", fakt: "Nur wer will, kauft Essen: Du sparst 80 % der Essenskosten. Gäste mögen es weniger.", komfort: -0.5, essenAnteil: 0.2 } } },
     platzwahl: { name: "Sitzplatzwahl", icon: "🎟️", optionen: {
-      kostenlos: { name: "Kostenlos", text: "", komfort: 0 },
-      gebuehr: { name: "Gebühr", text: "+5 € pro Gast", komfort: -0.5, extra: 5 } } },
+      kostenlos: { name: "Kostenlos", text: "", fakt: "Bringt kein Geld, kostet keine Gäste.", komfort: 0 },
+      gebuehr: { name: "Gebühr", text: "+5 € pro Gast", fakt: "Bringt dir 5 € pro Gast. Gäste mögen es weniger.", komfort: -0.5, extra: 5 } } },
     koffer: { name: "Koffer", icon: "🧳", optionen: {
-      inklusive: { name: "Inklusive", text: "", komfort: 0 },
-      gebuehr: { name: "Gebühr", text: "+9 € pro Gast", komfort: -0.7, extra: 9 } } },
+      inklusive: { name: "Inklusive", text: "", fakt: "Bringt kein Geld, kostet keine Gäste.", komfort: 0 },
+      gebuehr: { name: "Gebühr", text: "+9 € pro Gast", fakt: "Bringt dir 9 € pro Gast. Gäste mögen es weniger.", komfort: -0.7, extra: 9 } } },
     boarding: { name: "Boarding", icon: "⏱️", optionen: {
-      schnell: { name: "Schnell", text: "mehr Flüge am Tag", komfort: -0.3, wende: 0.4 },
-      gruendlich: { name: "Gründlich", text: "", komfort: 0, wende: 0.9 } } },
+      schnell: { name: "Schnell", text: "30 Min am Boden", fakt: "Flugzeuge stehen nur 30 Minuten am Boden: Es passen mehr Flüge in den Tag. Gäste fühlen sich gehetzt.", komfort: -0.3, wende: 0.5 },
+      gruendlich: { name: "Gründlich", text: "45 Min am Boden", fakt: "Flugzeuge stehen 45 Minuten am Boden.", komfort: 0, wende: 0.75 } } },
   };
   const VORLAGEN = {
     billig: { sitz: "eng", essen: "keins", essenZahlen: "aufpreis", platzwahl: "gebuehr", koffer: "gebuehr", boarding: "schnell" },
@@ -119,7 +123,7 @@
       preis: Math.max(0.7, Math.min(1.3, 1 + 0.08 * K)),
       kosten: 2 + essenKosten,
       extra: (o.platzwahl.extra || 0) + (o.koffer.extra || 0),
-      wende: o.boarding.wende + (o.sitz.wende || 0),
+      wende: o.boarding.wende,
       betrieb: K < 0 ? 1 + 0.043 * K : 1 + 0.017 * K,
       // Die Mitte zieht beide Gästegruppen etwas an ("gut für alle").
       gast: { urlaub: Math.exp(-(K < 0 ? 0.25 : 0.23) * K) * mitte, geschaeft: Math.exp((K < 0 ? 0.23 : 0.135) * K) * mitte },
@@ -164,27 +168,12 @@
     const business = (g * KLASSEN.business.anteil * kurz + u * 0.02) * vorne;
     return { first, business, eco: u + g - first - business };
   }
-  // Wie viel Business und First überhaupt in die Flugzeuge der Linie passt (wie in echt):
-  // Propeller und kleine Jets nur Economy, Mittelstrecke etwas Business, große Langstreckenjets auch First.
-  function klassenGrenzen(a, rid) {
-    const fs = a.flotte.filter((f) => f.route === rid);
-    const sitze = fs.length ? Math.min(...fs.map((f) => TYPEN[f.typ].sitze)) : 999;
-    if (sitze < 100) return { business: 0, first: 0 };
-    if (sitze < 250) return { business: 0.2, first: 0 };
-    if (sitze < 500) return { business: 0.4, first: 0.1 };
-    return { business: KLASSEN_MAX.business, first: KLASSEN_MAX.first };
-  }
-  function klassenVon(r, a) {
-    const k = r.klassen || KLASSEN_START[profil(a).klassen];
-    const g = klassenGrenzen(a, r.id);
-    return { business: Math.min(g.business, k.business), first: Math.min(g.first, k.first) };
-  }
 
   // Preis pro Route: angreifen, normal, abschöpfen.
   const STUFEN = {
-    angreifen: { name: "Angreifen", icon: "⬇", preis: 0.82, urlaub: 1.4, geschaeft: 1.12 },
-    normal: { name: "Normal", icon: "●", preis: 1.0, urlaub: 1.0, geschaeft: 1.0 },
-    abschoepfen: { name: "Abschöpfen", icon: "⬆", preis: 1.25, urlaub: 0.55, geschaeft: 0.82, geschaeftTreu: 0.98 },
+    angreifen: { name: "Angreifen", kurz: "Billiger", icon: "⬇", preis: 0.82, urlaub: 1.4, geschaeft: 1.12 },
+    normal: { name: "Normal", kurz: "Normal", icon: "●", preis: 1.0, urlaub: 1.0, geschaeft: 1.0 },
+    abschoepfen: { name: "Abschöpfen", kurz: "Teurer", icon: "⬆", preis: 1.25, urlaub: 0.55, geschaeft: 0.82, geschaeftTreu: 0.98 },
   };
 
   // Erfundene Flugzeugtypen.
@@ -384,7 +373,7 @@
     k: {
       name: "Kontinentia", chef: "Harald Brenner", farbe: "#E0574F", service: "standard", basis: "paris", ersatz: "frankfurt",
       stil: "platzhirsch", geld: 9000000, start: 7, text: "Der Platzhirsch: alt, groß, sitzt auf den besten Slots.",
-      sprueche: { gross: "Die guten Landerechte? Gehören bald alle mir.", gegen: "Junge Airlines kommen und gehen.", verliert: "Hm. Sie sind hartnäckiger als gedacht." },
+      sprueche: { gross: "Die guten Slots? Gehören bald alle mir.", gegen: "Junge Airlines kommen und gehen.", verliert: "Hm. Sie sind hartnäckiger als gedacht." },
     },
     s: {
       name: "Spatzflug", chef: "Bruno Kiesel", farbe: "#F08A24", service: "billig", basis: "barcelona", ersatz: "mailand",
@@ -528,7 +517,7 @@
     return {
       id, name: d.name, farbe: d.farbe, service: d.service, grundsaetze: { ...VORLAGEN[d.service] }, basis: d.basis, stil: d.stil || null,
       assistenten: {},
-      ruf: REGELN.rufStart, geld: d.geld, kredit: 0, slots: {}, flotte: [], routen: [], naechste: 1,
+      ruf: REGELN.rufStart, geld: d.geld, kredit: 0, slots: [], fluege: [], geschenk: REGELN.heimGeschenk, flotte: [], routen: [], naechste: 1,
       wechselBis: 0, verlauf: [],
     };
   }
@@ -536,16 +525,17 @@
   function neuesSpiel(opt) {
     opt = opt || {};
     const st = {
-      version: 2, zeit: 6, rng: (opt.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
+      version: 3, zeit: 6, rng: (opt.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
       kerosin: 1, kerosinBis: 0, messen: [], gelegenheiten: [], meldungen: [], naechsteGel: 1,
       welt: false, platz1: false, stufe: 1, pleite: { stufe: 0, tage: 0 }, ende: null,
       airlines: {}, reihenfolge: [SPIELER, "k", "s", "a"], letzterTag: null, stand: 0,
+      pool: [], naechsterSlot: 1, slotUhr: {},
     };
+    st.saat = st.rng;
     const basis = opt.basis || "frankfurt";
     const name = opt.name || NAMEN[0];
-    // Alle starten bei Null: kein Flugzeug, keine Route, nur Startgeld und zwei Landerechte daheim.
+    // Alle starten bei Null: kein Flugzeug, keine Linie, nur Startgeld und zwei geschenkte Slots auf der eigenen Tafel.
     const p = neueAirline(SPIELER, { name: name.name, farbe: name.farbe, service: opt.service || "standard", basis, geld: REGELN.startGeld });
-    p.slots[basis] = REGELN.startSlots;
     st.airlines[SPIELER] = p;
     // Die Rivalen sitzen in der Nähe: der Platzhirsch im nächsten Weltdrehkreuz, die anderen in Großstädten.
     const vergeben = new Set([basis]);
@@ -555,40 +545,176 @@
       const b = nah(WAHL[id]);
       vergeben.add(b);
       const a = neueAirline(id, { name: r.name, farbe: r.farbe, service: r.service, basis: b, stil: r.stil, geld: REGELN.startGeld });
-      a.slots[b] = REGELN.startSlots;
       st.airlines[id] = a;
     }
+    // An jedem Flughafen liegt am Anfang genau ein freier Slot für alle zusammen. Wer zuerst kommt, bekommt ihn.
+    for (const c of ALLE) poolNeu(st, c.id, false, null, true);
     st.ziel = 0;
     geaendert(st);
     return st;
   }
 
-  // ---------- Flotte, Slots, Routen ----------
-  function flugzeugHinzu(a, typ) {
-    const f = { id: a.id + "f" + a.naechste++, typ, route: null };
+  // ---------- Uhrzeiten und Slots ----------
+  // Ein Slot ist ein Abflug pro Tag zu einer festen Uhrzeit (Ortszeit des Flughafens).
+  // Heimat und ausgebaute Drehkreuze haben eine eigene Tafel, die nur der Airline gehört.
+  // An allen anderen Flughäfen gibt es wenige Slots für alle zusammen: Wer einen will, bietet.
+  const GAESTE = ["urlaub", "geschaeft"];
+  const zone = (s) => Math.round(STADT[s].lon / 15);
+  const uhr24 = (h) => ((h % 24) + 24) % 24;
+  function uhrText(h) { const m = Math.round(uhr24(h) * 60) % 1440; return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); }
+  function zeitArt(h) { h = uhr24(h); return (h >= 6 && h < 10) || (h >= 17 && h < 21) ? "begehrt" : h < 6 || h >= 22 ? "schwach" : "ruhig"; }
+  const runde10k = (x) => Math.round(x / 10000) * 10000;
+  function slotGrundpreis(stadt, h) { return runde10k(REGELN.slotPreis[STADT[stadt].k] * REGELN.zeitPreis[zeitArt(h)]); }
+  function heimPreis(stadt, h) { return runde10k(REGELN.heimPreis[zeitArt(h)] * REGELN.heimFaktor[STADT[stadt].k]); }
+  const HEIM_STUNDEN = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+  const HUB_STUNDEN = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23];
+  const hatTafel = (a, stadt) => stadt === a.basis || ausgebaut(a, stadt);
+  const tafelStunden = (a, stadt) => (stadt === a.basis ? HEIM_STUNDEN : ausgebaut(a, stadt) ? HUB_STUNDEN : []);
+
+  // Wann wollen die Leute fliegen? Geschäftsreisende morgens und abends, Urlauber eher tagsüber, nachts fast niemand.
+  const norm = (xs) => { const s = xs.reduce((p, q) => p + q, 0); return xs.map((x) => x / s); };
+  const TAGESGANG = {
+    geschaeft: norm([0.1, 0.1, 0.1, 0.1, 0.1, 0.6, 1.6, 2.2, 2.0, 1.4, 0.7, 0.6, 0.6, 0.6, 0.6, 0.7, 1.0, 1.8, 2.0, 1.6, 1.0, 0.5, 0.25, 0.15]),
+    urlaub: norm([0.1, 0.1, 0.1, 0.1, 0.15, 0.4, 0.8, 1.1, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.2, 1.1, 0.9, 0.7, 0.5, 0.35, 0.2, 0.1]),
+  };
+  const NAEHE = { geschaeft: 1.5, urlaub: 3 };     // so viele Stunden weicht ein Gast gern von seiner Wunschzeit ab
+  const kernCache = new Map();
+  function kern(h) {
+    const u = uhr24(h), key = Math.round(u * 6);
+    let k = kernCache.get(key);
+    if (!k) {
+      k = {};
+      for (const g of GAESTE) {
+        k[g] = [];
+        for (let t = 0; t < 24; t++) { let d = Math.abs(t + 0.5 - u); d = Math.min(d, 24 - d); k[g].push(Math.exp(-d / NAEHE[g])); }
+      }
+      kernCache.set(key, k);
+    }
+    return k;
+  }
+  // Verteilt die Reisenden einer Richtung auf die Flüge dieser Richtung. Jeder Gast nimmt den Flug,
+  // der zu seiner Wunschzeit passt, oder bleibt daheim. Zwei Flüge kurz hintereinander nehmen sich Gäste weg.
+  function verteilen(n, liste) {
+    for (const o of liste) o.k = kern(o.h);
+    for (const gast of GAESTE) {
+      const P = TAGESGANG[gast];
+      for (let t = 0; t < 24; t++) {
+        let summe = REGELN.daheim;
+        for (const o of liste) summe += o.att[gast] * o.k[gast][t];
+        const menge = n[gast] * P[t] / summe;
+        for (const o of liste) o.out.dem[gast] += menge * o.att[gast] * o.k[gast][t];
+      }
+    }
+  }
+  // Wie gut ist eine Abflugzeit? 1 = so gut wie die beste Stunde des Tages.
+  const gueteCache = new Map();
+  const GUETE_MAX = {};
+  for (const gast of GAESTE) { let m = 0; for (let h = 5; h <= 23; h += 0.5) { const k = kern(h)[gast]; let s2 = 0; for (let t = 0; t < 24; t++) s2 += TAGESGANG[gast][t] * k[t]; m = Math.max(m, s2); } GUETE_MAX[gast] = m; }
+  function zeitGuete(h, w) {
+    const key = Math.round(uhr24(h) * 6);
+    let g = gueteCache.get(key);
+    if (!g) {
+      const k = kern(h); g = {};
+      for (const gast of GAESTE) { let s = 0; for (let t = 0; t < 24; t++) s += TAGESGANG[gast][t] * k[gast][t]; g[gast] = s; }
+      gueteCache.set(key, g);
+    }
+    return w * g.geschaeft / GUETE_MAX.geschaeft + (1 - w) * g.urlaub / GUETE_MAX.urlaub;
+  }
+
+  // ---------- Flotte, Slots, Linien, Flüge ----------
+  // Sitzaufteilung gehört zum Flugzeug: Propeller und kleine Jets nur Economy, Mittelstrecke etwas Business, große Jets auch First.
+  function kabineGrenzen(typ) {
+    const sitze = TYPEN[typ].sitze;
+    if (sitze < 100) return { business: 0, first: 0 };
+    if (sitze < 250) return { business: 0.2, first: 0 };
+    if (sitze < 500) return { business: 0.4, first: 0.1 };
+    return { business: KLASSEN_MAX.business, first: KLASSEN_MAX.first };
+  }
+  function kabineStandard(typ, a) {
+    const g = kabineGrenzen(typ), art = a ? profil(a).klassen : "standard";
+    const b = art === "billig" ? 0 : art === "premium" ? g.business : Math.min(g.business, g.business >= 0.4 ? 0.2 : 0.1);
+    return { business: b, first: art === "premium" ? Math.min(g.first, 0.1) : 0 };
+  }
+  function flugzeugHinzu(a, typ, kabine) {
+    const g = kabineGrenzen(typ), k = kabine || kabineStandard(typ, a);
+    const f = { id: a.id + "f" + a.naechste++, typ, ort: null, kabine: { business: Math.min(g.business, k.business || 0), first: Math.min(g.first, k.first || 0) } };
     a.flotte.push(f);
     return f;
   }
-  const flugzeugeAuf = (a, rid) => a.flotte.filter((f) => f.route === rid);
-  const freieFlugzeuge = (a) => a.flotte.filter((f) => !f.route);
-  function slotsBelegt(st, stadt) {
+  const fluegeVon = (a, fid) => a.fluege.filter((x) => x.f === fid);
+  const fluegeAuf = (a, rid) => a.fluege.filter((x) => x.route === rid);
+  function flugzeugeAuf(a, rid) {
+    const ids = new Set(fluegeAuf(a, rid).map((x) => x.f));
+    return a.flotte.filter((f) => ids.has(f.id));
+  }
+  function freieFlugzeuge(a) {
+    const ids = new Set(a.fluege.map((x) => x.f));
+    return a.flotte.filter((f) => !ids.has(f.id));
+  }
+  const slotVon = (a, id) => a.slots.find((s) => s.id === id) || null;
+  const slotsIn = (a, stadt) => a.slots.filter((s) => s.stadt === stadt);
+  const slotFlug = (a, sid) => a.fluege.find((x) => x.s1 === sid || x.s2 === sid) || null;
+  function benutzteSlots(a) { const b = new Set(); for (const x of a.fluege) { b.add(x.s1); b.add(x.s2); } return b; }
+  function slotsFreiVon(a, stadt) { const b = benutzteSlots(a); return a.slots.filter((s) => s.stadt === stadt && !b.has(s.id)); }
+  // Wie viele Slots gibt es an einem Flughafen für alle zusammen (ohne die eigenen Tafeln)?
+  function slotZahl(st, stadt) {
     let n = 0;
-    for (const id of st.reihenfolge) { const a = st.airlines[id]; n += Math.max(0, (a.slots[stadt] || 0) - (a.basis === stadt ? REGELN.heimatPlaetze : 0)); }
+    for (const s of st.pool) if (s.stadt === stadt) n++;
+    for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt && !s.heim) n++;
     return n;
   }
-  function slotsFrei(st, stadt) { return REGELN.slotPlaetze[STADT[stadt].k] + ((st.ausbau && st.ausbau[stadt]) || 0) - slotsBelegt(st, stadt); }
-  const heimatPlatz = (a, stadt) => stadt === a.basis && (a.slots[stadt] || 0) < REGELN.heimatPlaetze;
-  function slotPreis(st, stadt) {
-    const k = STADT[stadt].k;
-    const anteil = slotsBelegt(st, stadt) / REGELN.slotPlaetze[k];
-    return Math.round(REGELN.slotPreis[k] * (1 + REGELN.slotAufschlag * Math.min(1, anteil)) / 10000) * 10000;
+  const poolIn = (st, stadt) => st.pool.filter((s) => s.stadt === stadt);
+  // Ein neuer Slot kommt in den Topf. Mit Frist wird einen Tag lang verdeckt geboten, ohne Frist ist er sofort zu haben.
+  // "tags": Der erste Slot jedes Flughafens liegt zwischen 9 und 17 Uhr, damit ein Flugzeug am selben Tag hin und zurück kommt.
+  function poolNeu(st, stadt, bieten, h, tags) {
+    if (h == null) {
+      const belegt = new Set();
+      for (const s of st.pool) if (s.stadt === stadt) belegt.add(Math.round(s.h * 6));
+      for (const id of st.reihenfolge) for (const s of st.airlines[id].slots) if (s.stadt === stadt) belegt.add(Math.round(s.h * 6));
+      let n = 0, versuche = 0;
+      do { n = tags ? 54 + Math.floor(zufall(st) * 49) : 30 + Math.floor(zufall(st) * 109); versuche++; } while (belegt.has(n) && versuche < 40);
+      h = n / 6;
+    }
+    const s = { id: "s" + st.naechsterSlot++, stadt, h, bis: bieten ? st.zeit + 24 : null, gebote: {} };
+    st.pool.push(s);
+    if (bieten) s.ki = kiGebote(st, s);
+    return s;
   }
-  function slotsGenutzt(a, stadt) {
-    let n = 0;
-    for (const r of a.routen) if (r.a === stadt || r.b === stadt) n += flugzeugeAuf(a, r.id).length;
-    return n;
+  // Die Tafel der Heimat oder eines Drehkreuzes: jede Stunde ein Slot, den nur die Airline kaufen kann.
+  function tafel(st, aid, stadt) {
+    const a = st.airlines[aid];
+    const b = benutzteSlots(a);
+    return tafelStunden(a, stadt).map((h) => {
+      const slot = a.slots.find((s) => s.heim && s.stadt === stadt && s.h === h) || null;
+      return { h, art: zeitArt(h), preis: a.geschenk > 0 ? 0 : heimPreis(stadt, h), listenpreis: heimPreis(stadt, h), slot, frei: !!slot && !b.has(slot.id), flug: slot ? slotFlug(a, slot.id) : null };
+    });
   }
-  const slotsUebrig = (a, stadt) => (a.slots[stadt] || 0) - slotsGenutzt(a, stadt);
+  function heimSlotKaufen(st, aid, stadt, h) {
+    const a = st.airlines[aid];
+    if (!tafelStunden(a, stadt).includes(h) || a.slots.some((s) => s.heim && s.stadt === stadt && s.h === h)) return { ok: false };
+    const preis = a.geschenk > 0 ? 0 : heimPreis(stadt, h);
+    if (a.geld < preis) return { ok: false, grund: "geld" };
+    a.geld -= preis;
+    if (a.geschenk > 0) a.geschenk--;
+    const s = { id: "s" + st.naechsterSlot++, stadt, h, heim: true, seit: tagVon(st) };
+    a.slots.push(s);
+    geaendert(st);
+    return { ok: true, slot: s, preis };
+  }
+  // Einen liegen gebliebenen Slot nimmt, wer zuerst kommt, zum Grundpreis.
+  function slotNehmen(st, aid, sid) {
+    const a = st.airlines[aid];
+    const s = st.pool.find((x) => x.id === sid);
+    if (!s || s.bis != null) return { ok: false };
+    const preis = slotGrundpreis(s.stadt, s.h);
+    if (a.geld < preis) return { ok: false, grund: "geld" };
+    a.geld -= preis;
+    st.pool = st.pool.filter((x) => x !== s);
+    const neu = { id: s.id, stadt: s.stadt, h: s.h, seit: tagVon(st) };
+    a.slots.push(neu);
+    geaendert(st);
+    return { ok: true, slot: neu, preis };
+  }
   function typFrei(st, a, typ) {
     const t = TYPEN[typ];
     if (a.id !== SPIELER) return t.stufe <= (a.stufe || 1);
@@ -596,65 +722,156 @@
   }
   function routeVon(a, x, y) { return a.routen.find((r) => (r.a === x && r.b === y) || (r.a === y && r.b === x)); }
 
-  // Was kostet es, einer Route ein Flugzeug dazuzugeben (oder sie zu eröffnen)?
-  function kostenFuer(st, aid, x, y, typ) {
+  // Ein Umlauf: ab x um h1 (Ortszeit x), zurück ab y um h2 (Ortszeit y). Das Spiel rechnet Flugzeit und Zeitzonen.
+  const flugdauer = (typ, km) => km / TYPEN[typ].kmh + 0.35;       // mit Start, Landung, Rollen
+  function zeiten(a, x, y, typ, h1, h2) {
+    const km = entfernung(x, y), d = flugdauer(typ, km);
+    const w = profil(a).wende + (km > 4000 ? 0.75 : 0);          // Langstrecke: tanken und putzen dauert länger
+    const dz = zone(y) - zone(x);
+    const an = h1 + d + dz;                                       // Ankunft in y, Ortszeit y
+    let rueck = h2;
+    while (rueck < an + w - 1e-6) rueck += 24;                    // sonst erst am nächsten Tag
+    const heim = rueck + d - dz;                                  // wieder in x, Ortszeit x
+    const dauer = heim + w - h1;                                  // so lange ist das Flugzeug gebunden
+    const tage = Math.max(1, Math.ceil((dauer - 1e-6) / 24));
+    // Kurze Strecken müssen am selben Tag zurück. Langstrecken dürfen über Nacht, dann fliegt das Flugzeug nur jeden zweiten Tag.
+    const passt = dauer <= 24 + 1e-6 || (d >= 4.5 && dauer <= 48 + 1e-6);
+    return { km, flug: d, wende: w, ab: h1, an, rueck, heim, dauer, tage, passt, warte: rueck - an };
+  }
+  function zeitenVon(a, F) {
+    const f = a.flotte.find((z) => z.id === F.f), s1 = slotVon(a, F.s1), s2 = slotVon(a, F.s2);
+    if (!f || !s1 || !s2) return null;
+    return zeiten(a, F.von, F.nach, f.typ, s1.h, s2.h);
+  }
+  // Der Tagesplan eines Flugzeugs: wann es wohin unterwegs ist.
+  function tagesplan(st, aid, fid) {
     const a = st.airlines[aid];
-    const frei = freieFlugzeuge(a).find((f) => f.typ === typ);
-    let slots = 0, slotFehlt = false;
-    for (const s of [x, y]) {
-      if (slotsUebrig(a, s) > 0) continue;
-      if (!heimatPlatz(a, s) && slotsFrei(st, s) <= 0) slotFehlt = true;
-      slots += slotPreis(st, s);
+    return fluegeVon(a, fid).map((F) => ({ flug: F, z: zeitenVon(a, F) })).filter((x) => x.z).sort((p, q) => p.z.ab - q.z.ab);
+  }
+  const ueberlappt = (s1, d1, s2, d2) => uhr24(s2 - s1) < d1 - 1e-6 || uhr24(s1 - s2) < d2 - 1e-6;
+  function flugzeugFrei(a, f, x, ab, dauer, ohne) {
+    const fl = fluegeVon(a, f.id).filter((F) => F.id !== ohne);
+    if (!fl.length) return true;
+    if (f.ort && f.ort !== x) return false;                       // ein Flugzeug startet alle Flüge am selben Flughafen
+    if (dauer > 24) return false;
+    for (const F of fl) {
+      const z = zeitenVon(a, F);
+      if (!z || z.dauer > 24 || ueberlappt(z.ab, z.dauer, ab, dauer)) return false;
     }
-    const flugzeug = frei ? 0 : TYPEN[typ].preis;
-    return { flugzeug, slots, gesamt: flugzeug + slots, slotFehlt, frei: !!frei };
+    return true;
+  }
+  // Wie viele Stunden des Tages (5 bis 23 Uhr) ist das Flugzeug in der Luft oder am Boden beschäftigt?
+  function auslastungFlugzeug(st, aid, fid) {
+    let s = 0;
+    for (const x of tagesplan(st, aid, fid)) s += Math.min(24, x.z.dauer);
+    return Math.min(1, s / 18);
   }
 
-  function kannFliegen(st, aid, x, y, typ, opt) {
+  // Welche Slots kann die Airline an diesem Flughafen für einen neuen Flug nehmen?
+  function slotIndex(st, a) {
+    const idx = { benutzt: benutzteSlots(a), eigene: {}, pool: {}, geschenk: a.geschenk || 0 };
+    for (const s of a.slots) if (!idx.benutzt.has(s.id)) (idx.eigene[s.stadt] = idx.eigene[s.stadt] || []).push(s);
+    for (const s of st.pool) if (s.bis == null) (idx.pool[s.stadt] = idx.pool[s.stadt] || []).push(s);
+    return idx;
+  }
+  function enden(st, a, stadt, idx) {
+    idx = idx || slotIndex(st, a);
+    const liste = [];
+    for (const s of idx.eigene[stadt] || []) liste.push({ art: "slot", id: s.id, h: s.h, preis: 0 });
+    if (hatTafel(a, stadt)) {
+      for (const h of tafelStunden(a, stadt)) if (!a.slots.some((s) => s.heim && s.stadt === stadt && s.h === h)) liste.push({ art: "tafel", h, preis: idx.geschenk > 0 ? 0 : heimPreis(stadt, h) });
+    } else for (const s of idx.pool[stadt] || []) liste.push({ art: "pool", id: s.id, h: s.h, preis: slotGrundpreis(stadt, s.h) });
+    return liste;
+  }
+
+  // Sucht den besten Flug x→y→x mit diesem Flugzeugtyp: passende Slots an beiden Enden und ein Flugzeug, das Zeit hat.
+  // opt.e1 / opt.e2: ein bestimmter Slot; opt.fid: ein bestimmtes Flugzeug; opt.neu: auf jeden Fall ein neues kaufen;
+  // opt.nurFrei: nur mit einem Flugzeug, das schon da ist.
+  function flugFinden(st, aid, x, y, typ, opt) {
+    opt = opt || {};
+    const a = st.airlines[aid];
     if (x === y) return { ok: false, grund: "gleich" };
-    const a = st.airlines[aid];
-    if (!typFrei(st, a, typ)) return { ok: false, grund: "gesperrt" };
-    if (entfernung(x, y) > TYPEN[typ].reichweite) return { ok: false, grund: "reichweite" };
-    const k = kostenFuer(st, aid, x, y, typ);
-    if (opt && opt.nurFrei && !k.frei) return { ok: false, grund: "keinFlugzeug", kosten: k };
-    if (k.slotFehlt) return { ok: false, grund: "slots", kosten: k };
-    if (k.gesamt > a.geld) return { ok: false, grund: "geld", kosten: k };
-    return { ok: true, kosten: k };
-  }
-
-  // Eröffnet eine Route oder setzt ein weiteres Flugzeug darauf.
-  function fliegen(st, aid, x, y, typ, opt) {
-    const test = kannFliegen(st, aid, x, y, typ, opt);
-    if (!test.ok) return test;
-    const a = st.airlines[aid];
-    const k = test.kosten;
-    for (const s of [x, y]) {
-      if (slotsUebrig(a, s) > 0) continue;
-      a.slots[s] = (a.slots[s] || 0) + 1;
+    if (!TYPEN[typ] || !typFrei(st, a, typ)) return { ok: false, grund: "gesperrt" };
+    const km = entfernung(x, y);
+    if (km > TYPEN[typ].reichweite) return { ok: false, grund: "reichweite" };
+    const idx = opt.idx || slotIndex(st, a);
+    const e1 = opt.e1 ? [opt.e1] : enden(st, a, x, idx), e2 = opt.e2 ? [opt.e2] : enden(st, a, y, idx);
+    if (!e1.length || !e2.length) return { ok: false, grund: "slots", fehlt: !e1.length ? x : y };
+    const eigene = opt.neu ? [] : a.flotte.filter((f) => (opt.fid ? f.id === opt.fid : f.typ === typ));
+    const w = (STADT[x].w + STADT[y].w) / 2;
+    let best = null, zeitPasst = false, belegt = false;
+    for (const s1 of e1) for (const s2 of e2) {
+      const z = zeiten(a, x, y, typ, s1.h, s2.h);
+      if (!z.passt) continue;
+      zeitPasst = true;
+      const f = eigene.find((k) => flugzeugFrei(a, k, x, z.ab, z.dauer)) || null;
+      if (!f && (opt.fid || opt.nurFrei)) { belegt = true; continue; }
+      const flugzeug = f ? 0 : TYPEN[typ].preis;
+      let slots = s1.preis + s2.preis;
+      if (s1.art === "tafel" && s2.art === "tafel" && idx.geschenk === 1) slots = Math.max(s1.preis, s2.preis) || heimPreis(y, s2.h);
+      const guete = (zeitGuete(s1.h, w) + zeitGuete(s2.h, w)) / z.tage - z.dauer * 0.01 - (flugzeug + slots) / 2e7;
+      if (!best || guete > best.guete) best = { guete, s1, s2, z, f, flugzeug, slots };
     }
-    a.geld -= k.gesamt;
-    let f = freieFlugzeuge(a).find((z) => z.typ === typ);
-    if (!f) f = flugzeugHinzu(a, typ);
-    let r = routeVon(a, x, y);
+    if (!best) return { ok: false, grund: !zeitPasst ? "zeit" : opt.nurFrei && !opt.fid ? "keinFlugzeug" : belegt ? "belegt" : "zeit" };
+    const kosten = { flugzeug: best.flugzeug, slots: best.slots, gesamt: best.flugzeug + best.slots, frei: !!best.f };
+    const plan = { x, y, typ, fid: best.f ? best.f.id : null, e1: best.s1, e2: best.s2, stufe: opt.stufe || null, kabine: opt.kabine || null };
+    if (kosten.gesamt > a.geld) return { ok: false, grund: "geld", kosten, plan, zeiten: best.z };
+    return { ok: true, kosten, plan, zeiten: best.z };
+  }
+  const kostenFuer = (st, aid, x, y, typ) => { const t = flugFinden(st, aid, x, y, typ); return t.kosten ? Object.assign({ slotFehlt: false }, t.kosten) : { flugzeug: TYPEN[typ].preis, slots: 0, gesamt: TYPEN[typ].preis, slotFehlt: t.grund === "slots" || t.grund === "zeit", frei: false }; };
+  function kannFliegen(st, aid, x, y, typ, opt) { return flugFinden(st, aid, x, y, typ, opt); }
+
+  // Nimmt einen Slot für einen Flug in Besitz (kauft ihn, wenn nötig).
+  function endeNehmen(st, a, stadt, e) {
+    if (e.art === "slot") return slotVon(a, e.id);
+    if (e.art === "tafel") { const r = heimSlotKaufen(st, a.id, stadt, e.h); return r.ok ? r.slot : null; }
+    const r = slotNehmen(st, a.id, e.id);
+    return r.ok ? r.slot : null;
+  }
+  // Legt einen Flug an: kauft fehlende Slots und (wenn nötig) das Flugzeug, eröffnet die Linie, wenn es sie noch nicht gibt.
+  function flugAnlegen(st, aid, plan) {
+    const a = st.airlines[aid];
+    const test = flugFinden(st, aid, plan.x, plan.y, plan.typ, { e1: plan.e1, e2: plan.e2, fid: plan.fid, neu: !plan.fid });
+    if (!test.ok) return test;
+    const s1 = endeNehmen(st, a, plan.x, plan.e1), s2 = endeNehmen(st, a, plan.y, plan.e2);
+    if (!s1 || !s2) return { ok: false, grund: "slots" };
+    let f = plan.fid ? a.flotte.find((z) => z.id === plan.fid) : null;
+    if (!f) { a.geld -= TYPEN[plan.typ].preis; f = flugzeugHinzu(a, plan.typ, plan.kabine); }
+    f.ort = plan.x;
+    let r = routeVon(a, plan.x, plan.y);
     if (!r) {
-      r = { id: a.id + "r" + a.naechste++, a: x, b: y, stufe: (opt && opt.stufe) || "normal", seit: tagVon(st), auslastung: null, minus: 0 };
+      r = { id: a.id + "r" + a.naechste++, a: plan.x, b: plan.y, stufe: plan.stufe || "normal", seit: tagVon(st), auslastung: null, minus: 0 };
       a.routen.push(r);
     }
-    f.route = r.id;
-    f.ab = st.zeit;
+    const F = { id: a.id + "u" + a.naechste++, route: r.id, f: f.id, von: plan.x, nach: plan.y, s1: s1.id, s2: s2.id, seit: tagVon(st) };
+    a.fluege.push(F);
     geaendert(st);
-    return { ok: true, route: r, flugzeug: f, kosten: k };
+    return { ok: true, route: r, flugzeug: f, flug: F, kosten: test.kosten, zeiten: test.zeiten };
+  }
+  // Kurzform: den besten Flug suchen und anlegen.
+  function fliegen(st, aid, x, y, typ, opt) {
+    const test = flugFinden(st, aid, x, y, typ, opt);
+    if (!test.ok) return test;
+    if (opt && opt.stufe) test.plan.stufe = opt.stufe;
+    return flugAnlegen(st, aid, test.plan);
   }
 
-  // Nimmt ein Flugzeug von der Route. Das letzte schließt sie. Slots bleiben bis Saisonende.
-  function abziehen(st, aid, rid) {
+  // Streicht einen Flug. Die Slots bleiben bis zum Saisonende, das Flugzeug bleibt in der Flotte.
+  function flugStreichen(st, aid, flugId) {
     const a = st.airlines[aid];
-    const fs = flugzeugeAuf(a, rid);
-    if (!fs.length) return false;
-    fs[fs.length - 1].route = null;
-    if (fs.length === 1) a.routen = a.routen.filter((r) => r.id !== rid);
+    const F = a.fluege.find((x) => x.id === flugId);
+    if (!F) return false;
+    a.fluege = a.fluege.filter((x) => x !== F);
+    if (!a.fluege.some((x) => x.route === F.route)) a.routen = a.routen.filter((r) => r.id !== F.route);
+    const f = a.flotte.find((z) => z.id === F.f);
+    if (f && !a.fluege.some((x) => x.f === f.id)) f.ort = null;
     geaendert(st);
     return true;
+  }
+  // Nimmt den letzten Flug von der Linie. Der letzte schließt sie.
+  function abziehen(st, aid, rid) {
+    const fl = fluegeAuf(st.airlines[aid], rid);
+    return fl.length ? flugStreichen(st, aid, fl[fl.length - 1].id) : false;
   }
   function routeSchliessen(st, aid, rid) {
     while (abziehen(st, aid, rid));
@@ -662,51 +879,67 @@
   function verkaufen(st, aid, fid) {
     const a = st.airlines[aid];
     const f = a.flotte.find((z) => z.id === fid);
-    if (!f || f.route) return false;
+    if (!f || a.fluege.some((x) => x.f === fid)) return false;
     a.flotte = a.flotte.filter((z) => z !== f);
     a.geld += Math.round(TYPEN[f.typ].preis * REGELN.verkaufAnteil);
     geaendert(st);
     return true;
   }
-  function kaufen(st, aid, typ, preis) {
-    const a = st.airlines[aid];
-    preis = preis ?? TYPEN[typ].preis;
-    if (a.geld < preis || !typFrei(st, a, typ)) return null;
-    a.geld -= preis;
-    geaendert(st);
-    return flugzeugHinzu(a, typ);
-  }
   function preisStufe(st, aid, rid, stufe) {
     const r = st.airlines[aid].routen.find((x) => x.id === rid);
-    if (!r || !STUFEN[stufe]) return false;
+    if (!r || !STUFEN[stufe] || r.stufe === stufe) return false;
+    vermerken(st, aid, { art: "preis", rid, alt: r.stufe, text: "Preis " + STADT[r.a].name + "–" + STADT[r.b].name + ": " + STUFEN[stufe].kurz });
     r.stufe = stufe;
     geaendert(st);
     return true;
   }
-  // Sitzaufteilung einer Linie: Anteil der Kabine für Business und First (Rest Economy).
-  function klassenSetzen(st, aid, rid, business, first) {
-    const r = st.airlines[aid].routen.find((x) => x.id === rid);
-    if (!r) return false;
-    const g = klassenGrenzen(st.airlines[aid], rid);
-    business = Math.max(0, Math.min(g.business, Math.round(business * 10) / 10));
-    first = Math.max(0, Math.min(g.first, Math.round(first * 10) / 10));
-    r.klassen = { business, first };
+  // Kabine umbauen: kostet Geld, und das Flugzeug steht einen Tag in der Werkstatt.
+  function umbauPreis(typ) { return Math.max(50000, runde10k(TYPEN[typ].preis * 0.04)); }
+  function kabineSetzen(st, aid, fid, business, first, gratis) {
+    const a = st.airlines[aid];
+    const f = a.flotte.find((z) => z.id === fid);
+    if (!f) return { ok: false };
+    const g = kabineGrenzen(f.typ);
+    business = Math.max(0, Math.min(g.business, Math.round(business * 20) / 20));
+    first = Math.max(0, Math.min(g.first, Math.round(first * 20) / 20));
+    if (f.kabine.business === business && f.kabine.first === first) return { ok: false };
+    const preis = gratis ? 0 : umbauPreis(f.typ);
+    if (a.geld < preis) return { ok: false, grund: "geld" };
+    a.geld -= preis;
+    if (!gratis) {
+      vermerken(st, aid, { art: "kabine", fid, alt: { ...f.kabine }, text: "Kabine " + TYPEN[f.typ].kurz + " umgebaut" });
+      f.werkstattTag = tagVon(st) + 1;
+    }
+    f.kabine = { business, first };
     geaendert(st);
-    return true;
+    return { ok: true, preis };
   }
-  // Probiert alle Aufteilungen durch und nimmt die beste.
-  function besteKlassen(st, aid, rid) {
+  const inWerkstatt = (st, f) => !!f.werkstattTag && f.werkstattTag >= tagVon(st);
+  // Probiert alle Aufteilungen durch und nimmt die beste (für den Rat des Analysten und die Rivalen).
+  function besteKabine(st, aid, fid) {
+    const f = st.airlines[aid].flotte.find((z) => z.id === fid);
+    if (!f) return null;
+    const gr = kabineGrenzen(f.typ);
     let best = null;
-    const gr = klassenGrenzen(st.airlines[aid], rid);
+    const k = klonen(st);
+    const kf = k.airlines[aid].flotte.find((z) => z.id === fid);
+    delete kf.werkstattTag;
     for (let b = 0; b <= gr.business + 0.0001; b += 0.1) {
-      for (let f = 0; f <= gr.first + 0.0001; f += 0.1) {
-        const k = klonen(st);
-        klassenSetzen(k, aid, rid, b, f);
+      for (let fi = 0; fi <= gr.first + 0.0001; fi += 0.1) {
+        kf.kabine = { business: Math.round(b * 10) / 10, first: Math.round(fi * 10) / 10 };
         const g = berechnen(k, tagVon(k)).summe[aid];
-        if (!best || g > best.g + 1) best = { g, business: Math.round(b * 10) / 10, first: Math.round(f * 10) / 10 };
+        if (!best || g > best.g + 1) best = { g, business: kf.kabine.business, first: kf.kabine.first };
       }
     }
     return best;
+  }
+  // Für die Anzeige: die Sitzaufteilung einer Linie ist der Schnitt ihrer Flugzeuge.
+  function klassenVon(r, a) {
+    const fs = flugzeugeAuf(a, r.id);
+    if (!fs.length) return { business: 0, first: 0 };
+    let s = 0, b = 0, f = 0;
+    for (const z of fs) { const n = TYPEN[z.typ].sitze; s += n; b += n * z.kabine.business; f += n * z.kabine.first; }
+    return { business: b / s, first: f / s };
   }
 
   // Einen Grundsatz ändern. Wird es für die Gäste schlechter, leidet der Ruf ein wenig.
@@ -716,6 +949,7 @@
     a.grundsaetze = a.grundsaetze || { ...VORLAGEN[a.service || "standard"] };
     if (a.grundsaetze[k] === wert) return false;
     const vorher = profil(a).komfort;
+    vermerken(st, aid, { art: "grundsatz", k, alt: a.grundsaetze[k], text: GRUNDSAETZE[k].name + ": " + GRUNDSAETZE[k].optionen[wert].name });
     a.grundsaetze = { ...a.grundsaetze, [k]: wert };
     const nachher = profil(a);
     if (nachher.komfort < vorher) a.ruf = Math.max(5, a.ruf - REGELN.rufVerschlechtern * (vorher - nachher.komfort));
@@ -726,16 +960,15 @@
   function vorlageSetzen(st, aid, vorlage) {
     for (const [k, w] of Object.entries(VORLAGEN[vorlage])) grundsatzSetzen(st, aid, k, w);
   }
+  // Merkt sich eine Änderung des Spielers, damit er am nächsten Tag sieht, was sie wirklich gebracht hat.
+  function vermerken(st, aid, v) {
+    if (aid !== SPIELER || st.probe) return;
+    const a = st.airlines[aid];
+    a.vermerke = (a.vermerke || []).filter((x) => !(x.art === v.art && x.k === v.k && x.rid === v.rid && x.fid === v.fid));
+    a.vermerke.push(Object.assign({ tag: tagVon(st) }, v));
+  }
 
   // ---------- Flugbetrieb ----------
-  function umlauf(typ, km, a) {
-    const t = TYPEN[typ];
-    const flug = km / t.kmh + 0.35;            // Start, Landung, Rollen
-    const wende = profil(a).wende;
-    const rund = 2 * (flug + wende);
-    const runden = Math.max(1, Math.floor(REGELN.betriebsStunden / rund));
-    return { flug, wende, legs: runden * 2 };
-  }
 
   function drehkreuze(a) {
     const n = {};
@@ -762,47 +995,106 @@
     return r;
   }
 
+  // Reisende pro Tag, die an einem Flughafen überhaupt abfliegen wollen. Alle Linien und Airlines teilen sich diese Menge.
+  function reisende(st, stadt) {
+    const t = st.trend && st.trend[stadt];
+    return Math.round(REGELN.reisende * STADT[stadt].g ** 2 * (t ? t.f : 1) / 10) * 10;
+  }
+
   function berechnen(st, tag, nurAirline) {
-    const angebote = {};       // Paar → Liste von Angeboten
+    const richtungen = {};     // "x>y" → Flüge dieser Richtung
     const routen = {};         // Routen-ID → Ergebnis
     const nd = {};
     const nachfrage = (x, y) => nd[paar(x, y)] || (nd[paar(x, y)] = grundNachfrage(st, x, y, tag));
+    const angebote = {};
     for (const aid of st.reihenfolge) {
       const a = st.airlines[aid];
+      if (!a.fluege.length) continue;
+      const sv = profil(a);
+      const anzahl = {};
+      for (const F of a.fluege) anzahl[F.f] = (anzahl[F.f] || 0) + 1;
+      const flotte = {}, slots = {};
+      for (const f of a.flotte) flotte[f.id] = f;
+      for (const s of a.slots) slots[s.id] = s;
+      const proRoute = {};
+      for (const F of a.fluege) (proRoute[F.route] = proRoute[F.route] || []).push(F);
       for (const r of a.routen) {
-        const fs = flugzeugeAuf(a, r.id);
-        if (!fs.length) continue;
+        const fl = proRoute[r.id];
+        if (!fl) continue;
         const km = entfernung(r.a, r.b);
-        let sitze = 0, legs = 0, kerosin = 0, gebuehr = 0, crew = 0;
-        const g = (REGELN.gebuehr[STADT[r.a].k] + REGELN.gebuehr[STADT[r.b].k]) / 2;
+        const gA = REGELN.gebuehr[STADT[r.a].k], gB = REGELN.gebuehr[STADT[r.b].k];
         const fk = wirkung(st, aid, "kapazitaet", tag, r.a, r.b);   // Streik, Sturm: weniger Flüge
         const ker = (wirkung(st, aid, "kerosinFest", tag) < 1 ? 1 : st.kerosin) * wirkung(st, aid, "kerosin", tag);
-        for (const f of fs) {
-          const t = TYPEN[f.typ], u = umlauf(f.typ, km, a);
-          sitze += Math.round(t.sitze * profil(a).sitze) * u.legs / 2 * fk;
-          legs += u.legs;
-          kerosin += u.legs * km * t.verbrauch * ker * profil(a).betrieb * fk;
-          gebuehr += u.legs * g * t.groesse * profil(a).betrieb * fk;
-          crew += t.crew;
-        }
+        const bonus = ausgebaut(a, r.a) || ausgebaut(a, r.b) ? REGELN.ausbauGaeste : 1;
+        const att0 = { urlaub: anziehung(a, r.stufe, "urlaub") * bonus, geschaeft: anziehung(a, r.stufe, "geschaeft") * bonus };
         const e = {
-          id: r.id, airline: aid, a: r.a, b: r.b, km, flugzeuge: fs.length, legs, sitze,
-          lokal: { urlaub: 0, geschaeft: 0 }, umsteiger: [], kerosin, gebuehr, crew,
+          id: r.id, airline: aid, a: r.a, b: r.b, km, flugzeuge: 0, legs: 0, sitze: 0, ueber: 0,
+          lokal: { urlaub: 0, geschaeft: 0 }, umsteiger: [], kerosin: 0, gebuehr: 0, crew: 0, fluege: [], kab: { business: 0, first: 0 },
         };
+        const maschinen = new Set();
+        for (const F of fl) {
+          const f = flotte[F.f], s1 = slots[F.s1], s2 = slots[F.s2];
+          if (!f || !s1 || !s2) continue;
+          const t = TYPEN[f.typ];
+          const z = zeiten(a, F.von, F.nach, f.typ, s1.h, s2.h);
+          const ruht = f.werkstattTag === tag;      // in der Werkstatt: der Flug fällt aus
+          const freq = ruht ? 0 : fk / z.tage;
+          const sitze = Math.round(t.sitze * sv.sitze) * freq;
+          maschinen.add(f.id);
+          e.sitze += sitze; e.legs += 2 * freq;
+          e.kerosin += 2 * freq * km * t.verbrauch * ker * sv.betrieb;
+          e.gebuehr += freq * (gA + gB) * t.groesse * sv.betrieb;
+          e.crew += t.crew / anzahl[f.id];
+          e.kab.business += sitze * f.kabine.business; e.kab.first += sitze * f.kabine.first;
+          const att = { urlaub: att0.urlaub * freq, geschaeft: att0.geschaeft * freq };
+          const hin = { dem: { urlaub: 0, geschaeft: 0 }, sitze, h: z.ab }, zur = { dem: { urlaub: 0, geschaeft: 0 }, sitze, h: z.rueck };
+          e.fluege.push({ id: F.id, f: f.id, typ: f.typ, von: F.von, nach: F.nach, z, ruht, freq, hin, zur });
+          if (!freq) continue;
+          (richtungen[F.von + ">" + F.nach] = richtungen[F.von + ">" + F.nach] || []).push({ att, h: z.ab, out: hin });
+          (richtungen[F.nach + ">" + F.von] = richtungen[F.nach + ">" + F.von] || []).push({ att, h: z.rueck, out: zur });
+        }
+        if (!e.fluege.length) continue;
+        e.flugzeuge = maschinen.size;
         routen[r.id] = e;
         (angebote[paar(r.a, r.b)] = angebote[paar(r.a, r.b)] || []).push({ a, r, e });
       }
     }
-    // Direkte Fluggäste: Markt aufteilen.
-    for (const [k, liste] of Object.entries(angebote)) {
-      const [x, y] = k.split("|");
-      const n = nachfrage(x, y);
-      for (const gast of ["urlaub", "geschaeft"]) {
-        const att = liste.map((o) => anziehung(o.a, o.r.stufe, gast) * (ausgebaut(o.a, x) || ausgebaut(o.a, y) ? REGELN.ausbauGaeste : 1));
-        const summe = att.reduce((s, v) => s + v, 0);
-        const markt = n[gast] * marktGroesse(summe);
-        liste.forEach((o, i) => { o.e.lokal[gast] = markt * att[i] / summe; });
+    // Direkte Fluggäste: jede Richtung für sich, nach Uhrzeit verteilt.
+    for (const [k, liste] of Object.entries(richtungen)) {
+      const [x, y] = k.split(">");
+      verteilen(nachfrage(x, y), liste);
+    }
+    // Mehr als Plätze passen nicht in einen Flug.
+    const bedient = {};
+    for (const e of Object.values(routen)) {
+      for (const fl of e.fluege) {
+        for (const d of [fl.hin, fl.zur]) {
+          const will = d.dem.urlaub + d.dem.geschaeft;
+          const c = will > 0 ? Math.min(1, d.sitze / will) : 0;
+          d.last = d.sitze > 0 ? will / d.sitze : 0;
+          d.pax = will * c;
+          e.lokal.urlaub += d.dem.urlaub * c / 2;
+          e.lokal.geschaeft += d.dem.geschaeft * c / 2;
+          e.ueber += will * (1 - c) / 2;
+        }
       }
+      const n = e.lokal.urlaub + e.lokal.geschaeft;
+      bedient[e.a] = (bedient[e.a] || 0) + n;
+      bedient[e.b] = (bedient[e.b] || 0) + n;
+    }
+    // Jede Stadt hat nur so viele Reisende am Tag. Sind es mehr Plätze als Leute, teilen sich alle den Kuchen.
+    const staedteStand = {};
+    for (const c of Object.keys(bedient)) {
+      const R = reisende(st, c);
+      staedteStand[c] = { reisende: R, bedient: Math.min(R, bedient[c]), faktor: bedient[c] > R ? R / bedient[c] : 1 };
+    }
+    for (const e of Object.values(routen)) {
+      const f = Math.min(staedteStand[e.a].faktor, staedteStand[e.b].faktor);
+      if (f < 1) {
+        e.lokal.urlaub *= f; e.lokal.geschaeft *= f;
+        for (const fl of e.fluege) { fl.hin.pax *= f; fl.zur.pax *= f; }
+      }
+      if (e.sitze > 0) { e.kab.business /= e.sitze; e.kab.first /= e.sitze; }
     }
     // Umsteiger an Drehkreuzen.
     for (const aid of st.reihenfolge) {
@@ -820,8 +1112,10 @@
             const n = nachfrage(x, y);
             const direkt = angebote[paar(x, y)] ? 0.5 : 1;
             let pax = 0;
-            for (const gast of ["urlaub", "geschaeft"]) pax += n[gast] * anziehung(a, "normal", gast) * 0.6;
-            pax *= REGELN.umsteigerAnteil * sv.umsteiger * direkt * (ausgebaut(a, h) ? REGELN.ausbauUmsteiger : 1);
+            for (const gast of GAESTE) pax += n[gast] * anziehung(a, "normal", gast) * 0.6;
+            // Umsteigen klappt nur, wenn auf beiden Linien oft genug geflogen wird.
+            const takt = Math.min(1, Math.min(routen[r1.id].legs, routen[r2.id].legs) / 4);
+            pax *= REGELN.umsteigerAnteil * sv.umsteiger * direkt * (ausgebaut(a, h) ? REGELN.ausbauUmsteiger : 1) * (0.5 + 0.5 * takt);
             const preis = ticket(dd) * sv.preis * 0.9;
             const u = { pax, preis, wege: [r1.id, r2.id], km: [d1, d2], ziel: [y, x], ueber: h };
             routen[r1.id].umsteiger.push(u);
@@ -834,8 +1128,7 @@
     // fliegt zum Teil eine Klasse tiefer mit. Umsteiger fliegen Economy.
     for (const e of Object.values(routen)) {
       const a = st.airlines[e.airline];
-      const r = a.routen.find((x) => x.id === e.id);
-      const kl = klassenVon(r, a);
+      const kl = e.kab;
       const S = { first: e.sitze * kl.first / KLASSEN.first.platz, business: e.sitze * kl.business / KLASSEN.business.platz };
       S.eco = e.sitze * (1 - kl.first - kl.business);
       const D = klassenNachfrage(e, profil(a));
@@ -844,7 +1137,7 @@
       const b = Math.min(D.business, S.business);
       D.eco += (D.business - b) * 0.5;
       const umst = e.umsteiger.reduce((s, u) => s + u.pax, 0);
-      e.bedarf = D.first + D.business + D.eco + umst;
+      e.bedarf = D.first + D.business + D.eco + umst + e.ueber;
       e.faktor = D.eco + umst > 0 ? Math.min(1, S.eco / (D.eco + umst)) : 1;
       e.klassen = { first: { sitze: S.first, pax: f }, business: { sitze: S.business, pax: b }, eco: { sitze: S.eco, pax: D.eco * e.faktor } };
       e.sitzePlaetze = S.first + S.business + S.eco;
@@ -880,11 +1173,11 @@
       e.preis = preis;
       e.wert = e.gewinn + zubringerWert;  // was die Route dem ganzen Netz bringt
     }
-    const summe = {};
-    for (const aid of st.reihenfolge) summe[aid] = 0;
-    for (const e of Object.values(routen)) summe[e.airline] += e.gewinn;
+    const summe = {}, gaeste = {};
+    for (const aid of st.reihenfolge) { summe[aid] = 0; gaeste[aid] = 0; }
+    for (const e of Object.values(routen)) { summe[e.airline] += e.gewinn; gaeste[e.airline] += e.pax; }
     for (const aid of st.reihenfolge) summe[aid] -= verwaltungKosten(st.airlines[aid]);
-    return { routen, summe, tag };
+    return { routen, summe, gaeste, staedte: staedteStand, tag };
   }
 
   // Wirkungen auf Zeit (Streik, Sturm, Kerosin-Wette). Gibt den Faktor für Airline, Tag und Stadt zurück.
@@ -902,6 +1195,7 @@
   function probe(st, aid, aenderung) {
     const vorher = rechnung(st).summe[aid];
     const kopie = klonen(st);
+    kopie.probe = true;
     const res = aenderung(kopie);
     if (res && res.ok === false) return null;
     const nachher = berechnen(kopie, tagVon(kopie)).summe[aid];
@@ -909,49 +1203,71 @@
   }
   function klonen(st) { return JSON.parse(JSON.stringify(st)); }
 
-  // Grobe, schnelle Schätzung für die KI und den Bot (ohne volle Rechnung).
-  function schaetzen(st, aid, x, y, typ) {
+  // Schätzung für einen zusätzlichen Flug x→y→x (ab x um h1, zurück ab y um h2): Was bringt er der Airline am Tag?
+  // Rechnet mit den Uhrzeiten und allen Flügen, die es auf der Strecke schon gibt (auch den eigenen).
+  function schaetzen(st, aid, x, y, typ, h1, h2, neuesFlugzeug) {
     const a = st.airlines[aid];
     const tag = tagVon(st);
     const km = entfernung(x, y);
     const n = grundNachfrage(st, x, y, tag);
-    const andere = [];
-    for (const bid of st.reihenfolge) {
-      if (bid === aid) continue;
-      const b = st.airlines[bid];
-      const r = routeVon(b, x, y);
-      if (r && flugzeugeAuf(b, r.id).length) andere.push({ b, r });
-    }
-    const eigene = routeVon(a, x, y);
-    let pax = 0;
-    for (const gast of ["urlaub", "geschaeft"]) {
-      const meine = anziehung(a, "normal", gast);
-      const summe = andere.reduce((s, o) => s + anziehung(o.b, o.r.stufe, gast), meine);
-      pax += n[gast] * marktGroesse(summe) * meine / summe;
-    }
+    const sv = profil(a), t = TYPEN[typ];
+    if (h1 == null) h1 = 8;
+    if (h2 == null) h2 = uhr24(Math.ceil(h1 + flugdauer(typ, km) + zone(y) - zone(x) + 1));
+    const z = zeiten(a, x, y, typ, h1, h2);
+    const freq = 1 / z.tage;
+    const sitze = Math.round(t.sitze * sv.sitze) * freq;
+    const basisListen = () => {
+      const hin = [], zur = [];
+      for (const bid of st.reihenfolge) {
+        const b = st.airlines[bid];
+        const r = routeVon(b, x, y);
+        if (!r) continue;
+        const au = anziehung(b, r.stufe, "urlaub"), ag = anziehung(b, r.stufe, "geschaeft"), bs = profil(b).sitze;
+        for (const F of b.fluege) {
+          if (F.route !== r.id) continue;
+          const zz = zeitenVon(b, F);
+          if (!zz) continue;
+          const f = b.flotte.find((k) => k.id === F.f);
+          const s = Math.round(TYPEN[f.typ].sitze * bs) / zz.tage;
+          const att = { urlaub: au / zz.tage, geschaeft: ag / zz.tage };
+          const o1 = { att, h: zz.ab, out: { dem: { urlaub: 0, geschaeft: 0 } }, sitze: s, eigen: bid === aid };
+          const o2 = { att, h: zz.rueck, out: { dem: { urlaub: 0, geschaeft: 0 } }, sitze: s, eigen: bid === aid };
+          (F.von === x ? hin : zur).push(o1); (F.von === x ? zur : hin).push(o2);
+        }
+      }
+      return [hin, zur];
+    };
+    const eigenPax = (listen) => { let s = 0; for (const l of listen) for (const o of l) if (o.eigen) s += Math.min(o.sitze, o.out.dem.urlaub + o.out.dem.geschaeft); return s; };
+    let vorher = 0;
+    const alt = basisListen();
+    if (alt[0].some((o) => o.eigen) || alt[1].some((o) => o.eigen)) { verteilen(n, alt[0]); verteilen(n, alt[1]); vorher = eigenPax(alt); }
+    const neu = alt[0].length || alt[1].length ? basisListen() : alt;
+    const att = { urlaub: anziehung(a, "normal", "urlaub") * freq, geschaeft: anziehung(a, "normal", "geschaeft") * freq };
+    const n1 = { att, h: z.ab, out: { dem: { urlaub: 0, geschaeft: 0 } }, sitze, eigen: true };
+    const n2 = { att, h: z.rueck, out: { dem: { urlaub: 0, geschaeft: 0 } }, sitze, eigen: true };
+    neu[0].push(n1); neu[1].push(n2);
+    verteilen(n, neu[0]); verteilen(n, neu[1]);
+    let flieg = Math.max(0, eigenPax(neu) - vorher);
+    const imFlug = Math.min(sitze, n1.out.dem.urlaub + n1.out.dem.geschaeft) + Math.min(sitze, n2.out.dem.urlaub + n2.out.dem.geschaeft);
     // Umsteiger grob: über eigene Routen an x und y.
-    const sv = profil(a);
-    for (const [h, z] of [[x, y], [y, x]]) {
+    let umst = 0;
+    for (const [h, zl] of [[x, y], [y, x]]) {
       const speichen = a.routen.filter((r) => r.a === h || r.b === h);
       if (speichen.length + 1 < REGELN.drehkreuzAb) continue;
       for (const r of speichen) {
         const o = r.a === h ? r.b : r.a;
-        if (o === z) continue;
-        const dd = entfernung(o, z);
+        if (o === zl) continue;
+        const dd = entfernung(o, zl);
         if (dd < 300 || entfernung(o, h) + km > REGELN.umwegMax * dd) continue;
-        const m = grundNachfrage(st, o, z, tag);
-        pax += (m.urlaub + m.geschaeft) * 0.6 * REGELN.umsteigerAnteil * sv.umsteiger * 0.7;
+        const m = grundNachfrage(st, o, zl, tag);
+        umst += (m.urlaub + m.geschaeft) * 0.6 * REGELN.umsteigerAnteil * sv.umsteiger * 0.35;
       }
     }
-    const t = TYPEN[typ], u = umlauf(typ, km, a);
-    let sitze = Math.round(t.sitze * sv.sitze) * u.legs / 2;
-    let vorhanden = 0;
-    if (eigene) for (const f of flugzeugeAuf(a, eigene.id)) vorhanden += Math.round(TYPEN[f.typ].sitze * sv.sitze) * umlauf(f.typ, km, a).legs / 2;
-    const flieg = Math.max(0, Math.min(sitze, pax - vorhanden));
+    flieg += Math.max(0, Math.min(2 * umst * freq, 2 * sitze - imFlug));
     const preis = ticket(km) * sv.preis + sv.extra;
-    const g = (REGELN.gebuehr[STADT[x].k] + REGELN.gebuehr[STADT[y].k]) / 2;
-    const kosten = u.legs * (km * t.verbrauch * st.kerosin + g * t.groesse) * sv.betrieb + t.crew + 2 * flieg * sv.kosten;
-    return { gewinn: 2 * flieg * preis - kosten, auslastung: flieg / sitze, pax: 2 * flieg };
+    const g = REGELN.gebuehr[STADT[x].k] + REGELN.gebuehr[STADT[y].k];
+    const kosten = freq * (2 * km * t.verbrauch * st.kerosin + g * t.groesse) * sv.betrieb + (neuesFlugzeug === false ? 0 : t.crew) + flieg * sv.kosten;
+    return { gewinn: flieg * preis - kosten, auslastung: sitze > 0 ? Math.min(1, (imFlug + Math.min(2 * umst * freq, 2 * sitze - imFlug)) / (2 * sitze)) : 0, pax: flieg, zeiten: z };
   }
 
   // Drei Vorschläge für die erste Linie: günstig, gut fürs Drehkreuz, große Chance.
@@ -959,16 +1275,19 @@
     const a = st.airlines[aid];
     const x = a.basis;
     const kand = [];
+    const idx = slotIndex(st, a);
+    const pruefen = (ziel, typ) => {
+      const t = flugFinden(st, aid, x, ziel, typ, { idx });
+      if (!t.ok) return null;
+      const g = schaetzen(st, aid, x, ziel, typ, t.zeiten.ab, t.zeiten.rueck, !t.kosten.frei).gewinn;
+      return g > 0 ? { ziel, typ, gesamt: t.kosten.gesamt, gewinn: g, k: STADT[ziel].k, plan: t.plan } : null;
+    };
     for (const c of ALLE) {
       if (c.id === x || routeVon(a, x, c.id)) continue;
       let best = null;
       for (const typ of Object.keys(TYPEN)) {
-        const t = kannFliegen(st, aid, x, c.id, typ);
-        if (!t.ok) continue;
-        const g = schaetzen(st, aid, x, c.id, typ).gewinn;
-        if (g <= 0) continue;
-        const o = { ziel: c.id, typ, gesamt: t.kosten.gesamt, gewinn: g, k: c.k };
-        if (!best || g / Math.sqrt(o.gesamt) > best.gewinn / Math.sqrt(best.gesamt)) best = o;
+        const o = pruefen(c.id, typ);
+        if (o && (!best || o.gewinn / Math.sqrt(o.gesamt) > best.gewinn / Math.sqrt(best.gesamt))) best = o;
       }
       if (best) kand.push(best);
     }
@@ -992,10 +1311,8 @@
     for (const o of kand) {
       let b = o;
       for (const typ of Object.keys(TYPEN)) {
-        const t = kannFliegen(st, aid, x, o.ziel, typ);
-        if (!t.ok) continue;
-        const g = schaetzen(st, aid, x, o.ziel, typ).gewinn;
-        if (g > b.gewinn) b = { ziel: o.ziel, typ, gesamt: t.kosten.gesamt, gewinn: g, k: o.k };
+        const p = pruefen(o.ziel, typ);
+        if (p && p.gewinn > b.gewinn) b = p;
       }
       stark.push(b);
     }
@@ -1068,14 +1385,17 @@
     const a = st.airlines[aid];
     const tag = tagVon(st);
     const typen = Object.keys(TYPEN).filter((t) => typFrei(st, a, t));
+    const idx = slotIndex(st, a);
     const kandidaten = [];
     for (const c of ALLE) {
       if (c.id === stadt || routeVon(a, stadt, c.id)) continue;
       let best = null;
       for (const typ of typen) {
         if (entfernung(stadt, c.id) > TYPEN[typ].reichweite) continue;
-        const s = schaetzen(st, aid, stadt, c.id, typ);
-        if (!best || s.gewinn > best.gewinn) best = { ...s, typ };
+        const t = flugFinden(st, aid, stadt, c.id, typ, { idx });
+        if (!t.zeiten) continue;                        // dort ist gerade kein Slot zu haben
+        const s = schaetzen(st, aid, stadt, c.id, typ, t.zeiten.ab, t.zeiten.rueck, !t.kosten.frei);
+        if (!best || s.gewinn > best.gewinn) best = { ...s, typ, ab: t.zeiten.ab };
       }
       if (best && best.gewinn > 0) kandidaten.push({ ziel: c.id, ...best });
     }
@@ -1085,12 +1405,12 @@
     gesehen.sort((x, y) => y.schaetzung - x.schaetzung);
     return gesehen.slice(0, 3).map((k) => {
       const n = grundNachfrage(st, stadt, k.ziel, tag);
-      const gaeste = (n.urlaub + n.geschaeft) * wer.macke * rauschen(st, wer.streuung);
+      const gaeste = k.pax * wer.macke * rauschen(st, wer.streuung);
       const geschaeft = Math.round(n.geschaeft / Math.max(1, n.urlaub + n.geschaeft) * 10) * 10;
       const konkurrenz = st.reihenfolge.filter((b) => b !== aid && routeVon(st.airlines[b], stadt, k.ziel)).length;
       let preis = konkurrenz >= 2 ? "angreifen" : geschaeft >= 50 && !konkurrenz ? "abschoepfen" : "normal";
       if (zufall(st) < wer.streuung * 0.6) preis = ["angreifen", "normal", "abschoepfen"][Math.floor(zufall(st) * 3)];
-      return { start: stadt, ziel: k.ziel, typ: k.typ, km: Math.round(entfernung(stadt, k.ziel)), gewinn: spanne(k.schaetzung, wer.streuung), gaeste: spanne(gaeste, wer.streuung), geschaeft, konkurrenz, preis };
+      return { start: stadt, ziel: k.ziel, typ: k.typ, ab: k.ab, km: Math.round(entfernung(stadt, k.ziel)), gewinn: spanne(k.schaetzung, wer.streuung), gaeste: spanne(gaeste, wer.streuung), geschaeft, konkurrenz, preis };
     });
   }
   function preisBericht(st, aid, wer) {
@@ -1139,8 +1459,6 @@
     const schwach = linien.slice(0, Math.min(3, Math.max(0, linien.length - 1))).map(({ r, e, wert }) => {
       const ideen = [];
       for (const stufe of Object.keys(STUFEN)) if (stufe !== r.stufe) ideen.push({ art: "preis", stufe, f: (k) => preisStufe(k, aid, r.id, stufe) });
-      const bk = besteKlassen(st, aid, r.id);
-      if (bk) ideen.push({ art: "sitze", business: bk.business, first: bk.first, f: (k) => klassenSetzen(k, aid, r.id, bk.business, bk.first) });
       if (flugzeugeAuf(a, r.id).length > 1) ideen.push({ art: "abziehen", f: (k) => abziehen(k, aid, r.id) });
       else if (wert < 0) ideen.push({ art: "schliessen", f: (k) => routeSchliessen(k, aid, r.id) });
       let best = null;
@@ -1150,7 +1468,7 @@
         const schaetzung = pr.delta * wer.macke + (rauschen(st, wer.streuung) - 1) * Math.max(5000, Math.abs(e.gewinn) * 0.3);
         if (!best || schaetzung > best.schaetzung) best = { ...idee, schaetzung };
       }
-      const aktion = best && best.schaetzung > 2000 ? { art: best.art, stufe: best.stufe, business: best.business, first: best.first } : null;
+      const aktion = best && best.schaetzung > 2000 ? { art: best.art, stufe: best.stufe } : null;
       return { id: r.id, a: r.a, b: r.b, gewinn: Math.round(wert), auslastung: e.auslastung, aktion, plus: aktion ? spanne(best.schaetzung, wer.streuung) : null };
     });
     return {
@@ -1186,7 +1504,6 @@
     if (!x || !x.aktion || x.erledigt || !a.routen.some((r) => r.id === x.id)) return false;
     const k = x.aktion;
     if (k.art === "preis") preisStufe(st, SPIELER, x.id, k.stufe);
-    else if (k.art === "sitze") klassenSetzen(st, SPIELER, x.id, k.business, k.first);
     else if (k.art === "abziehen") { if (flugzeugeAuf(a, x.id).length < 2) return false; abziehen(st, SPIELER, x.id); }   // nie die Linie nebenbei schließen
     else if (k.art === "schliessen") routeSchliessen(st, SPIELER, x.id);
     x.erledigt = true;
@@ -1223,61 +1540,61 @@
     return landungen;
   }
 
+  // Ortszeit eines Flughafens → Uhr des Spiels (die Uhr zeigt die Zeit an der Heimat des Spielers).
+  const spielUhr = (st, stadt, h) => h - zone(stadt) + zone(st.airlines[SPIELER].basis);
+
   function buchen(st, t0, t1, landungen) {
     const rg = rechnung(st);
     for (const aid of st.reihenfolge) {
       const a = st.airlines[aid];
       for (const r of a.routen) {
         const e = rg.routen[r.id];
-        if (!e) continue;
+        if (!e || !e.legs) continue;
         const proLeg = e.gewinn / e.legs;
-        for (const f of flugzeugeAuf(a, r.id)) {
-          const u = umlauf(f.typ, e.km, a);
-          const takt = 24 / u.legs;
-          const versatz = (f.ab || 0) + u.flug;
-          const n0 = Math.floor((t0 - versatz) / takt), n1 = Math.floor((t1 - versatz) / takt);
-          if (n1 > n0) {
-            const betrag = proLeg * (n1 - n0);
+        for (const fl of e.fluege) {
+          if (!fl.freq) continue;
+          for (const [t, ziel] of [[spielUhr(st, fl.nach, fl.z.an), fl.nach], [spielUhr(st, fl.von, fl.z.heim), fl.von]]) {
+            const n = Math.floor((t1 - t) / 24) - Math.floor((t0 - t) / 24);
+            if (n <= 0) continue;
+            const betrag = proLeg * fl.freq * n;
             a.geld += betrag;
             a.heute = (a.heute || 0) + betrag;
-            if (aid === SPIELER && landungen.length < 60) {
-              const ziel = (n1 % 2 === 0) ? r.b : r.a;
-              landungen.push({ route: r.id, stadt: ziel, betrag });
-            }
+            if (aid === SPIELER && landungen.length < 60) landungen.push({ route: r.id, stadt: ziel, betrag });
           }
         }
       }
     }
   }
 
-  // Lage eines Flugzeugs für die Anzeige: 0..1 entlang der Route und Richtung.
+  // Lage eines Flugzeugs für die Anzeige: 0..1 entlang der Linie (von r.a nach r.b) und Richtung.
   function position(st, aid, f) {
     const a = st.airlines[aid];
-    const r = a.routen.find((x) => x.id === f.route);
-    if (!r) return null;
-    const km = entfernung(r.a, r.b);
-    const u = umlauf(f.typ, km, a);
-    const takt = 24 / u.legs;
-    const t = st.zeit - (f.ab || 0);
-    const n = Math.floor(t / takt);
-    const im = t - n * takt;
-    const hin = ((n % 2) + 2) % 2 === 0;
-    const flugAnteil = Math.min(u.flug, takt * 0.85);
-    const p = Math.min(1, im / flugAnteil);
-    const amBoden = im >= flugAnteil;
-    return { r, anteil: hin ? p : 1 - p, hin, amBoden };
+    let boden = null;
+    for (const F of a.fluege) {
+      if (F.f !== f.id) continue;
+      const z = zeitenVon(a, F);
+      const r = a.routen.find((x) => x.id === F.route);
+      if (!z || !r) continue;
+      const vorn = F.von === r.a;                       // fliegt der Hinflug in Richtung a→b?
+      const g1 = spielUhr(st, F.von, z.ab), g2 = spielUhr(st, F.nach, z.rueck);
+      const p1 = uhr24(st.zeit - g1), p2 = uhr24(st.zeit - g2);
+      if (p1 < z.flug) { const p = p1 / z.flug; return { r, anteil: vorn ? p : 1 - p, hin: vorn, amBoden: false, flug: F }; }
+      if (p2 < z.flug) { const p = p2 / z.flug; return { r, anteil: vorn ? 1 - p : p, hin: !vorn, amBoden: false, flug: F }; }
+      if (p1 >= z.flug && p1 < uhr24(g2 - g1)) boden = { r, anteil: vorn ? 1 : 0, hin: vorn, amBoden: true, flug: F };
+      else if (!boden) boden = { r, anteil: vorn ? 0 : 1, hin: !vorn, amBoden: true, flug: F };
+    }
+    return boden;
   }
 
   function ablaufen(st) {
     const vorher = st.gelegenheiten.length;
     for (const g of st.gelegenheiten) {
-      if (g.bis <= st.zeit && g.art === "auktion") auktionVerloren(st, g);
-      if (g.bis <= st.zeit && g.art === "versteigerung") versteigerungAuswerten(st, g);
       if (g.bis <= st.zeit && g.art === "wahl") { g.bis = st.zeit + 1; wahlTreffen(st, g.id, false); }   // nichts gewählt: es kommt, wie es kommt
-      if (g.bis <= st.zeit && g.art === "aufkauf" && g.pleite) rivalNeustart(st, g.aid);
     }
     st.gelegenheiten = st.gelegenheiten.filter((g) => g.bis > st.zeit);
     if (st.gelegenheiten.length !== vorher) geaendert(st);
+    // Gebotsfristen: Wer bekommt den Slot?
+    for (const s of st.pool.slice()) if (s.bis != null && s.bis <= st.zeit) poolAuswerten(st, s);
   }
 
   function melden(st, m) { st.meldungen.push(Object.assign({ tag: tagVon(st) }, m)); }
@@ -1339,14 +1656,39 @@
     if (tag + 1 >= REGELN.rivalenAb) for (const aid of ["k", "s", "a"]) if (!st.airlines[aid].konkurs) kiTag(st, aid);
     spannungTag(st, tag + 1);
     // Saisonende: Slots prüfen.
-    if (tag % REGELN.saisonTage === 0 && tag >= REGELN.ersteSlotPruefung) { slotsPruefen(st, tag); versteigerungAnlegen(st); }
-    else if (tag % REGELN.saisonTage === 0) melden(st, { art: "saison", text: "Neue Jahreszeit: " + saison(tag + 1).name });
+    if (tag % REGELN.saisonTage === 0) slotsPruefen(st, tag);
+    else if (tageBisSaisonende(tag) === 2) slotsWarnen(st, tag);
+    wirkungMelden(st, tag);
     // Kerosin, Messen, Gelegenheiten.
     neuerTag(st, tag + 1);
     rangPruefen(st);
     zielPruefen(st);
     beraterTag(st);
     geaendert(st);
+  }
+
+  // Am Morgen danach: Was hat die Änderung von gestern wirklich gebracht? Gerechnet wird gegen "alles wie vorher".
+  function wirkungMelden(st, tag) {
+    const p = st.airlines[SPIELER];
+    const liste = (p.vermerke || []).filter((v) => v.tag <= tag);
+    p.vermerke = (p.vermerke || []).filter((v) => v.tag > tag);
+    if (!liste.length || !p.fluege.length) return;
+    const jetzt = berechnen(st, tag);
+    st.wirkungenGestern = [];
+    for (const v of liste.slice(-3)) {
+      const k = klonen(st);
+      const kp = k.airlines[SPIELER];
+      if (v.art === "preis") { const r = kp.routen.find((x) => x.id === v.rid); if (!r) continue; r.stufe = v.alt; }
+      else if (v.art === "grundsatz") kp.grundsaetze = { ...kp.grundsaetze, [v.k]: v.alt };
+      else if (v.art === "kabine") { const f = kp.flotte.find((x) => x.id === v.fid); if (!f) continue; f.kabine = v.alt; }
+      else continue;
+      const alt = berechnen(k, tag);
+      const dG = Math.round((jetzt.summe[SPIELER] - alt.summe[SPIELER]) / 100) * 100;
+      const dP = Math.round(jetzt.gaeste[SPIELER] - alt.gaeste[SPIELER]);
+      const w = { text: v.text, gewinn: dG, gaeste: dP };
+      st.wirkungenGestern.push(w);
+      melden(st, { art: "wirkung", gut: dG >= 0, text: `${v.text}: ${dP >= 0 ? dP + " Gäste mehr" : -dP + " Gäste weniger"} am Tag, Gewinn ${dG >= 0 ? "+" : "−"}${Math.abs(dG).toLocaleString("de-DE")} €.` });
+    }
   }
 
   function pleitePruefen(st) {
@@ -1394,77 +1736,26 @@
     return true;
   }
 
-  // ---------- Saison: Slots laufen aus ----------
-  function slotsPruefen(st, tag) {
-    melden(st, { art: "saison", text: "Saisonende: Landerechte werden neu vergeben. Neue Jahreszeit: " + saison(tag + 1).name });
-    for (const aid of st.reihenfolge) {
-      const a = st.airlines[aid];
-      for (const stadt of Object.keys(a.slots)) {
-        const genutzt = slotsGenutzt(a, stadt);
-        const schutz = stadt === a.basis ? REGELN.startSlots : 0;
-        const ungenutzt = a.slots[stadt] - Math.max(genutzt, schutz);
-        if (ungenutzt > 0) {
-          a.slots[stadt] -= ungenutzt;
-          if (aid === SPIELER) melden(st, { art: "slotweg", text: `${ungenutzt} ungenutzte${ungenutzt > 1 ? "" : "s"} Landerecht${ungenutzt > 1 ? "e" : ""} in ${STADT[stadt].name} zurückgegeben.` });
-        }
-        if (!a.slots[stadt]) delete a.slots[stadt];
-      }
-      // Schwach genutzte Routen: ein Slot geht in die Versteigerung.
-      for (const r of a.routen) {
-        if (r.auslastung == null || r.auslastung >= REGELN.slotGutAb || tag - r.seit < 4) continue;
-        const stadt = STADT[r.a].k >= STADT[r.b].k ? r.a : r.b;
-        if (STADT[stadt].k === 1) continue;            // an kleinen Flughäfen gibt es genug
-        const preis = slotPreis(st, stadt);
-        if (aid === SPIELER) {
-          st.gelegenheiten.push({ id: "g" + st.naechsteGel++, art: "auktion", stadt, route: r.id, preis, bis: st.zeit + 10, dauer: 10 });
-        } else {
-          const e = rechnung(st).routen[r.id];
-          if (e && e.wert > 0 && a.geld > preis * 2) a.geld -= preis;
-          else { abziehen(st, aid, r.id); a.slots[stadt] = Math.max(0, (a.slots[stadt] || 0) - 1); }
-        }
-      }
-    }
-  }
-  function auktionVerloren(st, g) {
-    const p = st.airlines[SPIELER];
-    const r = p.routen.find((x) => x.id === g.route);
-    const letztes = r && flugzeugeAuf(p, r.id).length === 1;
-    if (r) abziehen(st, SPIELER, r.id);
-    p.slots[g.stadt] = Math.max(0, (p.slots[g.stadt] || 0) - 1);
-    // Ein Rivale schnappt sich den Slot gern.
-    const k = st.airlines.k;
-    if (slotsFrei(st, g.stadt) > 0) k.slots[g.stadt] = (k.slots[g.stadt] || 0) + 1;
-    melden(st, { art: "slotverloren", text: `Landerecht in ${STADT[g.stadt].name} verloren. Ein Flugzeug steht jetzt frei.` + (letztes ? ` Die Linie ${STADT[r.a].name}–${STADT[r.b].name} ist damit geschlossen.` : "") });
-    geaendert(st);
-  }
 
-  // ---------- Neuer Tag: Kerosin, Messen, Gelegenheiten ----------
+  // ---------- Neuer Tag: Kerosin, Messen, Slots, Gelegenheiten ----------
   function neuerTag(st, tag) {
     if (st.kerosinBis && tag > st.kerosinBis) { st.kerosin = 1; st.kerosinBis = 0; melden(st, { art: "kerosin", text: "Kerosin kostet wieder normal." }); }
     st.messen = st.messen.filter((m) => m.bis >= tag);
+    slotsNachschub(st, tag);
+    slotAngebot(st, tag);
     if (tag < REGELN.gelegenheitAb) return;
-    const offen = st.gelegenheiten.filter((g) => ["slot", "gebraucht", "messe", "kerosin", "wahl"].includes(g.art)).length;
-    if (offen < 2 && zufall(st) < 0.7) {
+    const offen = st.gelegenheiten.filter((g) => ["messe", "kerosin", "wahl"].includes(g.art)).length;
+    if (offen < 2 && zufall(st) < 0.6) {
       if (tag >= REGELN.wahlAb && !st.gelegenheiten.some((g) => g.art === "wahl") && zufall(st) < 0.3) wahlAnlegen(st, tag);
       else gelegenheitErzeugen(st, tag);
     }
   }
 
   function gelegenheitErzeugen(st, tag) {
-    const p = st.airlines[SPIELER];
-    const arten = ["slot", "gebraucht", "messe", "messe"].concat(st.kerosinBis ? [] : ["kerosin"]);
+    const arten = ["messe", "messe"].concat(st.kerosinBis ? [] : ["kerosin"]);
     const art = waehle(st, arten);
     const id = "g" + st.naechsteGel++;
-    if (art === "slot") {
-      const voll = STAEDTE.filter((s) => s.k >= 2 && slotsFrei(st, s.id) <= 3 && !st.gelegenheiten.some((g) => g.stadt === s.id));
-      const s = voll.length ? waehle(st, voll) : waehle(st, STAEDTE.filter((x) => x.k === 3));
-      const preis = Math.round(REGELN.slotPreis[s.k] * 1.2 / 10000) * 10000;
-      st.gelegenheiten.push({ id, art, stadt: s.id, preis, bis: st.zeit + 9, dauer: 9 });
-    } else if (art === "gebraucht") {
-      const typen = Object.keys(TYPEN).filter((t) => typFrei(st, p, t));
-      const typ = waehle(st, typen);
-      st.gelegenheiten.push({ id, art, typ, preis: Math.round(TYPEN[typ].preis * 0.55 / 10000) * 10000, bis: st.zeit + 8, dauer: 8 });
-    } else if (art === "messe") {
+    if (art === "messe") {
       const s = waehle(st, STAEDTE.filter((x) => x.w >= 0.35 && !st.messen.some((m) => m.stadt === x.id)));
       const m = { stadt: s.id, von: tag + 1, bis: tag + 3 };
       st.messen.push(m);
@@ -1480,13 +1771,8 @@
   function gelegenheitAnnehmen(st, gid) {
     const g = st.gelegenheiten.find((x) => x.id === gid);
     if (!g || g.info) return { ok: false };
-    const p = st.airlines[SPIELER];
-    if (p.geld < g.preis) return { ok: false, grund: "geld" };
-    p.geld -= g.preis;
-    if (g.art === "aufkauf") { p.geld += g.preis; if (!aufkaufen(st, g)) return { ok: false, grund: "geld" }; }
-    else if (g.art === "slot") p.slots[g.stadt] = (p.slots[g.stadt] || 0) + 1;
-    else if (g.art === "gebraucht") flugzeugHinzu(p, g.typ);
-    // Auktion: Slot bleibt, nichts weiter zu tun.
+    if (g.art === "slotangebot") { if (!slotAngebotAnnehmen(st, g)) return { ok: false }; }
+    else return { ok: false };
     st.gelegenheiten = st.gelegenheiten.filter((x) => x !== g);
     geaendert(st);
     return { ok: true, g };
@@ -1494,8 +1780,6 @@
   function gelegenheitAblehnen(st, gid) {
     const g = st.gelegenheiten.find((x) => x.id === gid);
     if (!g) return false;
-    if (g.art === "auktion") auktionVerloren(st, g);
-    if (g.art === "aufkauf" && g.pleite) rivalNeustart(st, g.aid);
     st.gelegenheiten = st.gelegenheiten.filter((x) => x !== g);
     geaendert(st);
     return true;
@@ -1505,7 +1789,7 @@
   function flottenWert(a) { return a.flotte.reduce((s, f) => s + TYPEN[f.typ].preis * REGELN.verkaufAnteil, 0); }
   function slotWert(a) {
     let s = 0;
-    for (const [stadt, n] of Object.entries(a.slots)) s += n * REGELN.slotPreis[STADT[stadt].k] * 0.5;
+    for (const x of a.slots) s += (x.heim ? heimPreis(x.stadt, x.h) : slotGrundpreis(x.stadt, x.h)) * 0.5;
     return s;
   }
   // Verwaltung: die ersten Linien sind frei, danach kostet jede weitere mehr (Büro, Planung, Personal).
@@ -1525,6 +1809,7 @@
     return { ok: true, preis };
   }
   // Umrüsten: ein Flugzeug der Linie gegen einen größeren Typ tauschen. Das alte wird verkauft.
+  // Geht nur, wenn das neue alle Flüge des alten zeitlich schafft.
   function umruestenKosten(st, aid, rid, typ) {
     const a = st.airlines[aid];
     const fs = flugzeugeAuf(a, rid);
@@ -1532,14 +1817,30 @@
     const alt = fs.slice().sort((x, y) => TYPEN[x.typ].sitze - TYPEN[y.typ].sitze)[0];
     return { alt, preis: Math.max(0, TYPEN[typ].preis - Math.round(TYPEN[alt.typ].preis * REGELN.umruestenAnteil)) };
   }
+  function umruestenGeht(st, aid, f, typ) {
+    const a = st.airlines[aid];
+    const plan = [];
+    for (const F of fluegeVon(a, f.id)) {
+      if (entfernung(F.von, F.nach) > TYPEN[typ].reichweite) return false;
+      const z = zeiten(a, F.von, F.nach, typ, slotVon(a, F.s1).h, slotVon(a, F.s2).h);
+      if (!z.passt) return false;
+      plan.push(z);
+    }
+    if (plan.length > 1 && plan.some((z) => z.dauer > 24)) return false;
+    for (let i = 0; i < plan.length; i++) for (let j = i + 1; j < plan.length; j++) if (ueberlappt(plan[i].ab, plan[i].dauer, plan[j].ab, plan[j].dauer)) return false;
+    return true;
+  }
   function umruesten(st, aid, rid, typ) {
     const a = st.airlines[aid];
     const r = a.routen.find((x) => x.id === rid);
-    if (!r || !TYPEN[typ] || !typFrei(st, a, typ) || entfernung(r.a, r.b) > TYPEN[typ].reichweite) return { ok: false };
+    if (!r || !TYPEN[typ] || !typFrei(st, a, typ)) return { ok: false };
     const k = umruestenKosten(st, aid, rid, typ);
     if (!k || TYPEN[typ].sitze <= TYPEN[k.alt.typ].sitze || a.geld < k.preis) return { ok: false };
+    if (!umruestenGeht(st, aid, k.alt, typ)) return { ok: false, grund: "zeit" };
     a.geld -= k.preis;
     k.alt.typ = typ;
+    const g = kabineGrenzen(typ);
+    k.alt.kabine = { business: Math.min(g.business, k.alt.kabine.business), first: Math.min(g.first, k.alt.kabine.first) };
     geaendert(st);
     return { ok: true, preis: k.preis };
   }
@@ -1572,7 +1873,7 @@
         if (aid === SPIELER) {
           st.stufe = stufe;
           const neu = Object.keys(TYPEN).filter((t) => TYPEN[t].stufe === stufe);
-          melden(st, { art: "stufe", text: "Neu im Store: " + neu.map((t) => TYPEN[t].name).join(", ") + (stufe === 2 ? ". Damit geht es über den Atlantik!" : stufe === 3 ? ". Damit fliegst du um die halbe Welt!" : "."), typ: neu[0] });
+          melden(st, { art: "stufe", text: "Neue Flugzeuge: " + neu.map((t) => TYPEN[t].name).join(", ") + (stufe === 2 ? ". Damit geht es über den Atlantik!" : stufe === 3 ? ". Damit fliegst du um die halbe Welt!" : "."), typ: neu[0] });
         }
       }
     }
@@ -1586,18 +1887,20 @@
   const heimRouten = (p) => p.routen.filter((r) => r.a === p.basis || r.b === p.basis).length;
   const ZIELE = [
     { id: "kaufen", text: "Starte deine erste Linie: Tippe hier", ist: (st, p) => p.flotte.length, soll: 1, belohnung: 0 },
-    { id: "route", text: "Eröffne deine erste Linie im ✏️ Editor", ist: (st, p) => p.routen.length, soll: 1, belohnung: 0 },
-    { id: "gewinn", text: "Mach einen Tag mit Gewinn", ist: (st, p) => (p.verlauf.some((v) => v > 0) ? 1 : 0), soll: 1, belohnung: 200000 },
-    { id: "drehkreuz", text: "Drei Linien ab deiner Heimat: dein Drehkreuz", ist: (st, p) => heimRouten(p), soll: 3, belohnung: 500000 },
-    { id: "flotte5", text: "Baue eine Flotte aus 5 Flugzeugen", ist: (st, p) => p.flotte.length, soll: 5, belohnung: 500000 },
-    { id: "wert10", text: "Firmenwert 10 Mio", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 10, belohnung: 1000000, mio: true },
-    { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st) => (platz(st) <= 3 ? 1 : 0), soll: 1, belohnung: 1000000 },
-    { id: "wert30", text: "Firmenwert 30 Mio: der A321neo schafft den Atlantik", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 30, belohnung: 2000000, mio: true },
-    { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st) => (platz(st) <= 2 ? 1 : 0), soll: 1, belohnung: 2000000 },
-    { id: "kontinent", text: "Fliege auf einen anderen Kontinent", ist: (st, p) => p.routen.filter((r) => STADT[r.a].r !== STADT[r.b].r).length, soll: 1, belohnung: 3000000 },
-    { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st) => (platz(st) === 1 ? 1 : 0), soll: 1, belohnung: 5000000 },
-    { id: "wert100", text: "Firmenwert 100 Mio: die Boeing 787", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 100, belohnung: 5000000, mio: true },
-    { id: "kontinente4", text: "Fliege auf vier Kontinente", ist: (st, p) => new Set(p.routen.flatMap((r) => [STADT[r.a].r, STADT[r.b].r])).size, soll: 4, belohnung: 8000000 },
+    { id: "route", text: "Eröffne deine erste Linie", ist: (st, p) => p.routen.length, soll: 1, belohnung: 0 },
+    { id: "gewinn", text: "Mach einen Tag mit Gewinn", ist: (st, p) => (p.verlauf.some((v) => v > 0) ? 1 : 0), soll: 1, belohnung: 100000 },
+    { id: "zweiterFlug", text: "Lass ein Flugzeug zweimal am Tag fliegen", ist: (st, p) => Math.max(0, ...p.flotte.map((f) => fluegeVon(p, f.id).length)), soll: 2, belohnung: 200000 },
+    { id: "drehkreuz", text: "Drei Linien ab deiner Heimat: dein Drehkreuz", ist: (st, p) => heimRouten(p), soll: 3, belohnung: 200000 },
+    { id: "bieten", text: "Gewinne einen Slot beim Bieten", ist: (st, p) => (p.geboten ? 1 : 0), soll: 1, belohnung: 200000 },
+    { id: "flotte5", text: "Baue eine Flotte aus 5 Flugzeugen", ist: (st, p) => p.flotte.length, soll: 5, belohnung: 400000 },
+    { id: "wert5", text: "Firmenwert 5 Mio", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 5, belohnung: 400000, mio: true },
+    { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st) => (platz(st) <= 3 ? 1 : 0), soll: 1, belohnung: 400000 },
+    { id: "wert10", text: "Firmenwert 10 Mio: der A321neo schafft den Atlantik", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 10, belohnung: 800000, mio: true },
+    { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st) => (platz(st) <= 2 ? 1 : 0), soll: 1, belohnung: 800000 },
+    { id: "kontinent", text: "Fliege auf einen anderen Kontinent", ist: (st, p) => p.routen.filter((r) => STADT[r.a].r !== STADT[r.b].r).length, soll: 1, belohnung: 1200000 },
+    { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st) => (platz(st) === 1 ? 1 : 0), soll: 1, belohnung: 2000000 },
+    { id: "wert35", text: "Firmenwert 35 Mio: die Boeing 787", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 35, belohnung: 2000000, mio: true },
+    { id: "kontinente4", text: "Fliege auf vier Kontinente", ist: (st, p) => new Set(p.routen.flatMap((r) => [STADT[r.a].r, STADT[r.b].r])).size, soll: 4, belohnung: 3000000 },
   ];
   // Danach endlos: Firmenwert verdoppeln.
   function zielAktuell(st) {
@@ -1606,7 +1909,7 @@
     // Im späten Spiel wechseln sich Firmenwert und Optimier-Ziele ab: lieber gut als viel.
     if (i % 2 === 0) return spaetesZiel(i / 2);
     const stufe = (i - 1) / 2;
-    const soll = 200 * 2 ** stufe;
+    const soll = 70 * 2 ** stufe;
     return { id: "wert" + soll, text: `Firmenwert ${soll} Mio`, ist: (s) => Math.round(firmenwert(s, SPIELER) / 1e5) / 10, soll, belohnung: soll * 50000, mio: true };
   }
   function linienWerte(st, p) {
@@ -1616,11 +1919,11 @@
   function spaetesZiel(j) {
     const stufe = Math.floor(j / 4);
     const art = j % 4;
-    if (art === 0) return { id: "rot" + j, text: "Keine rote Linie mehr: alle Linien im Plus", ist: (st, p) => (p.routen.length && linienWerte(st, p).every((e) => e.wert > 0) ? 1 : 0), soll: 1, belohnung: 4000000 * (stufe + 1) };
-    if (art === 1) { const soll = Math.min(95, 80 + 5 * stufe); return { id: "auslastung" + j, text: `Volle Flieger: im Schnitt ${soll} % Auslastung`, ist: (st, p) => { const w = linienWerte(st, p); return w.length ? Math.round(w.reduce((s2, e) => s2 + Math.min(1, e.auslastung), 0) / w.length * 100) : 0; }, soll, belohnung: 5000000 * (stufe + 1), einheit: "%" }; }
-    if (art === 2) { const soll = Math.min(100, 80 + 5 * stufe); return { id: "ruf" + j, text: `Bester Ruf: ⭐ ${soll} erreichen`, ist: (st, p) => Math.round(p.ruf), soll, belohnung: 5000000 * (stufe + 1) }; }
-    const soll = 100 * 2 ** stufe;
-    return { id: "proLinie" + j, text: `Starke Linien: im Schnitt ${soll} Tsd Gewinn pro Linie am Tag`, ist: (st, p) => { const w = linienWerte(st, p); return w.length ? Math.round(w.reduce((s2, e) => s2 + e.wert, 0) / w.length / 1000) : 0; }, soll, belohnung: 6000000 * (stufe + 1) };
+    if (art === 0) return { id: "rot" + j, text: "Keine rote Linie mehr: alle Linien im Plus", ist: (st, p) => (p.routen.length && linienWerte(st, p).every((e) => e.wert > 0) ? 1 : 0), soll: 1, belohnung: 1500000 * (stufe + 1) };
+    if (art === 1) { const soll = Math.min(95, 80 + 5 * stufe); return { id: "auslastung" + j, text: `Volle Flieger: im Schnitt ${soll} % Auslastung`, ist: (st, p) => { const w = linienWerte(st, p); return w.length ? Math.round(w.reduce((s2, e) => s2 + Math.min(1, e.auslastung), 0) / w.length * 100) : 0; }, soll, belohnung: 2000000 * (stufe + 1), einheit: "%" }; }
+    if (art === 2) { const soll = Math.min(100, 80 + 5 * stufe); return { id: "ruf" + j, text: `Bester Ruf: ⭐ ${soll} erreichen`, ist: (st, p) => Math.round(p.ruf), soll, belohnung: 2000000 * (stufe + 1) }; }
+    const soll = 50 * 2 ** stufe;
+    return { id: "proLinie" + j, text: `Starke Linien: im Schnitt ${soll} Tsd Gewinn pro Linie am Tag`, ist: (st, p) => { const w = linienWerte(st, p); return w.length ? Math.round(w.reduce((s2, e) => s2 + e.wert, 0) / w.length / 1000) : 0; }, soll, belohnung: 2500000 * (stufe + 1) };
   }
   function zielStand(st) {
     const z = zielAktuell(st);
@@ -1634,7 +1937,7 @@
       const z = zielAktuell(st);
       if (z.ist(st, p) < z.soll) break;
       p.geld += z.belohnung;
-      melden(st, { art: "ziel", text: "Ziel geschafft: " + z.text + (z.belohnung ? " · Prämie " + Math.round(z.belohnung / 1e5) / 10 + " Mio" : ""), ziel: z.id, belohnung: z.belohnung });
+      melden(st, { art: "ziel", text: "Ziel geschafft: " + z.text + (z.belohnung ? " · Prämie " + (z.belohnung >= 1e6 ? String(Math.round(z.belohnung / 1e5) / 10).replace(".", ",") + " Mio" : Math.round(z.belohnung / 1000) + " Tsd") : ""), ziel: z.id, belohnung: z.belohnung });
       st.ziel++;
     }
   }
@@ -1654,46 +1957,71 @@
     for (const r of a.routen.slice()) {
       if (r.minus >= 3) {
         abziehen(st, aid, r.id);
-        if (aid !== SPIELER && zufall(st) < 0.5) melden(st, { art: "rivale", text: `${a.name} gibt ${STADT[r.a].name}–${STADT[r.b].name} auf.`, wer: aid });
+        if (aid !== SPIELER && zufall(st) < 0.5) melden(st, { art: "rivale", text: `${a.name} streicht einen Flug ${STADT[r.a].name}–${STADT[r.b].name}.`, wer: aid });
       }
     }
-    if (a.geld < 0) {
-      // Not: freie Flugzeuge verkaufen.
-      for (const f of freieFlugzeuge(a)) if (a.geld < 0) verkaufen(st, aid, f.id);
-      return;
+    // Flugzeuge ohne Flug kosten nur Geld: nach ein paar Tagen weg damit.
+    for (const f of freieFlugzeuge(a)) {
+      f.leer = (f.leer || 0) + 1;
+      if (a.geld < 0 || f.leer > 6) verkaufen(st, aid, f.id);
     }
+    for (const f of a.flotte) if (a.fluege.some((x) => x.f === f.id)) f.leer = 0;
+    if (a.geld < 0) return;
     // Ab und zu ein zweites Drehkreuz.
-    if (aid !== SPIELER && tagVon(st) >= REGELN.aufkaufAb && zufall(st) < 0.08) {
+    if (tagVon(st) >= REGELN.aufkaufAb && zufall(st) < 0.08) {
       const h = drehkreuze(a).find((c) => kannAusbauen(st, aid, c) && a.geld > 3 * drehkreuzPreis(st, aid, c));
       if (h) drehkreuzAusbauen(st, aid, h);
     }
     const stil = STIL[a.stil] || STIL.bot;
     for (let i = 0; i < stil.proTag; i++) if (!kiAusbauen(st, aid)) break;
+    if (stil.proTag) kiAufruesten(st, aid);
+  }
+
+  // Slots sind knapp: Wo mehr Gäste als Plätze da sind, kommt ein größeres Flugzeug auf die Linie.
+  function kiAufruesten(st, aid) {
+    const a = st.airlines[aid];
+    const stil = STIL[a.stil] || STIL.bot;
+    const rg = rechnung(st);
+    let best = null;
+    for (const r of a.routen) {
+      const e = rg.routen[r.id];
+      if (!e || e.bedarf < e.sitzePlaetze * 1.2) continue;
+      for (const typ of stil.typen) {
+        if (!typFrei(st, a, typ)) continue;
+        const k = umruestenKosten(st, aid, r.id, typ);
+        if (!k || TYPEN[typ].sitze <= TYPEN[k.alt.typ].sitze || k.preis > a.geld - stil.reserve) continue;
+        const pr = probe(st, aid, (kopie) => umruesten(kopie, aid, r.id, typ));
+        if (!pr || pr.delta <= 0 || k.preis / pr.delta > stil.amortisation) continue;
+        if (!best || pr.delta / (k.preis + 1) > best.wert) best = { rid: r.id, typ, wert: pr.delta / (k.preis + 1) };
+      }
+    }
+    if (best) umruesten(st, aid, best.rid, best.typ);
+    return !!best;
   }
 
   function kiAusbauen(st, aid, opt) {
     const a = st.airlines[aid];
     const stil = STIL[a.stil] || STIL.bot;
     const reserve = opt && opt.start ? 0 : stil.reserve;
-    if (a.geld < reserve + 200000) return false;
+    if (a.geld < reserve + 100000) return false;
     const kandidaten = kiKandidaten(st, aid, reserve);
     // Die besten drei genau prüfen.
     for (const c of kandidaten.slice(0, 3)) {
-      const pr = probe(st, aid, (kopie) => fliegen(kopie, aid, c.x, c.y, c.typ));
+      const pr = probe(st, aid, (kopie) => flugAnlegen(kopie, aid, c.plan));
       if (!pr) continue;
-      const kost = kostenFuer(st, aid, c.x, c.y, c.typ).gesamt;
-      if (pr.delta > 0 && (kost / pr.delta) <= stil.amortisation) {
-        kiFliegen(st, aid, c.x, c.y, c.typ, opt);
+      if (pr.delta > 0 && (c.kosten / (pr.delta * c.umlaeufe)) <= stil.amortisation) {
+        kiFliegen(st, aid, c.plan, opt);
         return true;
       }
     }
     return false;
   }
   // Fliegt los und reagiert, wenn das eine Strecke des Spielers ist: Preiskampf.
-  function kiFliegen(st, aid, x, y, typ, opt) {
+  function kiFliegen(st, aid, plan, opt) {
     const a = st.airlines[aid];
+    const x = plan.x, y = plan.y;
     const neu = !routeVon(a, x, y);
-    const res = fliegen(st, aid, x, y, typ);
+    const res = flugAnlegen(st, aid, plan);
     if (!res.ok) return res;
     const p = st.airlines[SPIELER];
     const pr = routeVon(p, x, y);
@@ -1710,45 +2038,37 @@
     }
     return res;
   }
-  function kiKandidaten(st, aid, reserve) {
+  // Welche Flüge kämen in Frage? Nur dorthin, wo die Airline einen Slot hat oder sofort einen bekommt.
+  function kiKandidaten(st, aid, reserve, ohneGeld) {
     const a = st.airlines[aid];
     const stil = STIL[a.stil] || STIL.bot;
-    const orte = new Set([a.basis]);
-    for (const r of a.routen) { orte.add(r.a); orte.add(r.b); }
     const kandidaten = [];
     const typen = stil.typen.filter((t) => typFrei(st, a, t));
-    // Kosten je Stadt und Typ nur einmal ausrechnen (sonst wird das späte Spiel zäh).
-    const slotKost = new Map();
-    const slotVon = (s) => {
-      if (!slotKost.has(s)) slotKost.set(s, slotsUebrig(a, s) > 0 ? { preis: 0, fehlt: false } : { preis: slotPreis(st, s), fehlt: !heimatPlatz(a, s) && slotsFrei(st, s) <= 0 });
-      return slotKost.get(s);
-    };
-    const flugzeugPreis = {};
-    for (const typ of typen) flugzeugPreis[typ] = freieFlugzeuge(a).some((f) => f.typ === typ) ? 0 : TYPEN[typ].preis;
-    const budget = a.geld - reserve;
+    const idx = slotIndex(st, a);
+    const budget = ohneGeld ? Infinity : a.geld - reserve;
     const maxWeite = Math.max(0, ...typen.map((t) => TYPEN[t].reichweite));
     const verwZusatz = verwaltungKosten(a, a.routen.length + 1) - verwaltungKosten(a);   // eine neue Linie kostet auch Verwaltung
-    for (const x of orte) {
-      const sx = slotVon(x);
-      if (sx.fehlt) continue;
-      for (const s of staedte(st)) {
-        const y = s.id;
+    const ziele = new Set([...Object.keys(idx.eigene), ...Object.keys(idx.pool), a.basis, ...(a.ausgebaut || [])]);
+    for (const x of new Set([a.basis, ...(a.ausgebaut || [])])) {
+      for (const y of ziele) {
         if (y === x) continue;
         const km = entfernung(x, y);
         if (km > maxWeite) continue;
-        const sy = slotVon(y);
-        if (sy.fehlt) continue;
         for (const typ of typen) {
           if (km > TYPEN[typ].reichweite) continue;
-          const k = { gesamt: flugzeugPreis[typ] + sx.preis + sy.preis };
-          if (k.gesamt > budget) continue;
-          const sch = schaetzen(st, aid, x, y, typ);
+          const t = flugFinden(st, aid, x, y, typ, { idx });
+          if (!t.plan || (!t.ok && !(ohneGeld && t.grund === "geld"))) continue;
+          if (t.kosten.gesamt > budget) continue;
+          const sch = schaetzen(st, aid, x, y, typ, t.zeiten.ab, t.zeiten.rueck, !t.kosten.frei);
           if (verwZusatz && !routeVon(a, x, y)) sch.gewinn -= verwZusatz;
-          if (sch.gewinn <= 0 || sch.auslastung < 0.45) continue;
+          if (sch.gewinn <= 0 || sch.auslastung < 0.4) continue;
           const vorliebe = stil.klasse[STADT[y].k] * (a.stil === "premium" ? 0.6 + (STADT[x].w + STADT[y].w) : 1) * (x === a.basis ? 1.15 : 1);
-          const tage = (k.gesamt + 1) / sch.gewinn;
+          // Ein neues Flugzeug schafft später mehrere Flüge am Tag: Das rechnet die Airline beim Kauf mit ein.
+          const umlaeufe = t.kosten.frei ? 1 : Math.max(1, Math.min(3, Math.floor(18 / t.zeiten.dauer)));
+          const tage = (t.kosten.gesamt + 1) / (sch.gewinn * umlaeufe);
           if (tage > stil.amortisation * 1.5) continue;
-          kandidaten.push({ x, y, typ, wert: (sch.gewinn * vorliebe) / Math.max(k.gesamt, 300000), tage, sch });
+          t.plan.kabine = kabineStandard(typ, a);
+          kandidaten.push({ x, y, typ, plan: t.plan, kosten: t.kosten.gesamt, umlaeufe, wert: (sch.gewinn * umlaeufe * vorliebe) / Math.max(t.kosten.gesamt, 150000), tage, sch });
         }
       }
     }
@@ -1771,7 +2091,8 @@
         melden(st, { art: "zuvor", wer: pl.aid, text: `🏁 Du warst schneller! ${a.name} verzichtet auf ${STADT[pl.x].name}–${STADT[pl.y].name}.` });
         p.ruf = Math.min(REGELN.rufMax, p.ruf + 2);
       } else if (!a.konkurs) {
-        const res = kiFliegen(st, pl.aid, pl.x, pl.y, pl.typ);
+        const t = flugFinden(st, pl.aid, pl.x, pl.y, pl.typ);
+        const res = t.ok ? kiFliegen(st, pl.aid, Object.assign(t.plan, { kabine: kabineStandard(pl.typ, a) })) : t;
         if (res.ok) melden(st, { art: "rivale", wer: pl.aid, text: `${a.name} fliegt jetzt wie angekündigt ${STADT[pl.x].name}–${STADT[pl.y].name}.` });
       }
     }
@@ -1832,49 +2153,320 @@
     return true;
   }
 
-  // Versteigerung am Saisonende: neue Landerechte an einem begehrten Flughafen, verdeckt geboten.
-  function versteigerungAnlegen(st) {
-    const p = st.airlines[SPIELER];
-    const nah = new Set([p.basis, ...p.routen.flatMap((r) => [r.a, r.b])]);
-    const kandidaten = ALLE.filter((c) => (c.k >= 2 || nah.has(c.id)) && (nah.has(c.id) || entfernung(p.basis, c.id) < 1500));
-    if (!kandidaten.length) return;
-    const knapp = kandidaten.sort((x, y) => slotsFrei(st, x.id) - slotsFrei(st, y.id) || y.g - x.g).slice(0, 4);
-    const c = waehle(st, knapp);
-    const stufe = Math.max(100000, Math.round(REGELN.slotPreis[c.k] * 1.5 / 50000) * 50000);
-    neueGel(st, { art: "versteigerung", stadt: c.id, stufe, gebot: 0, bis: st.zeit + 24, dauer: 24 });
-    melden(st, { art: "versteigerung", stadt: c.id, text: `🏛️ Versteigerung in ${c.name}: ${REGELN.versteigerungStueck} neue Landerechte. Biete verdeckt bis morgen.` });
+  // ---------- Slots: bieten, verlieren, handeln ----------
+  const fremdeSlots = (a, stadt) => a.slots.filter((s) => s.stadt === stadt && !s.heim).length;
+  // Von wo aus könnte die Airline einen Slot in dieser Stadt nutzen? Heimat, Drehkreuze und Orte mit einem freien eigenen Slot.
+  function startorte(st, a) {
+    const orte = new Set([a.basis, ...(a.ausgebaut || [])]);
+    const b = benutzteSlots(a);
+    for (const s of a.slots) if (!s.heim && !b.has(s.id)) orte.add(s.stadt);
+    return [...orte];
   }
-  function bieten(st, gid, stufen) {
-    const g = st.gelegenheiten.find((x) => x.id === gid && x.art === "versteigerung");
-    if (!g) return false;
-    g.gebot = Math.max(0, Math.min(3, stufen | 0));
+  // Was bringt dieser Slot der Airline am Tag, wenn sie den besten Flug darauf legt?
+  function slotNutzen(st, aid, stadt, h, sid) {
+    const a = st.airlines[aid];
+    const stil = STIL[a.stil] || STIL.bot;
+    const typen = (aid === SPIELER ? Object.keys(TYPEN) : stil.typen).filter((t) => typFrei(st, a, t));
+    const e2 = { art: "pool", id: sid || "?", h, preis: 0 };
+    let best = null;
+    for (const x of startorte(st, a)) {
+      if (x === stadt) continue;
+      const km = entfernung(x, stadt);
+      for (const typ of typen) {
+        if (km > TYPEN[typ].reichweite) continue;
+        const t = flugFinden(st, aid, x, stadt, typ, { e2 });
+        if (!t.zeiten) continue;
+        const g = schaetzen(st, aid, x, stadt, typ, t.zeiten.ab, t.zeiten.rueck, !(t.kosten && t.kosten.frei)).gewinn - (t.kosten && !t.kosten.frei ? TYPEN[typ].preis / 60 : 0);
+        if (!best || g > best.gewinn) best = { gewinn: g, von: x, typ };
+      }
+    }
+    return best;
+  }
+  // Die Rivalen legen ihr Gebot fest, sobald der Slot ausgeschrieben wird.
+  function kiGebote(st, s) {
+    const gebote = {};
+    const gp = slotGrundpreis(s.stadt, s.h);
+    for (const aid of ["k", "s", "a"]) {
+      const a = st.airlines[aid];
+      if (!a || a.konkurs || hatTafel(a, s.stadt) || a.geld < gp * 2 || slotsFreiVon(a, s.stadt).length) continue;
+      { const b = benutzteSlots(a); if (a.slots.filter((x) => !x.heim && !b.has(x.id)).length >= 2) continue; }     // erst nutzen, was man hat
+      const n = slotNutzen(st, aid, s.stadt, s.h, s.id);
+      if (!n || n.gewinn * 25 < gp || zufall(st) > 0.75) continue;
+      const lust = a.stil === "platzhirsch" && STADT[s.stadt].k >= 2 ? 1.3 : a.stil === "billig" && STADT[s.stadt].k === 1 ? 1.2 : 1;
+      gebote[aid] = Math.max(gp, runde10k(Math.min(n.gewinn * 25, gp * (1 + zufall(st) * 0.9) * lust, a.geld * 0.3)));
+    }
+    return gebote;
+  }
+  function bieten(st, sid, betrag) {
+    const s = st.pool.find((x) => x.id === sid);
+    if (!s || s.bis == null) return false;
+    const gp = slotGrundpreis(s.stadt, s.h);
+    if (!betrag) delete s.gebote[SPIELER];
+    else s.gebote[SPIELER] = Math.max(gp, runde10k(betrag));
     geaendert(st);
     return true;
   }
-  function versteigerungAuswerten(st, g) {
+  // Frist vorbei: Ein Bieter zahlt den Grundpreis, bei mehreren gewinnt das höchste Gebot, bei Gleichstand der Neuling.
+  function poolAuswerten(st, s) {
+    const gp = slotGrundpreis(s.stadt, s.h);
     const gebote = [];
-    const p = st.airlines[SPIELER];
-    const zuWenig = g.gebot > 0 && p.geld < g.gebot * g.stufe;
-    if (g.gebot && !zuWenig) gebote.push({ aid: SPIELER, betrag: g.gebot * g.stufe });
-    for (const aid of ["k", "s", "a"]) {
+    const mein = s.gebote[SPIELER] || 0;
+    const zuWenig = mein > 0 && st.airlines[SPIELER].geld < mein;
+    if (mein && !zuWenig) gebote.push({ aid: SPIELER, betrag: mein });
+    for (const [aid, betrag] of Object.entries(s.ki || {})) {
       const a = st.airlines[aid];
-      if (a.konkurs) continue;
-      let n = a.geld > 6 * g.stufe ? 3 : a.geld > 3 * g.stufe ? 2 : a.geld > 1.5 * g.stufe ? 1 : 0;
-      if (n && zufall(st) < 0.4) n--;
-      if (n) gebote.push({ aid, betrag: Math.round(n * g.stufe * (0.85 + zufall(st) * 0.3) / 10000) * 10000 });
+      if (a && !a.konkurs && a.geld >= betrag) gebote.push({ aid, betrag });
     }
-    gebote.sort((x, y) => y.betrag - x.betrag);
-    const liste = gebote.map((x) => `${st.airlines[x.aid].name} ${(Math.round(x.betrag / 1e5) / 10).toLocaleString("de-DE")} Mio`).join(", ");
-    if (!gebote.length) { melden(st, { art: "versteigerung", text: `🏛️ Niemand hat in ${STADT[g.stadt].name} geboten.` }); return; }
+    if (!gebote.length) { s.bis = null; s.gebote = {}; s.ki = null; geaendert(st); return null; }    // bleibt liegen: wer zuerst kommt, bekommt ihn
+    gebote.sort((x, y) => y.betrag - x.betrag || fremdeSlots(st.airlines[x.aid], s.stadt) - fremdeSlots(st.airlines[y.aid], s.stadt) || (y.aid === SPIELER) - (x.aid === SPIELER));
     const w = gebote[0], a = st.airlines[w.aid];
-    // Für das Ergebnis-Fenster: alle Gebote, der Sieger, und ob das eigene Gebot gezählt hat.
-    st.versteigerungErgebnis = { stadt: g.stadt, stueck: REGELN.versteigerungStueck, gebote: gebote.map((x) => ({ aid: x.aid, betrag: x.betrag })), sieger: w.aid, zuWenig, meinGebot: g.gebot * g.stufe };
-    a.geld -= w.betrag;
-    st.ausbau = st.ausbau || {};
-    st.ausbau[g.stadt] = (st.ausbau[g.stadt] || 0) + REGELN.versteigerungStueck;
-    a.slots[g.stadt] = (a.slots[g.stadt] || 0) + REGELN.versteigerungStueck;
-    melden(st, { art: w.aid === SPIELER ? "versteigerungsieg" : "versteigerung", stadt: g.stadt,
-      text: (w.aid === SPIELER ? `🏛️ Gewonnen! ${REGELN.versteigerungStueck} Landerechte in ${STADT[g.stadt].name} gehören dir.` : `🏛️ ${a.name} gewinnt die Landerechte in ${STADT[g.stadt].name}.`) + ` Gebote: ${liste}.` });
+    const preis = gebote.length === 1 ? gp : w.betrag;
+    a.geld -= preis;
+    st.pool = st.pool.filter((x) => x !== s);
+    a.slots.push({ id: s.id, stadt: s.stadt, h: s.h, seit: tagVon(st) });
+    if (w.aid === SPIELER) a.geboten = (a.geboten || 0) + 1;
+    if (mein) {
+      st.bietErgebnisse = st.bietErgebnisse || [];
+      st.bietErgebnisse.push({ slot: s.id, stadt: s.stadt, h: s.h, gebote: gebote.map((x) => ({ aid: x.aid, betrag: x.betrag })), sieger: w.aid, preis, zuWenig, meinGebot: mein });
+      melden(st, { art: w.aid === SPIELER ? "slotsieg" : "slotweg", stadt: s.stadt,
+        text: w.aid === SPIELER ? `🎟 Gewonnen! Der Slot ${STADT[s.stadt].name} ${uhrText(s.h)} Uhr gehört dir.` : `🎟 ${a.name} bekommt den Slot ${STADT[s.stadt].name} ${uhrText(s.h)} Uhr.` });
+    }
+    geaendert(st);
+    return w;
+  }
+
+  // Nutzen oder verlieren: Am Saisonende gehen ungenutzte Slots an fremden Flughäfen zurück in den Topf.
+  function slotInGefahr(st, a, s, b) {
+    return !s.heim && !(b || benutzteSlots(a)).has(s.id) && tagVon(st) - (s.seit || 0) >= REGELN.slotSchonTage;
+  }
+  function tageBisSaisonende(tag) { return (REGELN.saisonTage - (tag % REGELN.saisonTage)) % REGELN.saisonTage; }
+  function slotsPruefen(st, tag) {
+    melden(st, { art: "saison", text: "Saisonende. Neue Jahreszeit: " + saison(tag + 1).name });
+    for (const aid of st.reihenfolge) {
+      const a = st.airlines[aid];
+      const b = benutzteSlots(a);
+      const weg = a.slots.filter((s) => !s.heim && !b.has(s.id) && tag - (s.seit || 0) >= REGELN.slotSchonTage);
+      if (!weg.length) continue;
+      a.slots = a.slots.filter((s) => !weg.includes(s));
+      for (const s of weg) poolNeu(st, s.stadt, true, s.h);
+      if (aid === SPIELER) melden(st, { art: "slotweg", text: `🎟 ${weg.length === 1 ? "Ein ungenutzter Slot geht" : weg.length + " ungenutzte Slots gehen"} zurück: ${weg.map((s) => STADT[s.stadt].name + " " + uhrText(s.h)).join(", ")}.` });
+    }
+  }
+  function slotsWarnen(st, tag) {
+    const p = st.airlines[SPIELER];
+    const b = benutzteSlots(p);
+    const gefahr = p.slots.filter((s) => !s.heim && !b.has(s.id) && tag + 2 - (s.seit || 0) >= REGELN.slotSchonTage);
+    if (gefahr.length) melden(st, { art: "slotwarnung", stadt: gefahr[0].stadt, text: `⚠️ In zwei Tagen ist Saisonende. ${gefahr.length === 1 ? "Ein Slot ist" : gefahr.length + " Slots sind"} ungenutzt und ${gefahr.length === 1 ? "geht" : "gehen"} dann zurück: ${gefahr.map((s) => STADT[s.stadt].name + " " + uhrText(s.h)).join(", ")}.` });
+  }
+  // Flughäfen geben von sich aus neue Slots frei, große öfter als kleine, bis zu ihrer Obergrenze.
+  function slotsNachschub(st, tag) {
+    st.slotUhr = st.slotUhr || {};
+    for (const c of ALLE) {
+      const naechster = st.slotUhr[c.id];
+      if (naechster == null) { st.slotUhr[c.id] = tag + 1 + Math.floor(zufall(st) * REGELN.slotTakt[c.k]); continue; }
+      if (tag < naechster) continue;
+      st.slotUhr[c.id] = tag + REGELN.slotTakt[c.k] + Math.floor(zufall(st) * 2);
+      // Nie mehr als ein offener Slot je Flughafen: Slots bleiben knapp.
+      if (slotZahl(st, c.id) < REGELN.slotMax[c.k] && !st.pool.some((s) => s.stadt === c.id)) poolNeu(st, c.id, true);
+    }
+  }
+
+  // Was ist ein Slot seinem Besitzer wert? Ungenutzt wenig, mit einer guten Linie darauf viel.
+  function slotWertFuer(st, aid, s) {
+    const a = st.airlines[aid];
+    const gp = slotGrundpreis(s.stadt, s.h);
+    const F = slotFlug(a, s.id);
+    if (!F) return runde10k(gp * 0.8);
+    const e = rechnung(st).routen[F.route];
+    const teil = e && e.fluege.length ? Math.max(0, e.wert) / e.fluege.length : 0;
+    return runde10k(gp * 1.2 + teil * 30);
+  }
+  const slotBesitzer = (st, sid) => st.reihenfolge.find((id) => st.airlines[id].slots.some((s) => s.id === sid)) || null;
+  // Der Slot wechselt den Besitzer. Ein Flug, der ihn braucht, wird gestrichen.
+  function slotUebergeben(st, vonAid, anAid, sid) {
+    const von = st.airlines[vonAid], an = st.airlines[anAid];
+    const s = slotVon(von, sid);
+    if (!s || s.heim) return false;
+    const F = slotFlug(von, sid);
+    if (F) flugStreichen(st, vonAid, F.id);
+    von.slots = von.slots.filter((x) => x !== s);
+    an.slots.push({ id: s.id, stadt: s.stadt, h: s.h, seit: tagVon(st) });
+    return true;
+  }
+  // Angebot an einen Rivalen: Geld und (wenn gewünscht) ein eigener Slot im Tausch. Die Antwort kommt sofort.
+  function handelPruefen(st, sid) {
+    const aid = slotBesitzer(st, sid);
+    if (!aid || aid === SPIELER) return { ok: false, grund: "keiner" };
+    const s = slotVon(st.airlines[aid], sid);
+    if (s.heim) return { ok: false, grund: "heim" };
+    if (s.sperre && s.sperre >= tagVon(st)) return { ok: false, grund: "sperre", bis: s.sperre };
+    return { ok: true, aid, slot: s, wert: slotWertFuer(st, aid, s), grundpreis: slotGrundpreis(s.stadt, s.h) };
+  }
+  function handelAnbieten(st, sid, betrag, tauschId) {
+    const h = handelPruefen(st, sid);
+    if (!h.ok) return h;
+    const p = st.airlines[SPIELER], a = st.airlines[h.aid];
+    betrag = Math.max(0, runde10k(betrag || 0));
+    const tausch = tauschId ? slotVon(p, tauschId) : null;
+    if (tauschId && (!tausch || tausch.heim)) return { ok: false, grund: "tausch" };
+    if (p.geld < betrag) return { ok: false, grund: "geld" };
+    const gegenwert = betrag + (tausch ? slotGrundpreis(tausch.stadt, tausch.h) * 0.8 : 0);
+    if (gegenwert < h.wert) {
+      h.slot.sperre = tagVon(st) + REGELN.handelSperre;
+      geaendert(st);
+      return { ok: false, grund: "nein", aid: h.aid };
+    }
+    p.geld -= betrag; a.geld += betrag;
+    slotUebergeben(st, h.aid, SPIELER, sid);
+    if (tausch) slotUebergeben(st, SPIELER, h.aid, tausch.id);
+    melden(st, { art: "handel", wer: h.aid, stadt: h.slot.stadt, text: `🤝 ${a.name} überlässt dir den Slot ${STADT[h.slot.stadt].name} ${uhrText(h.slot.h)} Uhr.` });
+    geaendert(st);
+    return { ok: true, aid: h.aid, betrag };
+  }
+  // Ab und zu will ein Rivale einen deiner Slots kaufen.
+  function slotAngebot(st, tag) {
+    if (tag < REGELN.handelAb || st.gelegenheiten.some((g) => g.art === "slotangebot") || zufall(st) > 0.18) return;
+    const p = st.airlines[SPIELER];
+    const kand = p.slots.filter((s) => !s.heim && STADT[s.stadt].k >= 2);
+    if (!kand.length) return;
+    const s = waehle(st, kand);
+    const aid = waehle(st, ["k", "s", "a"]);
+    const a = st.airlines[aid];
+    if (a.konkurs || hatTafel(a, s.stadt)) return;
+    const wert = slotWertFuer(st, SPIELER, s);
+    const preis = runde10k(wert * (0.8 + zufall(st) * 0.7));
+    if (a.geld < preis * 1.5) return;
+    neueGel(st, { art: "slotangebot", aid, slot: s.id, stadt: s.stadt, h: s.h, preis, bis: st.zeit + 24, dauer: 24 });
+    melden(st, { art: "slotangebot", wer: aid, stadt: s.stadt, text: `💬 ${a.name} will deinen Slot ${STADT[s.stadt].name} ${uhrText(s.h)} Uhr kaufen.` });
+  }
+  function slotAngebotAnnehmen(st, g) {
+    const p = st.airlines[SPIELER], a = st.airlines[g.aid];
+    if (!slotVon(p, g.slot) || a.geld < g.preis) return false;
+    slotUebergeben(st, SPIELER, g.aid, g.slot);
+    a.geld -= g.preis; p.geld += g.preis;
+    return true;
+  }
+
+  // ---------- Rat des Analysten ----------
+  // Er rechnet ehrlich, sieht die Welt aber durch seine Brille: Die Spanne ist je nach Können enger oder weiter.
+  function fest(st, text) {         // feste Zufallszahl 0..1 für einen Text und den heutigen Tag (ändert sich nicht bei jedem Blick)
+    let h = (st.saat | 0) ^ (tagVon(st) * 2654435761);
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+    h ^= h >>> 13; h = Math.imul(h, 1274126177); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  function brille(st, wer, wert, text) {
+    const u = fest(st, text + "a") + fest(st, text + "b") + fest(st, text + "c") - 1.5;
+    return wert * wer.macke * Math.exp(u * wer.streuung * 1.4);
+  }
+  function ratSlot(st, sid) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    const s = st.pool.find((x) => x.id === sid);
+    if (!wer || !s) return null;
+    const n = slotNutzen(st, SPIELER, s.stadt, s.h, s.id);
+    const gp = slotGrundpreis(s.stadt, s.h);
+    const wert = n && n.gewinn > 0 ? brille(st, wer, n.gewinn * 30, "slot" + sid) : 0;
+    // Wer bietet mit? Ein guter Analyst weiß es fast immer, ein schwacher rät öfter falsch.
+    const echte = Object.keys(s.ki || {});
+    const irrtum = fest(st, "wer" + sid) < wer.streuung;
+    const mit = irrtum ? (echte.length ? [] : [waehleFest(st, ["k", "s", "a"], "x" + sid)]) : echte;
+    return { wer, wert: wert > 0 ? spanne(wert, wer.streuung).map((v) => Math.max(0, runde10k(v))) : null, lohnt: wert >= gp, mit: mit.filter((id) => !st.airlines[id].konkurs), von: n ? n.von : null, typ: n ? n.typ : null, grundpreis: gp };
+  }
+  const waehleFest = (st, liste, text) => liste[Math.floor(fest(st, text) * liste.length)];
+  function ratHandel(st, sid) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    const h = handelPruefen(st, sid);
+    if (!wer || !h.ok) return null;
+    const n = slotNutzen(st, SPIELER, h.slot.stadt, h.slot.h, sid);
+    return { wer, noetig: spanne(brille(st, wer, h.wert, "handel" + sid), wer.streuung).map((v) => Math.max(0, runde10k(v))), wert: n && n.gewinn > 0 ? spanne(brille(st, wer, n.gewinn * 30, "hw" + sid), wer.streuung).map((v) => Math.max(0, runde10k(v))) : null };
+  }
+  // Was würde eine Einstellung am Tag bringen? Für jede Wahlmöglichkeit eine Spanne, die beste ist die Empfehlung.
+  function ratWahl(st, key, optionen) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    if (!wer) return null;
+    const erg = {};
+    let best = null;
+    for (const [id, aenderung] of Object.entries(optionen)) {
+      let delta = 0;
+      if (aenderung) { const pr = probe(st, SPIELER, aenderung); if (!pr) continue; delta = pr.delta; }
+      const gesehen = aenderung ? delta + (brille(st, wer, 1, key + id) - 1) * Math.max(3000, Math.abs(delta)) : 0;
+      erg[id] = { gesehen, spanne: aenderung ? spanne(gesehen, wer.streuung).map((v) => Math.round(v / 100) * 100) : null };
+      if (!best || gesehen > erg[best].gesehen + 500) best = id;
+    }
+    return { wer, optionen: erg, empfehlung: best };
+  }
+  function ratGrundsatz(st, k) {
+    const a = st.airlines[SPIELER];
+    const jetzt = (a.grundsaetze || {})[k];
+    const o = {};
+    for (const id of Object.keys(GRUNDSAETZE[k].optionen)) o[id] = id === jetzt ? null : (kopie) => { grundsatzSetzen(kopie, SPIELER, k, id); };
+    return ratWahl(st, "g" + k, o);
+  }
+  function ratPreis(st, rid) {
+    const r = st.airlines[SPIELER].routen.find((x) => x.id === rid);
+    if (!r) return null;
+    const o = {};
+    for (const id of Object.keys(STUFEN)) o[id] = id === r.stufe ? null : (kopie) => { preisStufe(kopie, SPIELER, rid, id); };
+    return ratWahl(st, "p" + rid, o);
+  }
+  // Vorschau für einen geplanten Flug: Was bringt er dem ganzen Netz, und wie voll werden Hin- und Rückflug?
+  function flugVorschau(st, plan) {
+    const pr = probe(st, SPIELER, (kopie) => flugAnlegen(kopie, SPIELER, plan));
+    if (!pr || !pr.res || !pr.res.ok) return null;
+    const rg = berechnen(pr.kopie, tagVon(pr.kopie));
+    const e = rg.routen[pr.res.route.id];
+    const fl = e && e.fluege.find((x) => x.id === pr.res.flug.id);
+    return { delta: pr.delta, kopie: pr.kopie, flug: fl, route: e, fid: pr.res.flugzeug.id, kosten: pr.res.kosten };
+  }
+  // Empfehlung beim Kauf: welches Flugzeug und welche Kabine für diesen Flug? (plan ohne typ und fid)
+  function ratKauf(st, plan) {
+    const p = st.airlines[SPIELER];
+    const wer = assistent(p, "analyst");
+    if (!wer) return null;
+    const km = entfernung(plan.x, plan.y);
+    let best = null;
+    for (const typ of Object.keys(TYPEN)) {
+      if (!typFrei(st, p, typ) || km > TYPEN[typ].reichweite) continue;
+      const pl = Object.assign({}, plan, { typ, fid: null, kabine: kabineStandard(typ, p) });
+      const z = zeiten(p, plan.x, plan.y, typ, plan.e1.h, plan.e2.h);
+      if (!z.passt) continue;
+      const s = schaetzen(st, SPIELER, plan.x, plan.y, typ, plan.e1.h, plan.e2.h, true);
+      const gesehen = brille(st, wer, s.gewinn, "kauf" + plan.x + plan.y + typ) - TYPEN[typ].preis / 45;
+      if (!best || gesehen > best.gesehen) best = { typ, gesehen, plan: pl, gewinn: s.gewinn };
+    }
+    if (!best) return null;
+    // Die Kabine dazu: auf einer Kopie ausprobieren.
+    let kabine = kabineStandard(best.typ, p);
+    const v = flugVorschau(st, Object.assign({}, best.plan, { kabine: { business: 0, first: 0 } }));
+    if (v) {
+      const bk = besteKabine(v.kopie, SPIELER, v.fid);
+      if (bk) {
+        const g = kabineGrenzen(best.typ);
+        // Ein schwacher Analyst verschätzt sich auch bei der Aufteilung.
+        const schief = Math.round((fest(st, "kab" + plan.x + plan.y) - 0.5) * wer.streuung * 4) / 10;
+        kabine = { business: Math.max(0, Math.min(g.business, Math.round((bk.business + schief) * 10) / 10)), first: bk.first };
+      }
+    }
+    return { wer, typ: best.typ, kabine, gewinn: spanne(brille(st, wer, best.gewinn, "kg" + plan.x + plan.y + best.typ), wer.streuung).map((v2) => Math.round(v2 / 100) * 100) };
+  }
+  // Was bringt ein geplanter Flug am Tag? Der Analyst nennt eine Spanne.
+  function ratFlug(st, plan, delta) {
+    const wer = assistent(st.airlines[SPIELER], "analyst");
+    if (!wer) return null;
+    const gesehen = delta + (brille(st, wer, 1, "flug" + plan.x + plan.y + plan.typ + plan.e1.h + "-" + plan.e2.h) - 1) * Math.max(4000, Math.abs(delta));
+    return { wer, gewinn: spanne(gesehen, wer.streuung).map((v) => Math.round(v / 100) * 100) };
+  }
+  // Passt die Kabine noch zu den Flügen? Der Analyst meldet sich, wenn ein Umbau lohnt.
+  function ratKabine(st, fid) {
+    const p = st.airlines[SPIELER];
+    const wer = assistent(p, "analyst");
+    const f = p.flotte.find((z) => z.id === fid);
+    if (!wer || !f || !p.fluege.some((x) => x.f === fid)) return null;
+    const bk = besteKabine(st, SPIELER, fid);
+    if (!bk) return null;
+    const jetzt = rechnung(st).summe[SPIELER];
+    const plus = bk.g - jetzt;
+    return { wer, business: bk.business, first: bk.first, lohnt: plus * 20 > umbauPreis(f.typ) && (bk.business !== f.kabine.business || bk.first !== f.kabine.first), plus: spanne(brille(st, wer, plus, "umbau" + fid), wer.streuung).map((v) => Math.round(v / 100) * 100) };
   }
 
   // Zweites Drehkreuz: eine Stadt mit mindestens drei Linien ausbauen.
@@ -1944,46 +2536,29 @@
     if (!st.rennen && tag >= REGELN.rennenAb && (tag - 1) % REGELN.saisonTage === 0) rennenStarten(st, tag);
   }
 
-  // Rivalen können in die Krise geraten oder pleitegehen. Dann gibt es ihre Flotte günstig.
+  // Rivalen können pleitegehen. Dann werden ihre Slots frei, und sie fangen mit neuem Geld von vorn an.
   function rivalNeustart(st, aid) {
     const a = st.airlines[aid];
-    a.routen = []; a.flotte = []; a.slots = { [a.basis]: REGELN.startSlots };
+    for (const s of a.slots) if (!s.heim) poolNeu(st, s.stadt, true, s.h);
+    a.routen = []; a.fluege = []; a.flotte = []; a.slots = []; a.geschenk = REGELN.heimGeschenk;
     a.geld = REGELN.startGeld * 4; a.kredit = 0; a.konkurs = false; a.minusTage = 0; a.ausgebaut = []; a.verlauf = [];
     st.plaene = (st.plaene || []).filter((x) => x.aid !== aid);
     for (const r of st.airlines[SPIELER].routen) if (r.duell && r.duell.gegen === aid) delete r.duell;
-    melden(st, { art: "rivale", wer: aid, text: `🔄 ${a.name} fängt mit neuem Geld von vorn an.` });
     geaendert(st);
   }
   function aufkaufTag(st, tag) {
     if (tag < REGELN.aufkaufAb) return;
     for (const aid of ["k", "s", "a"]) {
       const a = st.airlines[aid];
-      if (a.konkurs) continue;
       a.minusTage = a.geld < 0 ? (a.minusTage || 0) + 1 : 0;
-      const wert = flottenWert(a) + slotWert(a);
-      if (a.minusTage >= 4 && a.flotte.length) {
-        a.konkurs = true; a.routen = [];
-        neueGel(st, { art: "aufkauf", aid, pleite: true, stadt: a.basis, preis: Math.round(wert * 0.4 / 10000) * 10000, flugzeuge: a.flotte.length, bis: bisTagEnde(st, 2), dauer: 48 });
-        melden(st, { art: "pleite", wer: aid, text: `💥 ${a.name} ist pleite! Ihre ${a.flotte.length} Flugzeuge und Landerechte gibt es zwei Tage lang günstig.` });
+      if (a.minusTage >= 4 && (a.flotte.length || a.slots.length)) {
+        const n = a.slots.filter((s) => !s.heim).length;
+        melden(st, { art: "pleite", wer: aid, text: `💥 ${a.name} ist pleite! ${n} Slots werden frei: Biete mit. Die Airline fängt mit neuem Geld von vorn an.` });
+        rivalNeustart(st, aid);
+        st.rivalPleite = true;
         return;
       }
-      if (st.gelegenheiten.some((g) => g.art === "aufkauf") || (a.angebotTag && tag - a.angebotTag < 14)) continue;
-      if (firmenwert(st, SPIELER) >= 2.5 * firmenwert(st, aid) && a.flotte.length >= 3 && zufall(st) < 0.12) {
-        a.angebotTag = tag;
-        neueGel(st, { art: "aufkauf", aid, stadt: a.basis, preis: Math.round(wert * 0.75 / 10000) * 10000, flugzeuge: a.flotte.length, bis: bisTagEnde(st, 2), dauer: 48 });
-        melden(st, { art: "krise", wer: aid, text: `📉 ${a.name} steckt in der Krise und will ihre Flotte verkaufen.` });
-      }
     }
-  }
-  function aufkaufen(st, g) {
-    const p = st.airlines[SPIELER], a = st.airlines[g.aid];
-    if (p.geld < g.preis) return false;
-    p.geld -= g.preis;
-    for (const f of a.flotte) flugzeugHinzu(p, f.typ);
-    for (const [c, n] of Object.entries(a.slots)) p.slots[c] = (p.slots[c] || 0) + n;
-    melden(st, { art: "aufkauf", wer: g.aid, text: `🤝 Gekauft: ${a.flotte.length} Flugzeuge von ${a.name} stehen jetzt frei in deiner Flotte.` });
-    rivalNeustart(st, g.aid);
-    return true;
   }
 
   // Ereignisse mit zwei Wahlen: sicher (kostet sofort) oder riskant (vielleicht gut, vielleicht teuer).
@@ -2060,12 +2635,13 @@
       const n = flugzeugeAuf(p, r.id).length;
       const voll = e.bedarf > e.sitzePlaetze * 1.12;
       if (voll) {
-        // Erst ein freies Flugzeug, sonst ein größeres.
-        const frei = [...new Set(freieFlugzeuge(p).map((f) => f.typ))].filter((t) => TYPEN[t].reichweite >= e.km);
+        // Erst ein weiterer Flug (am liebsten mit einem Flugzeug, das Zeit hat), sonst ein größeres Flugzeug.
         let gemacht = false;
-        for (const typ of frei) {
-          const pr = probe(st, SPIELER, (k) => fliegen(k, SPIELER, r.a, r.b, typ, { nurFrei: true }));
-          if (pr && lohnt(pr.delta, e.gewinn)) { ideen.push({ art: "dazu", route: r.id, typ, delta: pr.delta, basis: e.gewinn }); gemacht = true; }
+        for (const typ of [...new Set(p.flotte.map((f) => f.typ))].filter((t) => TYPEN[t].reichweite >= e.km)) {
+          const t = flugFinden(st, SPIELER, r.a, r.b, typ);
+          if (!t.ok || !t.kosten.frei || t.kosten.gesamt > p.geld * 0.5) continue;
+          const pr = probe(st, SPIELER, (k) => flugAnlegen(k, SPIELER, t.plan));
+          if (pr && lohnt(pr.delta - t.kosten.gesamt / 40, e.gewinn)) { ideen.push({ art: "dazu", route: r.id, typ, preis: t.kosten.gesamt, delta: pr.delta - t.kosten.gesamt / 40, echt: pr.delta, basis: e.gewinn }); gemacht = true; break; }
         }
         if (!gemacht) {
           const kleinster = flugzeugeAuf(p, r.id).sort((x, y) => TYPEN[x.typ].sitze - TYPEN[y.typ].sitze)[0];
@@ -2084,13 +2660,13 @@
         const pr = probe(st, SPIELER, (k) => abziehen(k, SPIELER, r.id));
         if (pr && lohnt(pr.delta, e.gewinn)) ideen.push({ art: "abziehen", route: r.id, delta: pr.delta, basis: e.gewinn });
       }
-      // Sitze: nur wenn eine Klasse klar daneben liegt (leer oder übervoll).
-      const k = e.klassen, gr = klassenGrenzen(p, r.id);
-      if (gr.business > 0 && (k.business.sitze > 0 && k.business.pax < k.business.sitze * 0.6 || k.business.pax >= k.business.sitze * 0.99)) {
-        const bk = besteKlassen(st, SPIELER, r.id), jetzt = klassenVon(r, p);
-        if (bk && (bk.business !== jetzt.business || bk.first !== jetzt.first)) {
-          const pr = probe(st, SPIELER, (kk) => klassenSetzen(kk, SPIELER, r.id, bk.business, bk.first));
-          if (pr && lohnt(pr.delta, e.gewinn)) ideen.push({ art: "sitze", route: r.id, business: bk.business, first: bk.first, delta: pr.delta, basis: e.gewinn });
+      // Kabine: Passt die Aufteilung des größten Flugzeugs dieser Linie noch? Der Umbau muss sich in vier Wochen bezahlt machen.
+      const fz = flugzeugeAuf(p, r.id).filter((f) => kabineGrenzen(f.typ).business > 0 && !inWerkstatt(st, f)).sort((x, y) => TYPEN[y.typ].sitze - TYPEN[x.typ].sitze)[0];
+      if (fz && ideen.length < 3) {
+        const bk = besteKabine(st, SPIELER, fz.id);
+        if (bk && (bk.business !== fz.kabine.business || bk.first !== fz.kabine.first)) {
+          const preis = umbauPreis(fz.typ), plus = bk.g - rg.summe[SPIELER];
+          if (preis <= p.geld * 0.5 && lohnt(plus - preis / 28, e.gewinn)) ideen.push({ art: "kabine", route: r.id, fid: fz.id, typ: fz.typ, business: bk.business, first: bk.first, preis, delta: plus - preis / 28, echt: plus, basis: e.gewinn });
         }
       }
       // Schließen nur, wenn die Linie schon länger Geld verliert und sonst nichts hilft.
@@ -2122,9 +2698,9 @@
   }
   // Was kostet eine neue Linie, und lohnt sie sich nach Abzug des Flugzeugs (in etwa 40 Tagen bezahlt)?
   function neueLinieProbe(st, p, x, y, typ) {
-    const test = kannFliegen(st, SPIELER, x, y, typ);
+    const test = flugFinden(st, SPIELER, x, y, typ);
     if (!test.ok || test.kosten.gesamt > p.geld * 0.75) return null;
-    const pr = probe(st, SPIELER, (k) => fliegen(k, SPIELER, x, y, typ));
+    const pr = probe(st, SPIELER, (k) => flugAnlegen(k, SPIELER, test.plan));
     if (!pr) return null;
     const netto = pr.delta - test.kosten.gesamt / 40;
     return netto > 0 ? { delta: netto, echt: pr.delta, kosten: test.kosten.gesamt } : null;
@@ -2135,12 +2711,20 @@
     const typen = Object.keys(TYPEN).filter((t) => typFrei(st, p, t));
     const starts = [...new Set([p.basis, ...drehkreuze(p)])];
     const kandidaten = [];
-    for (const s of starts) for (const c of ALLE) {
-      if (c.id === s || routeVon(p, s, c.id)) continue;
-      for (const typ of typen) {
-        if (entfernung(s, c.id) > TYPEN[typ].reichweite) continue;
-        const g = schaetzen(st, SPIELER, s, c.id, typ).gewinn - TYPEN[typ].preis / 40;
-        if (g > 0) kandidaten.push({ start: s, ziel: c.id, typ, g: g * wer.macke * rauschen(st, wer.streuung) });
+    const idx = slotIndex(st, p);
+    const eigene = [...new Set(p.flotte.map((f) => f.typ))];
+    for (const s of starts) {
+      if (!enden(st, p, s, idx).length) continue;
+      for (const c of staedte(st)) {
+        if (c.id === s || routeVon(p, s, c.id) || !enden(st, p, c.id, idx).length) continue;
+        const km = entfernung(s, c.id);
+        const passend = typen.filter((t) => TYPEN[t].reichweite >= km);
+        for (const typ of new Set([...eigene.filter((t) => passend.includes(t)), ...passend.slice(0, 2)])) {
+          const t = flugFinden(st, SPIELER, s, c.id, typ, { idx });
+          if (!t.ok) continue;
+          const g = schaetzen(st, SPIELER, s, c.id, typ, t.plan.e1.h, t.plan.e2.h, !t.kosten.frei).gewinn - t.kosten.gesamt / 40;
+          if (g > 0) kandidaten.push({ start: s, ziel: c.id, typ, g: g * wer.macke * rauschen(st, wer.streuung) });
+        }
       }
     }
     kandidaten.sort((x, y) => y.g - x.g);
@@ -2151,7 +2735,7 @@
     return ideen;
   }
   // Ereignisse: Ein Rivale kündigt eine Strecke an, oder eine Versteigerung beginnt.
-  function ereignisIdeen(st, p, wer) {
+  function ereignisIdeen(st, p, wer, mitSlots) {
     const ideen = [];
     const typen = Object.keys(TYPEN).filter((t) => typFrei(st, p, t));
     for (const g of st.gelegenheiten) {
@@ -2165,18 +2749,20 @@
         }
         if (best && lohnt(best.delta, 0)) ideen.push({ art: "plan", gel: g.id, wer: g.aid, start: g.von, ziel: g.stadt, typ: best.typ, kosten: best.kosten, delta: best.delta, echt: best.echt, basis: 0, ereignis: true });
       }
-      if (g.art === "versteigerung" && !g.gebot) {
-        // Brauchen wir dort Landerechte? Nur wenn keine mehr frei sind und dort etwas voll ist oder sich lohnen würde.
-        const stadt = g.stadt;
-        if (slotsUebrig(p, stadt) > 0) continue;
-        const rg = rechnung(st);
-        const voll = p.routen.filter((r) => (r.a === stadt || r.b === stadt) && rg.routen[r.id] && rg.routen[r.id].bedarf > rg.routen[r.id].sitzePlaetze * 1.12);
-        const wichtig = stadt === p.basis || drehkreuze(p).includes(stadt) || voll.length > 0;
-        if (!wichtig) continue;
-        const stufen = p.geld > 10 * g.stufe ? 3 : p.geld > 4 * g.stufe ? 2 : 0;
-        if (!stufen) continue;
-        ideen.push({ art: "bieten", gel: g.id, stadt, stufen, betrag: stufen * g.stufe, voll: voll.length, delta: 1e9, basis: 0, ereignis: true });
-      }
+    }
+    // Wird gerade ein Slot vergeben, den wir gut brauchen können?
+    let bester = null;
+    for (const sl of st.pool) {
+      if (sl.bis == null || sl.gebote[SPIELER] || hatTafel(p, sl.stadt)) continue;
+      const gp = slotGrundpreis(sl.stadt, sl.h);
+      if (p.geld < gp * 2.5) continue;
+      const n = slotNutzen(st, SPIELER, sl.stadt, sl.h, sl.id);
+      if (!n || n.gewinn * 30 < gp) continue;
+      if (!bester || n.gewinn > bester.n.gewinn) bester = { sl, n, gp };
+    }
+    if (bester && mitSlots) {
+      const betrag = Math.max(bester.gp, Math.min(runde10k(bester.gp * 1.5), runde10k(bester.n.gewinn * 20 * wer.macke), runde10k(p.geld * 0.3)));
+      ideen.push({ art: "bieten", slot: bester.sl.id, stadt: bester.sl.stadt, h: bester.sl.h, betrag, von: bester.n.von, delta: bester.n.gewinn, basis: 0 });
     }
     return ideen;
   }
@@ -2192,14 +2778,14 @@
     const alle = [];
     const mit = (rolle, liste) => { for (const i of liste) alle.push({ ...i, rolle }); };
     const wichtigWer = rollen.analyst ? "analyst" : rollen.controller ? "controller" : "preis";
-    mit(wichtigWer, ereignisIdeen(st, p, rollen[wichtigWer]));
     const pause = tag - b.letzter >= BERATER.pauseTage;
+    mit(wichtigWer, ereignisIdeen(st, p, rollen[wichtigWer], pause));
     if (pause) {
       if (rollen.controller) mit("controller", controllerIdeen(st, p, rollen.controller));
       if (rollen.preis) mit("preis", preisIdeen(st, p, rollen.preis));
       if (rollen.analyst && p.routen.length) mit("analyst", analystIdeen(st, p, rollen.analyst));
     }
-    for (const i of alle) i.key = [i.art, i.route || "", i.start || "", i.ziel || "", i.gel || "", i.stufe || "", i.typ || ""].join("|");
+    for (const i of alle) i.key = [i.art, i.route || "", i.start || "", i.ziel || "", i.gel || "", i.slot || "", i.stufe || "", i.typ || ""].join("|");
     const frei = alle.filter((i) => !gesperrt(b, i.key, tag));
     if (!frei.length) return;
     // Ereignisse zuerst, sonst das, was der Assistent für das Beste hält.
@@ -2219,10 +2805,11 @@
     if (t.route && !p.routen.some((r) => r.id === t.route)) return false;
     if (t.gel && !st.gelegenheiten.some((g) => g.id === t.gel)) return false;
     if ((t.art === "neu" || t.art === "plan") && routeVon(p, t.start, t.ziel)) return false;
-    if (t.art === "dazu" && !freieFlugzeuge(p).some((f) => f.typ === t.typ)) return false;
+    if (t.art === "dazu") { const r = p.routen.find((x) => x.id === t.route); if (!flugFinden(st, SPIELER, r.a, r.b, t.typ).ok) return false; }
+    if (t.art === "kabine") { const f = p.flotte.find((x) => x.id === t.fid); if (!f || (f.kabine.business === t.business && f.kabine.first === t.first)) return false; }
     if (t.art === "abziehen" && flugzeugeAuf(p, t.route).length < 2) return false;
     if (t.art === "preis" && (p.routen.find((r) => r.id === t.route) || {}).stufe === t.stufe) return false;
-    if (t.art === "bieten" && (st.gelegenheiten.find((g) => g.id === t.gel) || {}).gebot) return false;
+    if (t.art === "bieten") { const sl = st.pool.find((x) => x.id === t.slot); if (!sl || sl.bis == null || sl.gebote[SPIELER]) return false; }
     return true;
   }
   function tipp(st) {
@@ -2238,12 +2825,12 @@
     if (!t) return { ok: false };
     let res = { ok: true };
     if (t.art === "preis") preisStufe(st, SPIELER, t.route, t.stufe);
-    else if (t.art === "sitze") klassenSetzen(st, SPIELER, t.route, t.business, t.first);
-    else if (t.art === "dazu") { const r = p.routen.find((x) => x.id === t.route); res = fliegen(st, SPIELER, r.a, r.b, t.typ, { nurFrei: true }); }
+    else if (t.art === "kabine") res = kabineSetzen(st, SPIELER, t.fid, t.business, t.first);
+    else if (t.art === "dazu") { const r = p.routen.find((x) => x.id === t.route); const f = flugFinden(st, SPIELER, r.a, r.b, t.typ); res = f.ok ? flugAnlegen(st, SPIELER, f.plan) : { ok: false }; }
     else if (t.art === "abziehen") { if (flugzeugeAuf(p, t.route).length > 1) abziehen(st, SPIELER, t.route); }
     else if (t.art === "umruesten") res = umruesten(st, SPIELER, t.route, t.typ);
     else if (t.art === "schliessen") routeSchliessen(st, SPIELER, t.route);
-    else if (t.art === "bieten") res = { ok: bieten(st, t.gel, t.stufen) };
+    else if (t.art === "bieten") res = { ok: bieten(st, t.slot, t.betrag) };
     p.berater.tipp = null;
     p.berater.gesperrt[t.key] = tagVon(st) + BERATER.sperrTage;
     geaendert(st);
@@ -2258,26 +2845,32 @@
 
   // ---------- Speichern ----------
   function laden(json) {
-    const st = typeof json === "string" ? JSON.parse(json) : json;
-    if (!st || st.version !== 2) return null;
+    let st;
+    try { st = typeof json === "string" ? JSON.parse(json) : json; } catch (e) { return null; }
+    // Ältere Stände (ohne Slots mit Uhrzeit) lassen sich nicht umrechnen: Dann beginnt ein neues Spiel.
+    if (!st || st.version !== 3) return null;
     for (const a of Object.values(st.airlines)) {
       a.grundsaetze = a.grundsaetze || { ...VORLAGEN[a.service || "standard"] };
       a.assistenten = a.assistenten || {};
-      // Ältere Stände: Sitzklassen in die realistischen Grenzen bringen.
-      for (const r of a.routen || []) if (r.klassen) r.klassen = { business: Math.min(KLASSEN_MAX.business, r.klassen.business || 0), first: Math.min(KLASSEN_MAX.first, r.klassen.first || 0) };
     }
     return st;
   }
+  const istAlterStand = (json) => { try { const st = typeof json === "string" ? JSON.parse(json) : json; return !!st && st.version !== 3; } catch (e) { return false; } };
 
   return {
     SPIELER, REGELN, SERVICE, STUFEN, SCHWIERIGKEIT, angebote, TYPEN, GRUPPEN, STAEDTE, WELT, ALLE, KONTINENTE, STADT, SAISONEN, WOCHENTAGE, RIVALEN, NAMEN, HEIMAT, STIL,
-    KLASSEN, KLASSEN_START, KLASSEN_MAX, klassenGrenzen, klassenVon, BERATER, beraterTag, tipp, tippAusfuehren, tippWeg, klassenSetzen, besteKlassen,
-    neuesSpiel, laden, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
-    flugzeugeAuf, freieFlugzeuge, slotsBelegt, slotsFrei, slotPreis, slotsGenutzt, slotsUebrig, typFrei, routeVon,
-    kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, kaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, CONTROLLER, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruesten,
-    umlauf, drehkreuze, rechnung, berechnen, probe, schaetzen, vorruecken, position, anziehung,
+    KLASSEN, KLASSEN_MAX, klassenVon, kabineGrenzen, kabineStandard, kabineSetzen, umbauPreis, inWerkstatt, besteKabine,
+    neuesSpiel, laden, istAlterStand, klonen, entfernung, tagVon, wochentag, saison, ticket, grundNachfrage, staedte,
+    HEIM_STUNDEN, HUB_STUNDEN, TAGESGANG, zone, uhrText, zeitArt, zeitGuete, spielUhr, slotGrundpreis, heimPreis, hatTafel, tafel, heimSlotKaufen, slotNehmen,
+    slotVon, slotsIn, slotFlug, slotsFreiVon, slotZahl, poolIn, enden, zeiten, zeitenVon, tagesplan, flugzeugFrei, auslastungFlugzeug,
+    flugzeugeAuf, freieFlugzeuge, fluegeVon, fluegeAuf, typFrei, routeVon, flugFinden, flugAnlegen, flugStreichen,
+    kostenFuer, kannFliegen, fliegen, abziehen, routeSchliessen, verkaufen, preisStufe, grundsatzSetzen, vorlageSetzen, profil, GRUNDSAETZE, VORLAGEN, ANALYSTEN, PREISPROFIS, assistent, einstellen, gehaelter, umbenennen, auftragGeben, preisVorschlagUebernehmen, CONTROLLER, wochenbericht, wochenVorschlagUebernehmen, missstaende, verwaltungKosten, werbungPreis, werbung, umruestenKosten, umruestenGeht, umruesten,
+    drehkreuze, rechnung, berechnen, reisende, probe, schaetzen, vorruecken, position, anziehung,
+    BERATER, beraterTag, tipp, tippAusfuehren, tippWeg,
     gelegenheitAnnehmen, gelegenheitAblehnen, uebernahmeAnnehmen, uebernahmeAblehnen, tilgen,
-    firmenwert, rangliste, platz, kiTag, kiAusbauen, tagesAbschluss, zielStand, zielPruefen, ZIELE,
-    trendVon, stadtTrend, vergleich, duellAntwort, bieten, drehkreuzPreis, kannAusbauen, drehkreuzAusbauen, rennenStand, wahlTreffen, wirkung, ausgebaut, KONTINENTE_PAARE: PAARE,
+    firmenwert, rangliste, platz, kiTag, kiAusbauen, kiFliegen, kiKandidaten, tagesAbschluss, zielStand, zielPruefen, ZIELE,
+    bieten, poolAuswerten, slotInGefahr, tageBisSaisonende, slotNutzen, slotWertFuer, slotBesitzer, handelPruefen, handelAnbieten,
+    ratSlot, ratHandel, ratGrundsatz, ratPreis, ratKauf, ratKabine, ratFlug, flugVorschau,
+    trendVon, stadtTrend, vergleich, duellAntwort, drehkreuzPreis, kannAusbauen, drehkreuzAusbauen, rennenStand, wahlTreffen, wirkung, ausgebaut, KONTINENTE_PAARE: PAARE,
   };
 });
