@@ -688,6 +688,29 @@ test("Rivalen: Wer überboten wird, ärgert sich und verlangt beim Handel mehr",
   assert.notEqual(L.laune(st, "k").art, "groll");
 });
 
+test("Manager-Profil: Name, Geschlecht, Aussehen; alte Stände laufen ohne Profil weiter", () => {
+  const st = L.neuesSpiel({ seed: 2, basis: "frankfurt", manager: { name: "  Florian   Horn ", geschlecht: "mann", aussehen: "mann-3" } });
+  assert.deepEqual(st.manager, { name: "Florian Horn", geschlecht: "mann", aussehen: "mann-3" });
+  assert.equal(L.anrede(st.manager), "Herr Horn");
+  assert.equal(L.anrede({ name: "Anna Weber", geschlecht: "frau", aussehen: "frau-1" }), "Frau Weber");
+  assert.equal(L.anrede({ name: "Kim Lee", geschlecht: "divers", aussehen: "frau-1" }), "Kim Lee");
+  // Aussehen passt immer zum Geschlecht, ohne Namen gibt es kein Profil.
+  assert.equal(L.managerPruefen({ name: "Eva", geschlecht: "frau", aussehen: "mann-2" }).aussehen, "frau-1");
+  assert.equal(L.managerPruefen({ name: "  ", geschlecht: "frau" }), null);
+  assert.equal(L.aussehenFuer("divers").length, L.AUSSEHEN.length);
+  // Später änderbar.
+  assert.ok(L.managerSetzen(st, { name: "Eva Horn", geschlecht: "frau", aussehen: "frau-4" }));
+  assert.equal(L.anrede(st.manager), "Frau Horn");
+  assert.equal(L.managerSetzen(st, { name: "" }), false);
+  assert.equal(st.manager.name, "Eva Horn");
+  // Speichern und Laden behält das Profil; ein Stand ohne Profil lädt trotzdem.
+  assert.deepEqual(L.laden(JSON.stringify(st)).manager, st.manager);
+  const alt = L.neuesSpiel({ seed: 2 }); delete alt.manager;
+  const geladen = L.laden(JSON.stringify(alt));
+  assert.ok(geladen);
+  assert.equal(geladen.manager, null);
+});
+
 test("Start nur in Europa: Heimat des Spielers und der Rivalen", () => {
   assert.ok(L.HEIMAT.length >= 10);
   for (const id of L.HEIMAT) assert.equal(L.STADT[id].r, "europa", id);
@@ -715,4 +738,60 @@ test("Echte Heimat-Airline: Spieler und Rivalen heißen wie die Airline ihres St
   const st = L.neuesSpiel({ seed: 1, basis: "wien" });
   L.umbenennen(st, "p", "Donauflug");
   assert.equal(st.airlines.p.name, "Donauflug");
+});
+
+test("Enge Sitze plus Gourmet-Essen ist kein Trick mehr: gutes Essen wirkt in enger Kabine nur halb", () => {
+  const a = { grundsaetze: { ...L.VORLAGEN.standard, sitz: "eng", essen: "gourmet" } };
+  const b = { grundsaetze: { ...L.VORLAGEN.standard, sitz: "normal", essen: "gourmet" } };
+  assert.ok(L.profil(a).komfort < L.profil(b).komfort - 1.5);
+  assert.ok(L.GRUNDSAETZE.essen.optionen.gourmet.kosten >= 25, "Gourmet kostet wie in echt");
+  assert.ok(L.GRUNDSAETZE.sitz.optionen.eng.sitze <= 1.2, "eng heißt etwa 15 % mehr Sitze, nicht 30 %");
+});
+
+test("Startvorschläge: die große Chance verspricht am meisten, Zahlen pro Tag", () => {
+  for (const basis of ["london", "hamburg", "wien"]) {
+    const a = L.angebote(L.neuesSpiel({ seed: 1, basis }), "p");
+    const mitte = (o) => (o.von + o.bis) / 2;
+    const ch = a.find((o) => o.art === "chance"), dr = a.find((o) => o.art === "drehkreuz");
+    assert.ok(mitte(ch) >= mitte(dr), basis);
+    assert.ok(ch.bis < 200000, "pro Tag, nicht pro Woche");
+  }
+});
+
+test("Rangliste zählt erst ab Woche 2, ein neues Flugzeug zählt erst voll", () => {
+  const st = leer();
+  flug(st, "frankfurt", "paris", "falke", 7, 11);
+  const p = st.airlines.p, f = p.flotte[0];
+  const neu = L.firmenwert(st, "p");
+  st.zeit += 24 * 60;
+  assert.ok(L.firmenwert(st, "p") < neu - L.TYPEN.falke.preis * 0.3, "Flugzeug verliert über zwei Monate an Wert");
+  assert.equal(f.seit, 1);
+  assert.ok(L.REGELN.rangAb >= 7);
+});
+
+test("Rivalen fliegen deine Strecken nach (Preiskampf) und können pleitegehen", () => {
+  let duelle = 0, pleiten = 0;
+  for (const seed of [2, 3]) {
+    const st = L.neuesSpiel({ seed, basis: "london", gegner: "schwer" });
+    st.airlines.p.stil = "bot";
+    for (let d = 1; d <= 80; d++) {
+      if (d === 1) for (let i = 0; i < 3; i++) L.kiAusbauen(st, "p", { start: true });
+      else L.kiTag(st, "p");
+      const m0 = st.meldungen.length;
+      L.vorruecken(st, 24);
+      for (const m of st.meldungen.slice(m0)) { if (m.art === "duell") duelle++; if (m.art === "pleite") pleiten++; }
+    }
+  }
+  assert.ok(duelle >= 1, "mindestens ein Preiskampf in zwei Partien");
+  assert.ok(pleiten <= 3);
+});
+
+test("Der Analyst schätzt Linien der Rivalen als Spanne", () => {
+  const st = L.neuesSpiel({ seed: 2, basis: "london" });
+  for (let d = 0; d < 20; d++) L.vorruecken(st, 24);
+  const k = st.airlines.k;
+  assert.ok(k.routen.length > 0);
+  L.einstellen(st, "p", "analyst", "kern");
+  const e = L.rivalenEinschaetzung(st, "k", k.routen[0].id, L.assistent(st.airlines.p, "analyst"));
+  assert.ok(e.gewinn[0] <= e.gewinn[1]);
 });

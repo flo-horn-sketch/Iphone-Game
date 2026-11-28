@@ -674,7 +674,8 @@
     hud.name = el("div", { class: "airline-name" });
     hud.geldB = el("b", { class: "zahl" });
     hud.geldS = el("small", { class: "zahl" });
-    hud.geldK = el("button", { class: "kachel geld", onclick: zeigeKasse }, hud.name, hud.geldB, hud.geldS);
+    hud.chef = el("span", { class: "hud-chef" });
+    hud.geldK = el("button", { class: "kachel geld", onclick: zeigeKasse }, hud.chef, el("span", { class: "geld-spalte" }, hud.name, hud.geldB, hud.geldS));
     hud.tag = el("span"); hud.saison = el("span"); hud.balken = el("i"); hud.kerosin = el("span", { class: "kerosin" });
     hud.uhr = el("div", { class: "kachel uhr" }, el("div", { class: "zeile" }, hud.tag, hud.saison, hud.kerosin), el("div", { class: "balken" }, hud.balken));
     hud.tempo = el("button", { class: "kachel tempoknopf", onclick: tempoWeiter, "aria-label": "Tempo" });
@@ -744,6 +745,8 @@
     const tag = L.tagVon(st);
     const rufSig = p.name + p.farbe + Math.round(p.ruf);
     if (hud.rufSig !== rufSig) { hud.rufSig = rufSig; hud.name.replaceChildren(el("span", { class: "punkt", style: { background: p.farbe } }), p.name, el("span", { class: "ruf-chip", text: "⭐ " + Math.round(p.ruf) })); }
+    const chefSig = st.manager ? st.manager.aussehen + st.manager.name : "";
+    if (hud.chefSig !== chefSig) { hud.chefSig = chefSig; hud.chef.replaceChildren(st.manager ? managerGesicht(st.manager) : ""); hud.chef.hidden = !st.manager; }
     hud.geldB.textContent = geld(p.geld);
     hud.geldB.className = "zahl" + (p.geld < 0 ? " minus" : "");
     const gestern = p.verlauf.length ? p.verlauf[p.verlauf.length - 1] : null;
@@ -757,7 +760,7 @@
     hud.tempo.textContent = ["❚❚", "▶", "▶▶", "▶▶▶"][TEMPI.indexOf(ui.tempo)];
     hud.tempo.classList.toggle("pause", ui.tempo === 0);
     const pl = L.platz(st);
-    hud.platz.replaceChildren(el("span", { class: "stufen-bild" }, [3, 1, 2].map((i) => el("i", { class: i === pl ? "an" : "", style: { height: (i === 1 ? 14 : i === 2 ? 10 : 7) + "px" } }))), el("b", { text: pl + "." }),
+    hud.platz.replaceChildren(el("span", { class: "stufen-bild" }, [3, 1, 2].map((i) => el("i", { class: i === pl ? "an" : "", style: { height: (i === 1 ? 14 : i === 2 ? 10 : 7) + "px" } }))), el("b", { text: L.tagVon(st) < L.REGELN.rangAb ? "–" : pl + "." }),
       ...(st.rennen ? [el("span", { class: "abzeichen rennen-abzeichen", text: "🏁" })] : []));
     const frei = L.freieFlugzeuge(p).length;
     hud.frei.textContent = frei; hud.frei.style.display = frei ? "" : "none";
@@ -1293,12 +1296,21 @@
   }
 
 
+  // Was dein Analyst über die beste Linie eines Rivalen denkt. Antippen öffnet die Strecke im Editor.
+  function rivalenLinieEl(aid) {
+    const b = L.besteRivalenLinie(st, aid);
+    if (!b) return null;
+    const N = (id) => L.STADT[id].name;
+    const spanneText = b.gewinn[0] === b.gewinn[1] ? "etwa " + kurz(b.gewinn[0]) : kurz(b.gewinn[0]) + " bis " + kurz(b.gewinn[1]).replace("+", "");
+    return el("button", { class: "rival-linie", onclick: () => { if (b.duFliegst) return; editorOeffnen({ start: b.a, ziel: b.b }); } },
+      "🔎 Beste Linie " + N(b.a) + "–" + N(b.b) + ": " + spanneText + " am Tag" + (b.duFliegst ? " · fliegst du auch" : " · ✏️"));
+  }
   function zeigeRang() {
     const liste = L.rangliste(st);
     const max = Math.max(...liste.map((r) => r.wert), 1);
     const meinPlatz = liste.findIndex((x) => x.id === L.SPIELER);
     const R = st.rennen;
-    tafel("rang", "Rangliste der Welt", "gezählt wird der Firmenwert · Rivalen: " + (L.GEGNER[st.gegner] || L.GEGNER.mittel).name,
+    tafel("rang", "Rangliste der Welt", (L.tagVon(st) < L.REGELN.rangAb ? "zählt ab Tag " + L.REGELN.rangAb + " · " : "gezählt wird der Firmenwert · ") + "Rivalen: " + (L.GEGNER[st.gegner] || L.GEGNER.mittel).name,
       R ? el("div", { class: "rennen" }, el("b", { text: "🏁 " + R.text }),
         el("small", { text: `Preis ${R.preis / 1e6} Mio + Pokal · noch ${Math.max(0, R.bis - L.tagVon(st) + 1)} Tage · du: ${Math.min(L.rennenStand(st, L.SPIELER), R.soll)} / ${R.soll}` })) : null,
       liste.map((r, i) => {
@@ -1307,13 +1319,15 @@
         const laune = riv ? L.laune(st, r.id) : null;
         return el("div", { class: "rang" + (riv ? "" : " ich") },
           el("span", { class: "nr", text: ["🥇", "🥈", "🥉", "4"][i] }),
-          el("div", { class: "gesicht", style: { background: r.farbe } }, riv ? bildEl(CHEF[r.id], riv.chef[0]) : "★"),
+          riv || !st.manager ? el("div", { class: "gesicht", style: { background: r.farbe } }, riv ? bildEl(CHEF[r.id], riv.chef[0]) : "★") : managerGesicht(st.manager),
           el("div", { class: "mitte" },
-            el("b", { text: r.name + (riv ? " · " + riv.chef : " (du)") + (st.airlines[r.id].pokale ? " " + "🏆".repeat(Math.min(5, st.airlines[r.id].pokale)) : "") }),
+            el("b", { text: r.name + (riv ? " · " + riv.chef : st.manager ? " · " + st.manager.name + " (du)" : " (du)") + (st.airlines[r.id].pokale ? " " + "🏆".repeat(Math.min(5, st.airlines[r.id].pokale)) : "") }),
             el("span", { class: "blass mini", text: `${geld(r.wert)} · ${r.routen} Linien · ${r.flugzeuge} ✈` }),
             el("div", { class: "spur" }, el("i", { style: { width: (r.wert / max * 100).toFixed(1) + "%", background: r.farbe } })),
-            laune && laune.art !== "normal" ? el("div", { class: "laune " + laune.art, text: laune.text }) : spruch ? el("div", { class: "spruch", text: "„" + spruch + "“" }) : null));
-      }));
+            laune && laune.art !== "normal" ? el("div", { class: "laune " + laune.art, text: laune.text }) : spruch ? el("div", { class: "spruch", text: "„" + spruch + "“" }) : null,
+            riv ? rivalenLinieEl(r.id) : null));
+      }),
+      L.assistent(ich(), "analyst") ? null : el("div", { class: "hinweis", text: "🔎 Mit einem Assistenten siehst du hier, welche Linie der Rivalen sich am meisten rechnet." }));
     erklaeren("rangliste");
   }
 
@@ -1339,7 +1353,11 @@
         el("button", { class: "zu", text: "✕", "aria-label": "Schließen", onclick: () => { seite.remove(); ui.modal = false; } })),
       el("div", { class: "meine-reihe" },
         el("div", { class: "meine-spalte" },
-          el("b", { class: "spaltentitel", text: "Name" }),
+          el("b", { class: "spaltentitel", text: "Manager" }),
+          el("button", { class: "manager-karte", onclick: () => { seite.remove(); profilSeite((m) => { L.managerSetzen(st, m); nachAktion(); hudAktualisieren(); meineAirline(); }, meineAirline, "Fertig ✓"); } },
+            st.manager ? managerGesicht(st.manager) : el("div", { class: "gesicht mgr-gesicht" }, "?"),
+            el("span", { class: "mitte" }, el("b", { text: st.manager ? st.manager.name : "Noch kein Profil" }), el("small", { text: st.manager ? "ändern ✏️" : "Profil anlegen ✏️" }))),
+          el("b", { class: "spaltentitel", text: "Name der Airline" }),
           el("input", { class: "namensfeld", value: p.name, maxlength: 18, onchange: (e) => { L.umbenennen(st, L.SPIELER, e.target.value); nachAktion(); neu(); } }),
           el("div", { class: "farben" }, FARBEN.map((f) => el("button", { class: "farbpunkt" + (p.farbe === f ? " an" : ""), style: { background: f }, "aria-label": "Farbe", onclick: () => { L.umbenennen(st, L.SPIELER, null, f); karte.fliegerEls.forEach((x) => x.remove()); karte.fliegerEls.clear(); nachAktion(); neu(); } }))),
           el("div", { class: "zeile" }, el("span", { text: "⭐ Ruf" }), el("b", { class: "rechts", text: Math.round(p.ruf) + " / 100" })),
@@ -1466,15 +1484,18 @@
       case "bieten": return { text: `In ${N(t.stadt)} wird ein Slot um ${uhr(t.h)} Uhr vergeben. Den können wir gut brauchen: Ich würde etwa ${geld(t.betrag)} bieten.`, knopf: "🎟️ Slot ansehen" };
       case "schliessen": return { text: `${linie} verliert seit ${t.tage} Tagen Geld, und nichts hilft. Schließen bringt ${plus}.`, knopf: "Linie schließen", sicher: true };
       case "neu": return { text: `Gute Strecke gefunden: ${N(t.start)}–${N(t.ziel)} mit ${typ}. Bringt ${plus}` + (t.kosten > 0 ? `, kostet einmalig ${geld(t.kosten)}.` : "."), knopf: "✏️ Ansehen" };
+      case "mitfliegen": return { text: `${st.airlines[t.wer2].name} verdient auf ${N(t.start)}–${N(t.ziel)} gut: ${t.rivale[0] === t.rivale[1] ? "etwa " + kurz(t.rivale[0]) : kurz(t.rivale[0]) + " bis " + kurz(t.rivale[1]).replace("+", "")} am Tag. Fliegen wir mit, bringt uns das ${plus}. Rechne mit einem Preiskampf.`, knopf: "✏️ Ansehen" };
       case "plan": return { text: `${st.airlines[t.wer2 || "k"] ? "" : ""}${L.RIVALEN[tippRivale(t)] ? st.airlines[tippRivale(t)].name : "Ein Rivale"} will ${N(t.start)}–${N(t.ziel)} fliegen. Sind wir zuerst da, verzichten sie, und es lohnt sich: ${plus}.`, knopf: "✏️ Zuvorkommen" };
       default: return null;
     }
   }
+  // Ohne Analyst: eine grobe Spanne (halb so genau wie der schwächste Analyst), damit man nie ganz ohne Zahl entscheidet.
+  function grob(delta) { const d = Math.max(3000, Math.abs(delta) * 0.5); return [Math.round((delta - d) / 1000) * 1000, Math.round((delta + d) / 1000) * 1000]; }
   function tippRivale(t) { const g = st.gelegenheiten.find((x) => x.id === t.gel); return g ? g.aid : null; }
   function tippWer(t) { return L.assistent(ich(), t.rolle); }
   function tippAnnehmen(t) {
     const p = ich();
-    if (t.art === "neu" || t.art === "plan") { L.tippAusfuehren(st); editorOeffnen({ start: t.start, ziel: t.ziel, vor: { typ: t.typ } }); return; }
+    if (t.art === "neu" || t.art === "plan" || t.art === "mitfliegen") { L.tippAusfuehren(st); editorOeffnen({ start: t.start, ziel: t.ziel, vor: { typ: t.typ } }); return; }
     if (t.art === "bieten") { zeigeSlot(t.slot); return; }
     const res = L.tippAusfuehren(st);
     L.zielPruefen(st);
@@ -1543,7 +1564,7 @@
     const ctrl = L.assistent(p);
     if (ctrl) {
       teile.push(el("div", { class: "bericht-kopf" }, el("div", { class: "gesicht klein-gesicht" }, bildEl(ctrl.bild, ctrl.name[0])),
-        el("div", {}, el("b", { text: ctrl.name + " " + sterne(ctrl.sterne) }), el("small", { class: "blass", text: "Dein Assistent" }))));
+        el("div", {}, el("b", { text: ctrl.name + " " + sterne(ctrl.sterne) }), el("small", { class: "blass", text: "Dein Assistent" + (st.manager ? " · für " + L.anrede(st.manager) : "") }))));
       const hs = (p.hinweise || []).filter((h) => p.routen.some((r) => r.id === h.id));
       teile.push(hs.length ? hs.map((h) => hinweisBox(h, true)) : el("div", { class: "hinweis gruen", text: "✅ Gerade läuft alles rund." }));
       const w = p.wochenbericht;
@@ -1647,7 +1668,7 @@
       ui.angebote.map((o) => el("button", { class: "wahl angebot " + o.art, onclick: () => { ui.angebote = null; editorOeffnen({ start: p.basis, ziel: o.ziel, vor: { typ: o.typ, e1: o.plan.e1, e2: o.plan.e2 } }); } },
         el("div", { class: "mitte" },
           el("small", { class: "angebot-art", text: ANGEBOT[o.art].icon + " " + ANGEBOT[o.art].titel }),
-          el("div", { class: "angebot-zeile" }, el("b", { text: "→ " + L.STADT[o.ziel].name }), el("span", { class: "plus", text: kurz(o.von) + " bis " + kurz(o.bis) + " / Woche" })),
+          el("div", { class: "angebot-zeile" }, el("b", { text: "→ " + L.STADT[o.ziel].name }), el("span", { class: "plus", text: kurz(o.von) + " bis " + kurz(o.bis) + " am Tag" })),
           el("div", { class: "angebot-zeile" }, el("span", { text: L.TYPEN[o.typ].name }), el("span", { class: "kostet", text: "kostet " + geld(o.gesamt) })),
           el("span", { class: "grund", text: o.grund })))),
       el("button", { class: "nebenknopf", text: "✏️ Lieber selbst planen", onclick: () => { ui.angebote = null; editorOeffnen(); } }));
@@ -1861,8 +1882,11 @@
         el("div", {}, el("span", { text: "Hinflug " + uhr(zRef.ab) }), el("b", { style: { color: hin[1] }, text: hin[0] })),
         el("div", {}, el("span", { text: "Rückflug " + uhr(zRef.rueck) }), el("b", { style: { color: zur[1] }, text: zur[0] }))) : null,
       analyst ? (ratF ? ratBox(analyst, "Bringt etwa " + kurz(ratF.gewinn[0]) + " bis " + kurz(ratF.gewinn[1]) + " am Tag." + (rat && rat.typ !== typ && !flieger ? " Ich würde den " + L.TYPEN[rat.typ].kurz + " nehmen." : "") + " ✨ zeigt, was ich empfehle.") : null)
-        : el("span", { class: "blass mini", text: "Ohne Assistent gibt es keine Vorhersage in Euro. Morgen siehst du, was der Flug wirklich bringt." }),
-      test.ok && test.kosten.gesamt ? el("span", { class: "blass mini mitte-text", text: [test.kosten.flugzeug ? "Flugzeug " + geld(test.kosten.flugzeug) : null, test.kosten.slots ? "Slots " + geld(test.kosten.slots) : null].filter(Boolean).join(" · ") }) : null,
+        : null,
+      // Unten, direkt über dem Knopf: was es bringt, was es kostet, was übrig bleibt. Ohne Analyst grob geschätzt.
+      el("div", { class: "kauf-fuss" },
+      test.ok && schau ? el("span", { class: "kauf-zahl", text: (ratF ? "✨ Bringt etwa " + kurz(ratF.gewinn[0]) + " bis " + kurz(ratF.gewinn[1]).replace("+", "") : "Grob geschätzt " + kurz(grob(schau.delta)[0]) + " bis " + kurz(grob(schau.delta)[1]).replace("+", "")) + " am Tag" }) : null,
+      test.ok && test.kosten.gesamt ? el("span", { class: "blass mini mitte-text", text: [test.kosten.flugzeug ? "Flugzeug " + geld(test.kosten.flugzeug) : null, test.kosten.slots ? "Slots " + geld(test.kosten.slots) : null, "danach bleiben dir " + geld(p.geld - test.kosten.gesamt)].filter(Boolean).join(" · ") }) : null,
       el("button", { class: "hauptknopf gross-knopf", disabled: !test.ok,
         text: !test.ok ? (GRUND[test.grund] || "geht nicht") + (test.grund === "geld" && test.kosten ? " (" + geld(test.kosten.gesamt) + ")" : "") : (neuLinie ? "Linie eröffnen" : "Flug hinzufügen") + (test.kosten.gesamt ? " · " + geld(test.kosten.gesamt) : ""),
         onclick: () => {
@@ -1878,7 +1902,7 @@
           ui.editor = { start: null, ziel: null, linie: r.route.id, typ: null, stufe: "normal" };
           editorZeichnen();
           if (!gesehen("erste-linie")) tippZeigen("Deine erste Linie fliegt! Jeden Tag ein Hin- und ein Rückflug. Tippe auf „Fertig“, um zuzuschauen.", editorEl.querySelector(".hauptknopf.klein"), "unten", "Okay");
-        } }));
+        } })));
     seite.append(el("div", { class: "flug-reihe" }, spalte1, spalte2, spalte3));
     erklaeren("slots");
   }
@@ -2311,7 +2335,7 @@
       el("div", { class: "rang", style: { width: "420px" } },
         el("div", { class: "gesicht", style: { background: st.airlines[u.von].farbe, width: "60px", height: "60px" } }, bildEl(CHEF[u.von], riv.chef[0])),
         el("div", { class: "mitte" }, el("b", { style: { fontSize: "16px" }, text: riv.chef + " von " + st.airlines[u.von].name }),
-          el("div", { class: "spruch", style: { fontSize: "13px" }, text: `„Ihre Airline ist am Ende. Ich zahle Ihnen ${geld(u.preis)}, und Ihre Flugzeuge fliegen ab morgen für mich.“` }))),
+          el("div", { class: "spruch", style: { fontSize: "13px" }, text: `„${st.manager ? L.anrede(st.manager) + ", Ihre" : "Ihre"} Airline ist am Ende. Ich zahle Ihnen ${geld(u.preis)}, und Ihre Flugzeuge fliegen ab morgen für mich.“` }))),
       el("div", { class: "blass", text: "Ablehnen heißt: Du hast drei Tage, um das Konto ins Plus zu bringen. Sonst ist die Airline pleite." }),
       el("div", { class: "knopfreihe", style: { width: "420px" } },
         el("button", { class: "nebenknopf", text: "Verkaufen", onclick: () => { L.uebernahmeAnnehmen(st); ui.modal = false; seite.remove(); endeSeite(); } }),
@@ -2326,7 +2350,7 @@
     const titel = e.grund === "verkauft" ? "Verkauft an " + st.airlines[e.von].name : "Pleite";
     feld.append(el("div", { class: "seite" },
       bild("air-ende") ? el("img", { class: "bg", src: bild("air-ende"), alt: "" }) : null,
-      el("h1", {}, titel, el("small", { text: p.name + " hat " + (e.tag - 1) + " Tage durchgehalten. Bester Platz: " + (st.bestPlatz || L.platz(st)) + "." })),
+      el("h1", {}, titel, el("small", { text: (st.manager ? st.manager.name + " und " : "") + p.name + (st.manager ? " haben " : " hat ") + (e.tag - 1) + " Tage durchgehalten. Bester Platz: " + (st.bestPlatz || L.platz(st)) + "." })),
       el("button", { class: "hauptknopf", text: "Neue Airline gründen", onclick: neuStart })));
   }
 
@@ -2359,7 +2383,58 @@
               el("b", { text: g.name }), el("small", { text: g.text })))),
           el("small", { class: "blass", text: "Alle spielen nach denselben Regeln wie du und starten mit demselben Geld." })),
         altHinweis ? el("div", { class: "hinweis", style: { maxWidth: "520px" }, text: "Neue Fassung: Slots haben jetzt Uhrzeiten, und ein Flugzeug kann mehrmals am Tag fliegen. Dein alter Spielstand passt nicht mehr dazu, deshalb beginnt ein neues Spiel." }) : null,
-        el("button", { class: "hauptknopf", text: "Airline gründen ▶", onclick: () => { altHinweis = false; try { localStorage.removeItem(SPEICHER_ALT); } catch (e) { /* egal */ } heimatWaehlen(); } })].filter(Boolean));
+        el("button", { class: "hauptknopf", text: "Airline gründen ▶", onclick: () => { altHinweis = false; try { localStorage.removeItem(SPEICHER_ALT); } catch (e) { /* egal */ } profilSeite(heimatWaehlen, startSeite, "Weiter ▶"); } })].filter(Boolean));
+    }
+    zeichnen();
+    feld.append(seite);
+  }
+
+  // ---------- Manager-Profil ----------
+  // Vor der Wahl der Heimat: Wer leitet die Airline? Name, Geschlecht, Aussehen. Das letzte Profil wird vorgeschlagen.
+  const MANAGER_KEY = "luftlinie-manager";
+  let profilEntwurf = null;
+  function managerGesicht(m, gross) {
+    const look = L.AUSSEHEN.find((a) => a.id === (m && m.aussehen)) || L.AUSSEHEN[0];
+    return el("div", { class: "gesicht mgr-gesicht" + (gross ? " gross" : ""), style: { background: look.farbe } },
+      bildEl("mgr-" + look.id, m && m.name ? m.name[0].toUpperCase() : "?"));
+  }
+  // weiter(m) bekommt das fertige Profil; zurueck() geht einen Schritt zurück.
+  function profilSeite(weiter, zurueck, knopfText) {
+    const m = profilEntwurf || (st && st.manager ? { ...st.manager } : lesen(MANAGER_KEY, null)) || { name: "", geschlecht: "frau", aussehen: "frau-1" };
+    profilEntwurf = m;
+    const seite = el("div", { class: "seite profil" });
+    const fertig = () => !!L.managerPruefen(m);
+    let knopf, vorschau, anredeEl;
+    const oben = () => { vorschau.replaceWith(vorschau = managerGesicht(m, true)); textSetzen(anredeEl, fertig() ? L.anrede(L.managerPruefen(m)) : "Wie heißt du?"); knopf.disabled = !fertig(); };
+    function zeichnen() {
+      const looks = L.aussehenFuer(m.geschlecht);
+      if (!looks.some((a) => a.id === m.aussehen)) m.aussehen = looks[0].id;
+      vorschau = managerGesicht(m, true);
+      anredeEl = el("b", { class: "profil-anrede" });
+      knopf = el("button", { class: "hauptknopf", text: knopfText, onclick: () => {
+        const neu = L.managerPruefen(m);
+        if (!neu) return;
+        schreiben(MANAGER_KEY, neu);
+        profilEntwurf = null;
+        seite.remove();
+        weiter(neu);
+      } });
+      seite.replaceChildren(
+        el("button", { class: "kachel rundknopf", onclick: () => { profilEntwurf = null; seite.remove(); zurueck(); }, style: { position: "absolute", left: "calc(6px + var(--sl))", top: "calc(6px + var(--st))", height: "38px", zIndex: 9 }, "aria-label": "Zurück", text: "◀" }),
+        el("h1", {}, "Dein Profil", el("small", { text: "Du leitest die Airline. Wer bist du?" })),
+        el("div", { class: "profil-reihe" },
+          el("div", { class: "profil-links" }, vorschau, anredeEl),
+          el("div", { class: "profil-rechts" },
+            el("input", { class: "namensfeld", value: m.name, maxlength: 24, placeholder: "Vor- und Nachname", autocomplete: "name",
+              oninput: (e) => { m.name = e.target.value; oben(); },
+              onkeydown: (e) => { if (e.key === "Enter") e.target.blur(); } }),
+            el("div", { class: "segment" }, Object.entries(L.GESCHLECHTER).map(([id, g]) =>
+              el("button", { class: m.geschlecht === id ? "an" : "", "data-geschlecht": id, text: g.name, onclick: () => { m.geschlecht = id; zeichnen(); } }))),
+            el("div", { class: "looks" + (looks.length > 6 ? " viele" : "") }, looks.map((a, i) =>
+              el("button", { class: "look" + (m.aussehen === a.id ? " an" : ""), "data-look": a.id, "aria-label": "Aussehen " + (i + 1), style: { background: a.farbe },
+                onclick: () => { m.aussehen = a.id; zeichnen(); } }, bildEl("mgr-" + a.id, String(i + 1))))))),
+        knopf);
+      oben();
     }
     zeichnen();
     feld.append(seite);
@@ -2376,18 +2451,18 @@
     karteBauen();
     feld.append(el("div", { class: "heimatwahl" }, "Wo soll deine Airline zu Hause sein?", el("small", { text: "Tippe auf eine leuchtende Stadt in Europa. Du führst die Airline, die dort zu Hause ist." }),
       el("div", { class: "legende" }, Object.entries(SCHWER_FARBE).filter(([k]) => L.HEIMAT.some((id) => L.SCHWIERIGKEIT[id] === k)).map(([k, f]) => el("span", {}, el("i", { style: { background: f } }), { leicht: "leichter Start", mittel: "mittel", schwer: "schwerer Start" }[k])))),
-      el("button", { class: "kachel rundknopf", onclick: () => { ui.heimat = false; startSeite(); }, style: { position: "absolute", left: "6px", top: "6px", height: "38px", zIndex: 9 }, "aria-label": "Zurück", text: "◀" }));
+      el("button", { class: "kachel rundknopf", onclick: () => { ui.heimat = false; feld.replaceChildren(); karte = null; profilSeite(heimatWaehlen, startSeite, "Weiter ▶"); }, style: { position: "absolute", left: "6px", top: "6px", height: "38px", zIndex: 9 }, "aria-label": "Zurück", text: "◀" }));
   }
 
   function heimatGewaehlt(id) {
     ui.heimat = false;
-    st = L.neuesSpiel({ basis: id, service: "standard", gegner: gegnerWahl });
+    st = L.neuesSpiel({ basis: id, service: "standard", gegner: gegnerWahl, manager: lesen(MANAGER_KEY, null) });
     einf = { gesehen: {} };
     schreiben(EINFUEHRUNG, einf);
     lackMerken();
     spielStarten();
     angeboteZeigen();
-    tippZeigen("Willkommen bei " + st.airlines[L.SPIELER].name + "! Alle Airlines starten bei Null. Hier sind drei Vorschläge für deine erste Linie: Tippe einen an. Dann wählst du nur noch die Uhrzeiten, das Flugzeug kaufst du gleich mit.", tafelEl, "links", "Los geht's");
+    tippZeigen("Willkommen" + (st.manager ? ", " + L.anrede(st.manager) : "") + " bei " + st.airlines[L.SPIELER].name + "! Alle Airlines starten bei Null. Hier sind drei Vorschläge für deine erste Linie: Tippe einen an. Dann wählst du nur noch die Uhrzeiten, das Flugzeug kaufst du gleich mit.", tafelEl, "links", "Los geht's");
   }
 
   function spielStarten() {
