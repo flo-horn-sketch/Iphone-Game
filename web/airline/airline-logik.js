@@ -1839,7 +1839,8 @@
   function versteigerungAuswerten(st, g) {
     const gebote = [];
     const p = st.airlines[SPIELER];
-    if (g.gebot && p.geld >= g.gebot * g.stufe) gebote.push({ aid: SPIELER, betrag: g.gebot * g.stufe });
+    const zuWenig = g.gebot > 0 && p.geld < g.gebot * g.stufe;
+    if (g.gebot && !zuWenig) gebote.push({ aid: SPIELER, betrag: g.gebot * g.stufe });
     for (const aid of ["k", "s", "a"]) {
       const a = st.airlines[aid];
       if (a.konkurs) continue;
@@ -1851,6 +1852,8 @@
     const liste = gebote.map((x) => `${st.airlines[x.aid].name} ${(Math.round(x.betrag / 1e5) / 10).toLocaleString("de-DE")} Mio`).join(", ");
     if (!gebote.length) { melden(st, { art: "versteigerung", text: `🏛️ Niemand hat in ${STADT[g.stadt].name} geboten.` }); return; }
     const w = gebote[0], a = st.airlines[w.aid];
+    // Für das Ergebnis-Fenster: alle Gebote, der Sieger, und ob das eigene Gebot gezählt hat.
+    st.versteigerungErgebnis = { stadt: g.stadt, stueck: REGELN.versteigerungStueck, gebote: gebote.map((x) => ({ aid: x.aid, betrag: x.betrag })), sieger: w.aid, zuWenig, meinGebot: g.gebot * g.stufe };
     a.geld -= w.betrag;
     st.ausbau = st.ausbau || {};
     st.ausbau[g.stadt] = (st.ausbau[g.stadt] || 0) + REGELN.versteigerungStueck;

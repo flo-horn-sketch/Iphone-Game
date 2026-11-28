@@ -1776,6 +1776,7 @@
     karteZeichnen();
     tafelNeu();
     meldungenZeigen();
+    versteigerungErgebnisZeigen();
     const lt = st.letzterTag;
     if (lt && lt.tag !== ui.letzterAbschluss) {
       ui.letzterAbschluss = lt.tag;
@@ -1811,7 +1812,8 @@
 
   const MELDUNG_ICON = { bericht: "📋", mahnung: "⚠️", kredit: "🏦", uebernahme: "🤝", gerettet: "✅", aufstieg: "🏆", abstieg: "📉", stufe: "✈️", welt: "🌍", saison: "🗓️", slotweg: "🎟️", slotverloren: "🔨", kerosin: "⛽", rivale: "📰", angriff: "⚔️", ziel: "🎯" };
   function meldungenZeigen() {
-    const neu = st.meldungen.splice(0);
+    // Das Ergebnis einer Versteigerung kommt als eigenes Fenster, nicht noch einmal als Meldung.
+    const neu = st.meldungen.splice(0).filter((m) => !(st.versteigerungErgebnis && (m.art === "versteigerung" || m.art === "versteigerungsieg") && m.stadt === st.versteigerungErgebnis.stadt));
     let verzoegerung = 0;
     // Wichtiges zuerst, höchstens vier auf einmal.
     const wichtig = ["duell", "plan", "pleite", "krise", "versteigerungsieg", "rennensieg", "rennen", "ziel", "mahnung", "kredit", "uebernahme"];
@@ -1825,6 +1827,39 @@
       }, verzoegerung);
       verzoegerung += 1500;
     }
+  }
+
+  // Ergebnis einer Versteigerung als Fenster: wer wie viel geboten hat, wer gewinnt.
+  function versteigerungErgebnisZeigen() {
+    const v = st.versteigerungErgebnis;
+    if (!v || ui.modal || feld.querySelector(".ergebnis-seite")) return;
+    st.versteigerungErgebnis = null;
+    const ichDabei = v.gebote.some((x) => x.aid === L.SPIELER);
+    const gewonnen = v.sieger === L.SPIELER;
+    const hoch = Math.max(...v.gebote.map((x) => x.betrag));
+    const titel = gewonnen ? "Gewonnen!" : ichDabei ? "Leider verloren" : st.airlines[v.sieger].name + " gewinnt";
+    const unter = gewonnen ? `${v.stueck} neue Landerechte in ${L.STADT[v.stadt].name} gehören dir.`
+      : `${v.stueck} Landerechte in ${L.STADT[v.stadt].name} gehen an ${st.airlines[v.sieger].name}.`;
+    const vorher = ui.modal;
+    ui.modal = true;
+    const seite = el("div", { class: "seite ergebnis-seite" },
+      el("div", { class: "ergebnis-karte" + (gewonnen ? " sieg" : "") },
+        el("div", { class: "ergebnis-kopf" }, el("span", { class: "ergebnis-icon", text: gewonnen ? "🏆" : "🏛" }),
+          el("div", {}, el("small", { text: "Versteigerung in " + L.STADT[v.stadt].name }), el("b", { text: titel }))),
+        el("div", { class: "blass", text: unter }),
+        el("div", { class: "gebote" }, v.gebote.map((x) => {
+          const a = st.airlines[x.aid], ich2 = x.aid === L.SPIELER;
+          return el("div", { class: "gebot" + (x.aid === v.sieger ? " vorn" : "") + (ich2 ? " ich" : "") },
+            el("span", { class: "gebot-punkt", style: { background: a.farbe } }),
+            el("span", { class: "gebot-name", text: ich2 ? "Du" : a.name }),
+            el("span", { class: "gebot-balken" }, el("i", { style: { width: Math.max(6, 100 * x.betrag / hoch) + "%", background: a.farbe } })),
+            el("span", { class: "gebot-betrag zahl", text: geld(x.betrag) }),
+            el("span", { class: "gebot-krone", text: x.aid === v.sieger ? "🏆" : "" }));
+        })),
+        v.zuWenig ? el("div", { class: "hinweis orange", text: `Dein Gebot (${geld(v.meinGebot)}) zählte nicht: Es war nicht genug Geld auf dem Konto.` }) : null,
+        !ichDabei && !v.zuWenig ? el("div", { class: "blass mini", text: "Du hast diesmal nicht geboten." }) : null,
+        el("button", { class: "hauptknopf", text: "Weiter", onclick: () => { seite.remove(); ui.modal = vorher; nachAktion(); } })));
+    feld.append(seite);
   }
 
   function nachAktion() {
