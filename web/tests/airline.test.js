@@ -693,3 +693,21 @@ test("Start nur in Europa: Heimat des Spielers und der Rivalen", () => {
   // Die Welt bleibt als Ziel im Spiel.
   assert.ok(L.ALLE.some((c) => c.r !== "europa"));
 });
+
+test("Echte Heimat-Airline: Spieler und Rivalen heißen wie die Airline ihres Startflughafens", () => {
+  for (const id of L.HEIMAT) assert.ok(L.heimAirline(id), "Airline fehlt für " + id);
+  const namen = Object.values(L.HEIM_AIRLINE).map((a) => a.name);
+  assert.equal(new Set(namen).size, namen.length, "jede Airline nur einmal");
+  assert.equal(L.neuesSpiel({ seed: 1, basis: "frankfurt" }).airlines.p.name, "Lufthansa");
+  assert.equal(L.neuesSpiel({ seed: 1, basis: "paris" }).airlines.p.name, "Air France");
+  for (const basis of L.HEIMAT) {
+    const st = L.neuesSpiel({ seed: 2, basis });
+    const alle = st.reihenfolge.map((id) => st.airlines[id]);
+    for (const a of alle) assert.equal(a.name, L.heimAirline(a.basis).name, basis + " " + a.id);
+    assert.equal(new Set(alle.map((a) => a.name)).size, 4);
+  }
+  // Der Name bleibt änderbar.
+  const st = L.neuesSpiel({ seed: 1, basis: "wien" });
+  L.umbenennen(st, "p", "Donauflug");
+  assert.equal(st.airlines.p.name, "Donauflug");
+});
