@@ -651,3 +651,34 @@ test("Pleite eines Rivalen: Seine Slots werden frei, Flugzeuge gibt es nicht zu 
   assert.ok(!st.gelegenheiten.some((g) => g.art === "aufkauf" || g.art === "gebraucht"));
   assert.ok(st.pool.some((s) => s.stadt === "rom") || st.reihenfolge.some((id) => st.airlines[id].slots.some((s) => s.id !== "k1" && s.stadt === "rom")));
 });
+
+test("Rivalen: drei Stufen, gleiche Regeln, spürbar verschieden", () => {
+  assert.deepEqual(Object.keys(L.GEGNER), ["leicht", "mittel", "schwer"]);
+  assert.equal(L.neuesSpiel({ seed: 1 }).gegner, "mittel");
+  const wert = {};
+  for (const gegner of ["leicht", "schwer"]) {
+    wert[gegner] = 0;
+    for (let i = 0; i < 4; i++) {
+      const st = L.neuesSpiel({ seed: 500 + i, basis: "hamburg", gegner });
+      // Gleiches Startgeld für alle, auf jeder Stufe.
+      for (const id of ["k", "s", "a"]) assert.equal(st.airlines[id].geld, st.airlines.p.geld);
+      for (let d = 0; d < 45; d++) L.vorruecken(st, 24);
+      wert[gegner] += ["k", "s", "a"].reduce((s, id) => s + L.firmenwert(st, id), 0);
+    }
+  }
+  assert.ok(wert.schwer > wert.leicht * 1.3, `Profis ${Math.round(wert.schwer / 1e6)} Mio, Anfänger ${Math.round(wert.leicht / 1e6)} Mio`);
+});
+
+test("Rivalen: Wer überboten wird, ärgert sich und verlangt beim Handel mehr", () => {
+  const st = L.neuesSpiel({ seed: 7, basis: "hamburg", gegner: "schwer" });
+  assert.equal(L.laune(st, "k").art, "normal");
+  const s = st.pool.find((x) => !L.hatTafel(st.airlines.k, x.stadt) && !L.hatTafel(st.airlines.p, x.stadt));
+  s.bis = st.zeit + 24; s.gebote = { p: 900000 }; s.ki = { k: 200000 };
+  const w = L.poolAuswerten(st, s);
+  assert.equal(w.aid, "p");
+  assert.equal(L.laune(st, "k").art, "groll");
+  assert.ok(st.meldungen.some((m) => /ärgert sich/.test(m.text)));
+  // Der Ärger verraucht mit der Zeit.
+  for (let d = 0; d < 12; d++) L.kiTag(st, "k");
+  assert.notEqual(L.laune(st, "k").art, "groll");
+});

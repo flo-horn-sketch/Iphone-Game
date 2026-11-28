@@ -530,6 +530,7 @@
       welt: false, platz1: false, stufe: 1, pleite: { stufe: 0, tage: 0 }, ende: null,
       airlines: {}, reihenfolge: [SPIELER, "k", "s", "a"], letzterTag: null, stand: 0,
       pool: [], naechsterSlot: 1, slotUhr: {},
+      gegner: GEGNER[opt.gegner] ? opt.gegner : "mittel",
     };
     st.saat = st.rng;
     const basis = opt.basis || "frankfurt";
@@ -843,6 +844,9 @@
       r = { id: a.id + "r" + a.naechste++, a: plan.x, b: plan.y, stufe: plan.stufe || "normal", seit: tagVon(st), auslastung: null, minus: 0 };
       a.routen.push(r);
     }
+    else if (aid === SPIELER) r.alt = true;
+    // Du fliegst jetzt eine Strecke, die schon ein Rivale fliegt: Das nimmt er persönlich.
+    if (aid === SPIELER && !r.alt) for (const rid of ["k", "s", "a"]) if (st.airlines[rid] && routeVon(st.airlines[rid], plan.x, plan.y)) aergern(st, rid, 1, `${st.airlines[rid].name} ärgert sich: Du fliegst jetzt auch ${STADT[plan.x].name}–${STADT[plan.y].name}.`);
     const F = { id: a.id + "u" + a.naechste++, route: r.id, f: f.id, von: plan.x, nach: plan.y, s1: s1.id, s2: s2.id, seit: tagVon(st) };
     a.fluege.push(F);
     geaendert(st);
@@ -1653,7 +1657,7 @@
     pleitePruefen(st);
     if (st.ende) return;
     // Rivalen planen.
-    if (tag + 1 >= REGELN.rivalenAb) for (const aid of ["k", "s", "a"]) if (!st.airlines[aid].konkurs) kiTag(st, aid);
+    if (tag + 1 >= REGELN.rivalenAb) for (const aid of ["k", "s", "a"]) if (!st.airlines[aid].konkurs) { zielRivale(st, aid); kiTag(st, aid); }
     spannungTag(st, tag + 1);
     // Saisonende: Slots prüfen.
     if (tag % REGELN.saisonTage === 0) slotsPruefen(st, tag);
@@ -1854,7 +1858,8 @@
     return st.reihenfolge.map((id) => ({ id, name: st.airlines[id].name, farbe: st.airlines[id].farbe, wert: firmenwert(st, id), routen: st.airlines[id].routen.length, flugzeuge: st.airlines[id].flotte.length }))
       .sort((x, y) => y.wert - x.wert || (x.id === SPIELER) - (y.id === SPIELER));   // bei Gleichstand liegt der Rivale vorn
   }
-  function platz(st) { return rangliste(st).findIndex((x) => x.id === SPIELER) + 1; }
+  function platzVon(st, aid) { return rangliste(st).findIndex((x) => x.id === aid) + 1; }
+  function platz(st) { return platzVon(st, SPIELER); }
   function staerksterRivale(st) { return rangliste(st).find((x) => x.id !== SPIELER).id; }
 
   function rangPruefen(st) {
@@ -1893,13 +1898,13 @@
     { id: "drehkreuz", text: "Drei Linien ab deiner Heimat: dein Drehkreuz", ist: (st, p) => heimRouten(p), soll: 3, belohnung: 200000 },
     { id: "bieten", text: "Gewinne einen Slot beim Bieten", ist: (st, p) => (p.geboten ? 1 : 0), soll: 1, belohnung: 200000 },
     { id: "flotte5", text: "Baue eine Flotte aus 5 Flugzeugen", ist: (st, p) => p.flotte.length, soll: 5, belohnung: 400000 },
-    { id: "wert5", text: "Firmenwert 5 Mio", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 5, belohnung: 400000, mio: true },
-    { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st) => (platz(st) <= 3 ? 1 : 0), soll: 1, belohnung: 400000 },
-    { id: "wert10", text: "Firmenwert 10 Mio: der A321neo schafft den Atlantik", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 10, belohnung: 800000, mio: true },
-    { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st) => (platz(st) <= 2 ? 1 : 0), soll: 1, belohnung: 800000 },
+    { id: "wert5", text: "Firmenwert 5 Mio", ist: (st, p) => Math.round(firmenwert(st, p.id) / 1e5) / 10, soll: 5, belohnung: 400000, mio: true },
+    { id: "platz3", text: "Erreiche Platz 3 der Rangliste", ist: (st, p) => (platzVon(st, p.id) <= 3 ? 1 : 0), soll: 1, belohnung: 400000 },
+    { id: "wert10", text: "Firmenwert 10 Mio: der A321neo schafft den Atlantik", ist: (st, p) => Math.round(firmenwert(st, p.id) / 1e5) / 10, soll: 10, belohnung: 800000, mio: true },
+    { id: "platz2", text: "Erreiche Platz 2 der Rangliste", ist: (st, p) => (platzVon(st, p.id) <= 2 ? 1 : 0), soll: 1, belohnung: 800000 },
     { id: "kontinent", text: "Fliege auf einen anderen Kontinent", ist: (st, p) => p.routen.filter((r) => STADT[r.a].r !== STADT[r.b].r).length, soll: 1, belohnung: 1200000 },
-    { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st) => (platz(st) === 1 ? 1 : 0), soll: 1, belohnung: 2000000 },
-    { id: "wert35", text: "Firmenwert 35 Mio: die Boeing 787", ist: (st) => Math.round(firmenwert(st, SPIELER) / 1e5) / 10, soll: 35, belohnung: 2000000, mio: true },
+    { id: "platz1", text: "Werde die Nummer 1 der Welt", ist: (st, p) => (platzVon(st, p.id) === 1 ? 1 : 0), soll: 1, belohnung: 2000000 },
+    { id: "wert35", text: "Firmenwert 35 Mio: die Boeing 787", ist: (st, p) => Math.round(firmenwert(st, p.id) / 1e5) / 10, soll: 35, belohnung: 2000000, mio: true },
     { id: "kontinente4", text: "Fliege auf vier Kontinente", ist: (st, p) => new Set(p.routen.flatMap((r) => [STADT[r.a].r, STADT[r.b].r])).size, soll: 4, belohnung: 3000000 },
   ];
   // Danach endlos: Firmenwert verdoppeln.
@@ -1942,6 +1947,19 @@
     }
   }
 
+  // Gleiche Regeln für alle: Auch die Rivalen bekommen die Prämien der Ziele, wenn sie sie erreichen.
+  function zielRivale(st, aid) {
+    const a = st.airlines[aid];
+    a.ziel = a.ziel || 0;
+    let n = 0;
+    while (a.ziel < ZIELE.length && n++ < 5) {
+      const z = ZIELE[a.ziel];
+      if (z.ist(st, a) < z.soll) break;
+      a.geld += z.belohnung;
+      a.ziel++;
+    }
+  }
+
   // ---------- Rivalen (und Bot für Probepartien) ----------
   const STIL = {
     platzhirsch: { reserve: 300000, amortisation: 44, klasse: { 1: 0.7, 2: 1, 3: 1.3 }, proTag: 3, typen: ["crj900", "falke", "a320", "kranich", "albatros", "b777"] },
@@ -1951,13 +1969,70 @@
     bot: { reserve: 300000, amortisation: 40, klasse: { 1: 1, 2: 1, 3: 1 }, proTag: 3, typen: ["libelle", "dash8", "falke", "a320", "kranich", "albatros", "b777"] },
   };
 
+  // Wie gut die Rivalen spielen. Alle drei Stufen spielen nach denselben Regeln und mit demselben Startgeld wie du.
+  // Der Unterschied liegt nur im Kopf: wie oft sie handeln, wie gut sie rechnen, wie lange sie an Fehlern festhalten
+  // und wie sehr sie auf dich achten.
+  //   takt: Chance pro Tag, dass sie überhaupt etwas unternehmen · proTag: Züge an so einem Tag
+  //   irrtum: wie weit ihre Einschätzung danebenliegt · pruefen: so viele Ideen rechnen sie genau durch
+  //   zaeh: so viele Verlusttage halten sie an einer Linie fest · pause: Ruhetage nach einem Flugzeugkauf
+  //   sorgfalt: wie oft sie an größere Flugzeuge denken · bietLust: wie oft sie bei einem Slot mitbieten
+  //   wahl: aus so vielen guten Ideen greifen sie eine heraus (1 = immer die beste) · vorsicht: wie viel Geld sie liegen lassen
+  //   preise: wie oft sie den Preis einer Linie nachstellen · kabine: wie oft sie die Sitze eines neuen Flugzeugs durchrechnen
+  //   reagiert: wie stark sie auf deine Züge antworten
+  const GEGNER = {
+    leicht: { name: "Anfänger", text: "Zögern oft, verschätzen sich und achten kaum auf dich.", takt: 0.4, proTag: 1, irrtum: 0.8, pruefen: 1, wahl: 4, vorsicht: 3, zaeh: 7, pause: 3, sorgfalt: 0.25, preise: 0, kabine: 0, bietLust: 0.4, reagiert: 0.2 },
+    mittel: { name: "Erfahrene", text: "Spielen solide, machen aber Fehler und brauchen Zeit.", takt: 0.8, proTag: 2, irrtum: 0.25, pruefen: 2, wahl: 2, vorsicht: 1.3, zaeh: 5, pause: 1, sorgfalt: 0.7, preise: 0.6, kabine: 0.7, bietLust: 0.6, reagiert: 0.6 },
+    schwer: { name: "Profis", text: "Rechnen genau, handeln schnell und antworten auf jeden deiner Züge.", takt: 1, proTag: 3, irrtum: 0.08, pruefen: 3, wahl: 1, vorsicht: 1, zaeh: 3, pause: 0, sorgfalt: 1, preise: 1, kabine: 1, bietLust: 0.8, reagiert: 1 },
+  };
+  const GENAU = { takt: 1, proTag: 3, irrtum: 0, pruefen: 3, wahl: 1, vorsicht: 1, preise: 1, kabine: 1, zaeh: 3, pause: 0, sorgfalt: 1, bietLust: 0.75, reagiert: 0 };   // Bot für Probepartien und Ratgeber
+  const koennen = (st, aid) => (aid === SPIELER ? GENAU : GEGNER[st.gegner] || GEGNER.mittel);
+  // Was im Kopf eines Rivalen vorgeht: Ärger über dich (groll), Respekt nach einer Niederlage (scheu), Ruhetage (ruhe).
+  const kopf = (a) => a.kopf || (a.kopf = { groll: 0, scheu: 0, ruhe: 0 });
+  function aergern(st, aid, menge, text) {
+    const a = st.airlines[aid];
+    if (!a || aid === SPIELER || a.konkurs || st.probe) return;
+    const k = kopf(a);
+    const vorher = k.groll;
+    k.groll = Math.max(0, Math.min(3, k.groll + menge));
+    if (text && menge > 0 && vorher < 1 && k.groll >= 1 && koennen(st, aid).reagiert >= 0.5) melden(st, { art: "rivale", wer: aid, text });
+  }
+  // Eine Airline hält eine Woche lang an ihrer Meinung über eine Strecke fest, auch wenn sie falsch ist.
+  function glaube(st, aid, text) {
+    const irr = koennen(st, aid).irrtum;
+    if (!irr) return 1;
+    let h = (st.saat | 0) ^ (Math.floor(tagVon(st) / 7) * 2654435761);
+    text = aid + text;
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+    const z = () => { h ^= h >>> 13; h = Math.imul(h, 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+    return Math.exp((z() + z() + z() - 1.5) * irr * 1.6);
+  }
+  // Ein Satz dazu, wie ein Rivale gerade zu dir steht (für die Rangliste).
+  function laune(st, aid) {
+    const a = st.airlines[aid];
+    if (!a || aid === SPIELER) return null;
+    const k = kopf(a);
+    if (a.geld < 0) return { art: "not", text: "Hat Geldsorgen" };
+    if (k.scheu > 0) return { art: "scheu", text: "Geht dir aus dem Weg" };
+    if (k.groll >= 2) return { art: "wut", text: "Ist wütend auf dich" };
+    if (k.groll >= 1) return { art: "groll", text: "Ärgert sich über dich" };
+    if (k.ruhe > 0) return { art: "ruhe", text: "Ordnet gerade die eigene Flotte" };
+    return { art: "normal", text: "Kümmert sich um sich selbst" };
+  }
+
   function kiTag(st, aid) {
     const a = st.airlines[aid];
-    // Verlustrouten aufgeben.
+    const K = koennen(st, aid);
+    const k = aid === SPIELER ? { groll: 0, scheu: 0, ruhe: 0 } : kopf(a);
+    k.groll = Math.max(0, k.groll - 0.12);     // Ärger verraucht in ein paar Wochen
+    if (k.scheu > 0) k.scheu--;
+    // Verlustrouten aufgeben. Wer schlechter spielt, hält länger daran fest.
     for (const r of a.routen.slice()) {
-      if (r.minus >= 3) {
+      if (r.minus >= K.zaeh) {
+        const jung = tagVon(st) - (r.seit || 0) <= 14;
+        const gegenDich = aid !== SPIELER && routeVon(st.airlines[SPIELER], r.a, r.b);
         abziehen(st, aid, r.id);
-        if (aid !== SPIELER && zufall(st) < 0.5) melden(st, { art: "rivale", text: `${a.name} streicht einen Flug ${STADT[r.a].name}–${STADT[r.b].name}.`, wer: aid });
+        if (gegenDich && !routeVon(a, r.a, r.b)) { k.scheu = 10; k.groll = 0; }    // gegen dich verloren: erst einmal Abstand
+        if (aid !== SPIELER && zufall(st) < 0.5) melden(st, { art: "rivale", text: jung ? `${a.name} hat sich verschätzt und gibt ${STADT[r.a].name}–${STADT[r.b].name} wieder auf.` : `${a.name} streicht einen Flug ${STADT[r.a].name}–${STADT[r.b].name}.`, wer: aid });
       }
     }
     // Flugzeuge ohne Flug kosten nur Geld: nach ein paar Tagen weg damit.
@@ -1967,14 +2042,38 @@
     }
     for (const f of a.flotte) if (a.fluege.some((x) => x.f === f.id)) f.leer = 0;
     if (a.geld < 0) return;
+    // Nicht jeden Tag wird entschieden: Nach einem großen Kauf wird erst einmal geordnet, und manche zögern.
+    if (k.ruhe > 0) { k.ruhe--; return; }
+    if (K.takt < 1 && zufall(st) > K.takt) return;
     // Ab und zu ein zweites Drehkreuz.
-    if (tagVon(st) >= REGELN.aufkaufAb && zufall(st) < 0.08) {
+    if (tagVon(st) >= REGELN.aufkaufAb && zufall(st) < 0.08 * K.sorgfalt) {
       const h = drehkreuze(a).find((c) => kannAusbauen(st, aid, c) && a.geld > 3 * drehkreuzPreis(st, aid, c));
       if (h) drehkreuzAusbauen(st, aid, h);
     }
     const stil = STIL[a.stil] || STIL.bot;
-    for (let i = 0; i < stil.proTag; i++) if (!kiAusbauen(st, aid)) break;
-    if (stil.proTag) kiAufruesten(st, aid);
+    const vorher = a.flotte.length;
+    for (let i = 0; i < Math.min(stil.proTag, K.proTag); i++) if (!kiAusbauen(st, aid)) break;
+    if (a.flotte.length > vorher) k.ruhe = K.pause;
+    if (stil.proTag && (K.sorgfalt >= 1 || zufall(st) < K.sorgfalt)) kiAufruesten(st, aid);
+    if (stil.proTag && K.preise && (K.preise >= 1 || zufall(st) < K.preise)) kiPreise(st, aid);
+  }
+  // Jeden Tag eine Linie ansehen: Wäre billiger oder teurer besser?
+  function kiPreise(st, aid) {
+    const a = st.airlines[aid];
+    if (!a.routen.length) return false;
+    const r = a.routen[tagVon(st) % a.routen.length];
+    const p = st.airlines[SPIELER];
+    if (aid !== SPIELER && p.routen.some((x) => x.duell && x.duell.gegen === aid && routeVon(a, x.a, x.b) === r)) return false;   // im Preiskampf gelten andere Regeln
+    let best = null;
+    for (const stufe of Object.keys(STUFEN)) {
+      if (stufe === r.stufe) continue;
+      const pr = probe(st, aid, (kopie) => { kopie.airlines[aid].routen.find((x) => x.id === r.id).stufe = stufe; geaendert(kopie); return { ok: true }; });
+      if (pr && pr.delta > 1500 && (!best || pr.delta > best.delta)) best = { stufe, delta: pr.delta };
+    }
+    if (!best) return false;
+    r.stufe = best.stufe;
+    geaendert(st);
+    return true;
   }
 
   // Slots sind knapp: Wo mehr Gäste als Plätze da sind, kommt ein größeres Flugzeug auf die Linie.
@@ -2002,15 +2101,24 @@
   function kiAusbauen(st, aid, opt) {
     const a = st.airlines[aid];
     const stil = STIL[a.stil] || STIL.bot;
-    const reserve = opt && opt.start ? 0 : stil.reserve;
+    const K = koennen(st, aid);
+    const reserve = opt && opt.start ? 0 : stil.reserve * K.vorsicht;
     if (a.geld < reserve + 100000) return false;
     const kandidaten = kiKandidaten(st, aid, reserve);
-    // Die besten drei genau prüfen.
-    for (const c of kandidaten.slice(0, 3)) {
+    // Nicht jeder greift zur besten Idee: Manche nehmen, was ihnen gerade gefällt.
+    if (K.wahl > 1 && kandidaten.length > 1) { const i = Math.floor(zufall(st) * Math.min(K.wahl, kandidaten.length)); kandidaten.unshift(...kandidaten.splice(i, 1)); }
+    // Die besten Ideen genau prüfen. Wer sich verschätzt, sieht in der Rechnung mehr oder weniger, als wirklich drin ist.
+    for (const c of kandidaten.slice(0, K.pruefen)) {
       const pr = probe(st, aid, (kopie) => flugAnlegen(kopie, aid, c.plan));
       if (!pr) continue;
-      if (pr.delta > 0 && (c.kosten / (pr.delta * c.umlaeufe)) <= stil.amortisation) {
-        kiFliegen(st, aid, c.plan, opt);
+      const geglaubt = pr.delta + (c.glaube - 1) * Math.max(Math.abs(pr.delta), c.sch.gewinn, 3000);
+      if (geglaubt > 0 && (c.kosten / (geglaubt * c.umlaeufe)) <= stil.amortisation) {
+        const res = kiFliegen(st, aid, c.plan, opt);
+        // Wer sorgfältig ist, rechnet die Sitze des neuen Flugzeugs durch, bevor es abhebt.
+        if (res.ok && !c.plan.fid && K.kabine && (K.kabine >= 1 || zufall(st) < K.kabine)) {
+          const b = besteKabine(st, aid, res.flugzeug.id);
+          if (b) kabineSetzen(st, aid, res.flugzeug.id, b.business, b.first, true);
+        }
         return true;
       }
     }
@@ -2049,6 +2157,9 @@
     const maxWeite = Math.max(0, ...typen.map((t) => TYPEN[t].reichweite));
     const verwZusatz = verwaltungKosten(a, a.routen.length + 1) - verwaltungKosten(a);   // eine neue Linie kostet auch Verwaltung
     const ziele = new Set([...Object.keys(idx.eigene), ...Object.keys(idx.pool), a.basis, ...(a.ausgebaut || [])]);
+    const K = koennen(st, aid);
+    const kf = aid === SPIELER ? null : kopf(a);
+    const spieler = st.airlines[SPIELER];
     for (const x of new Set([a.basis, ...(a.ausgebaut || [])])) {
       for (const y of ziele) {
         if (y === x) continue;
@@ -2061,14 +2172,19 @@
           if (t.kosten.gesamt > budget) continue;
           const sch = schaetzen(st, aid, x, y, typ, t.zeiten.ab, t.zeiten.rueck, !t.kosten.frei);
           if (verwZusatz && !routeVon(a, x, y)) sch.gewinn -= verwZusatz;
-          if (sch.gewinn <= 0 || sch.auslastung < 0.4) continue;
+          const g = glaube(st, aid, [x, y].sort().join("-"));
+          // Wer sich verschätzt, hält auch eine schwache Strecke für gut (oder eine gute für schwach).
+          if (sch.gewinn + (g - 1) * 8000 <= 0 || sch.auslastung * g < 0.4) continue;
           const vorliebe = stil.klasse[STADT[y].k] * (a.stil === "premium" ? 0.6 + (STADT[x].w + STADT[y].w) : 1) * (x === a.basis ? 1.15 : 1);
           // Ein neues Flugzeug schafft später mehrere Flüge am Tag: Das rechnet die Airline beim Kauf mit ein.
           const umlaeufe = t.kosten.frei ? 1 : Math.max(1, Math.min(3, Math.floor(18 / t.zeiten.dauer)));
-          const tage = (t.kosten.gesamt + 1) / (sch.gewinn * umlaeufe);
+          const tage = (t.kosten.gesamt + 1) / (Math.max(1, sch.gewinn + (g - 1) * 8000) * umlaeufe);
           if (tage > stil.amortisation * 1.5) continue;
           t.plan.kabine = kabineStandard(typ, a);
-          kandidaten.push({ x, y, typ, plan: t.plan, kosten: t.kosten.gesamt, umlaeufe, wert: (sch.gewinn * umlaeufe * vorliebe) / Math.max(t.kosten.gesamt, 150000), tage, sch });
+          // Wer sich über dich ärgert, fliegt dir nach. Wer gerade gegen dich verloren hat, meidet deine Strecken.
+          let gegen = 1;
+          if (kf && !routeVon(a, x, y) && routeVon(spieler, x, y)) gegen = kf.scheu > 0 ? 0.25 : 1 + 0.4 * kf.groll * K.reagiert;
+          kandidaten.push({ x, y, typ, plan: t.plan, kosten: t.kosten.gesamt, umlaeufe, glaube: g, wert: (sch.gewinn * umlaeufe * vorliebe * g * gegen) / Math.max(t.kosten.gesamt, 150000), tage, sch });
         }
       }
     }
@@ -2190,10 +2306,16 @@
       const a = st.airlines[aid];
       if (!a || a.konkurs || hatTafel(a, s.stadt) || a.geld < gp * 2 || slotsFreiVon(a, s.stadt).length) continue;
       { const b = benutzteSlots(a); if (a.slots.filter((x) => !x.heim && !b.has(x.id)).length >= 2) continue; }     // erst nutzen, was man hat
+      const K = koennen(st, aid), kf = kopf(a);
       const n = slotNutzen(st, aid, s.stadt, s.h, s.id);
-      if (!n || n.gewinn * 25 < gp || zufall(st) > 0.75) continue;
+      if (!n) continue;
+      const wert = n.gewinn * 25 * glaube(st, aid, "slot" + s.stadt);      // was die Airline glaubt, dass der Slot wert ist
+      if (wert < gp || zufall(st) > K.bietLust) continue;
       const lust = a.stil === "platzhirsch" && STADT[s.stadt].k >= 2 ? 1.3 : a.stil === "billig" && STADT[s.stadt].k === 1 ? 1.2 : 1;
-      gebote[aid] = Math.max(gp, runde10k(Math.min(n.gewinn * 25, gp * (1 + zufall(st) * 0.9) * lust, a.geld * 0.3)));
+      // Wo du schon sitzt, will dich ein aufmerksamer Rivale nicht noch stärker werden lassen. Mit Ärger im Bauch erst recht.
+      const duDort = st.airlines[SPIELER].slots.some((x) => x.stadt === s.stadt) ? 1 : 0;
+      const trotz = 1 + K.reagiert * (0.15 * duDort + 0.2 * Math.min(2, kf.groll));
+      gebote[aid] = Math.max(gp, runde10k(Math.min(wert, gp * (1 + zufall(st) * 0.9) * lust * trotz, a.geld * 0.3)));
     }
     return gebote;
   }
@@ -2224,7 +2346,11 @@
     a.geld -= preis;
     st.pool = st.pool.filter((x) => x !== s);
     a.slots.push({ id: s.id, stadt: s.stadt, h: s.h, seit: tagVon(st) });
-    if (w.aid === SPIELER) a.geboten = (a.geboten || 0) + 1;
+    a.geboten = (a.geboten || 0) + 1;
+    if (w.aid === SPIELER) {
+      // Wer überboten wurde, merkt sich das.
+      for (const g of gebote) if (g.aid !== SPIELER) aergern(st, g.aid, 1, `${st.airlines[g.aid].name} ärgert sich: Du hast den Slot in ${STADT[s.stadt].name} weggeschnappt.`);
+    }
     if (mein) {
       st.bietErgebnisse = st.bietErgebnisse || [];
       st.bietErgebnisse.push({ slot: s.id, stadt: s.stadt, h: s.h, gebote: gebote.map((x) => ({ aid: x.aid, betrag: x.betrag })), sieger: w.aid, preis, zuWenig, meinGebot: mein });
@@ -2300,7 +2426,9 @@
     const s = slotVon(st.airlines[aid], sid);
     if (s.heim) return { ok: false, grund: "heim" };
     if (s.sperre && s.sperre >= tagVon(st)) return { ok: false, grund: "sperre", bis: s.sperre };
-    return { ok: true, aid, slot: s, wert: slotWertFuer(st, aid, s), grundpreis: slotGrundpreis(s.stadt, s.h) };
+    // Wer sich über dich ärgert, verkauft dir nur mit Aufschlag.
+    const groll = Math.min(2, kopf(st.airlines[aid]).groll) * koennen(st, aid).reagiert;
+    return { ok: true, aid, slot: s, wert: runde10k(slotWertFuer(st, aid, s) * (1 + 0.2 * groll)), grundpreis: slotGrundpreis(s.stadt, s.h), groll };
   }
   function handelAnbieten(st, sid, betrag, tauschId) {
     const h = handelPruefen(st, sid);
@@ -2344,6 +2472,7 @@
     if (!slotVon(p, g.slot) || a.geld < g.preis) return false;
     slotUebergeben(st, SPIELER, g.aid, g.slot);
     a.geld -= g.preis; p.geld += g.preis;
+    aergern(st, g.aid, -1);          // ein gutes Geschäft glättet die Wogen
     return true;
   }
 
@@ -2541,7 +2670,7 @@
     const a = st.airlines[aid];
     for (const s of a.slots) if (!s.heim) poolNeu(st, s.stadt, true, s.h);
     a.routen = []; a.fluege = []; a.flotte = []; a.slots = []; a.geschenk = REGELN.heimGeschenk;
-    a.geld = REGELN.startGeld * 4; a.kredit = 0; a.konkurs = false; a.minusTage = 0; a.ausgebaut = []; a.verlauf = [];
+    a.geld = REGELN.startGeld; a.kredit = 0; a.ziel = ZIELE.length; a.kopf = null; a.konkurs = false; a.minusTage = 0; a.ausgebaut = []; a.verlauf = [];
     st.plaene = (st.plaene || []).filter((x) => x.aid !== aid);
     for (const r of st.airlines[SPIELER].routen) if (r.duell && r.duell.gegen === aid) delete r.duell;
     geaendert(st);
@@ -2868,7 +2997,7 @@
     drehkreuze, rechnung, berechnen, reisende, probe, schaetzen, vorruecken, position, anziehung,
     BERATER, beraterTag, tipp, tippAusfuehren, tippWeg,
     gelegenheitAnnehmen, gelegenheitAblehnen, uebernahmeAnnehmen, uebernahmeAblehnen, tilgen,
-    firmenwert, rangliste, platz, kiTag, kiAusbauen, kiFliegen, kiKandidaten, tagesAbschluss, zielStand, zielPruefen, ZIELE,
+    GEGNER, laune, firmenwert, rangliste, platz, kiTag, kiAusbauen, kiFliegen, kiKandidaten, tagesAbschluss, zielStand, zielPruefen, ZIELE,
     bieten, poolAuswerten, slotInGefahr, tageBisSaisonende, slotNutzen, slotWertFuer, slotBesitzer, handelPruefen, handelAnbieten,
     ratSlot, ratHandel, ratGrundsatz, ratPreis, ratKauf, ratKabine, ratFlug, flugVorschau,
     trendVon, stadtTrend, vergleich, duellAntwort, drehkreuzPreis, kannAusbauen, drehkreuzAusbauen, rennenStand, wahlTreffen, wirkung, ausgebaut, KONTINENTE_PAARE: PAARE,
