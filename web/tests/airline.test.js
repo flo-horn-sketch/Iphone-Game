@@ -49,7 +49,7 @@ test("An jedem Flughafen liegt am Anfang genau ein freier Slot", () => {
 });
 
 test("Rivalen sitzen in der Nähe der Heimat, jeder woanders", () => {
-  for (const basis of ["paris", "tokio", "newyork"]) {
+  for (const basis of ["paris", "athen", "helsinki"]) {
     const st = L.neuesSpiel({ seed: 3, basis });
     const orte = st.reihenfolge.map((id) => st.airlines[id].basis);
     assert.equal(new Set(orte).size, 4);
@@ -681,4 +681,33 @@ test("Rivalen: Wer überboten wird, ärgert sich und verlangt beim Handel mehr",
   // Der Ärger verraucht mit der Zeit.
   for (let d = 0; d < 12; d++) L.kiTag(st, "k");
   assert.notEqual(L.laune(st, "k").art, "groll");
+});
+
+test("Start nur in Europa: Heimat des Spielers und der Rivalen", () => {
+  assert.ok(L.HEIMAT.length >= 10);
+  for (const id of L.HEIMAT) assert.equal(L.STADT[id].r, "europa", id);
+  for (const basis of L.HEIMAT) {
+    const st = L.neuesSpiel({ seed: 11, basis });
+    for (const id of ["k", "s", "a"]) assert.equal(L.STADT[st.airlines[id].basis].r, "europa", basis + " " + id);
+  }
+  // Die Welt bleibt als Ziel im Spiel.
+  assert.ok(L.ALLE.some((c) => c.r !== "europa"));
+});
+
+test("Echte Heimat-Airline: Spieler und Rivalen heißen wie die Airline ihres Startflughafens", () => {
+  for (const id of L.HEIMAT) assert.ok(L.heimAirline(id), "Airline fehlt für " + id);
+  const namen = Object.values(L.HEIM_AIRLINE).map((a) => a.name);
+  assert.equal(new Set(namen).size, namen.length, "jede Airline nur einmal");
+  assert.equal(L.neuesSpiel({ seed: 1, basis: "frankfurt" }).airlines.p.name, "Lufthansa");
+  assert.equal(L.neuesSpiel({ seed: 1, basis: "paris" }).airlines.p.name, "Air France");
+  for (const basis of L.HEIMAT) {
+    const st = L.neuesSpiel({ seed: 2, basis });
+    const alle = st.reihenfolge.map((id) => st.airlines[id]);
+    for (const a of alle) assert.equal(a.name, L.heimAirline(a.basis).name, basis + " " + a.id);
+    assert.equal(new Set(alle.map((a) => a.name)).size, 4);
+  }
+  // Der Name bleibt änderbar.
+  const st = L.neuesSpiel({ seed: 1, basis: "wien" });
+  L.umbenennen(st, "p", "Donauflug");
+  assert.equal(st.airlines.p.name, "Donauflug");
 });
